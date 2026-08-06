@@ -55,6 +55,10 @@ namespace eft_where_am_i
             _ = webView2_Settings.ExecuteScriptAsync($"setLogPath('{escapedLogPath}')");
             _ = webView2_Settings.ExecuteScriptAsync($"setDeadZonePercent({appSettings.dead_zone_percent})");
             _ = webView2_Settings.ExecuteScriptAsync($"setTheme('{appSettings.theme_mode}')");
+            _ = webView2_Settings.ExecuteScriptAsync(
+                $"setFeatureSettings({appSettings.ui_scale.ToString(System.Globalization.CultureInfo.InvariantCulture)}, " +
+                $"'{appSettings.quest_panel_position}', '{appSettings.quest_floor_marker_mode}', " +
+                $"{appSettings.tarkov_wall_colors.ToString().ToLowerInvariant()})");
         }
 
         private async Task InitializeWebViewUI()
@@ -121,6 +125,11 @@ namespace eft_where_am_i
 
                         // 테마 설정 전송
                         await webView2_Settings.ExecuteScriptAsync($"setTheme('{appSettings.theme_mode}')");
+
+                        await webView2_Settings.ExecuteScriptAsync(
+                            $"setFeatureSettings({appSettings.ui_scale.ToString(System.Globalization.CultureInfo.InvariantCulture)}, " +
+                            $"'{appSettings.quest_panel_position}', '{appSettings.quest_floor_marker_mode}', " +
+                            $"{appSettings.tarkov_wall_colors.ToString().ToLowerInvariant()})");
 
                         // 앱 버전 정보 전송
                         var version = Assembly.GetExecutingAssembly()
@@ -223,6 +232,14 @@ namespace eft_where_am_i
                         SaveSettings();
                         break;
 
+                    case "map-feature-settings-changed":
+                        appSettings.ui_scale = Math.Clamp(message["uiScale"]?.Value<double>() ?? 1.0, 0.65, 2.0);
+                        appSettings.quest_panel_position = message["panelPosition"]?.ToString() ?? "right";
+                        appSettings.quest_floor_marker_mode = message["markerMode"]?.ToString() ?? "arrows";
+                        appSettings.tarkov_wall_colors = message["wallColors"]?.Value<bool>() ?? false;
+                        SaveSettings();
+                        break;
+
                     case "auto-detect-log-path":
                         try
                         {
@@ -257,7 +274,17 @@ namespace eft_where_am_i
         {
             try
             {
-                var mgr = new UpdateManager(new GithubSource("https://github.com/karpitony/eft-where-am-i", null, false));
+                if (string.IsNullOrWhiteSpace(appSettings.update_feed_url))
+                {
+                    MessageBox.Show(
+                        "This modified build does not have an update channel configured yet.",
+                        "Update channel",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
+                    return;
+                }
+
+                var mgr = new UpdateManager(new GithubSource(appSettings.update_feed_url, null, false));
                 
                 if (System.Diagnostics.Debugger.IsAttached)
                 {

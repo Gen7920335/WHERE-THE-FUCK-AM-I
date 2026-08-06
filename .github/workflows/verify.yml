@@ -1,0 +1,59 @@
+name: Verify
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+          cache: npm
+          cache-dependency-path: eft-where-am-i/package-lock.json
+
+      - name: Install locked frontend dependencies
+        working-directory: eft-where-am-i
+        run: npm ci
+
+      - name: Audit frontend dependencies
+        working-directory: eft-where-am-i
+        run: npm audit --audit-level=high
+
+      - name: Build CSS
+        working-directory: eft-where-am-i
+        run: npm run build:css
+
+      - name: Validate JSON assets
+        shell: pwsh
+        run: |
+          @(
+            'eft-where-am-i/assets/settings.json',
+            'eft-where-am-i/floor_db.json',
+            'eft-where-am-i/translations/en.json',
+            'eft-where-am-i/translations/ko.json'
+          ) | ForEach-Object {
+            Get-Content -Raw -Encoding UTF8 -LiteralPath $_ | ConvertFrom-Json | Out-Null
+          }
+
+      - name: Restore
+        run: dotnet restore eft-where-am-i/eft-where-am-i.csproj
+
+      - name: Build
+        run: dotnet build eft-where-am-i/eft-where-am-i.csproj -c Release --no-restore
+
+      - name: Check generated CSS and whitespace
+        run: git diff --check

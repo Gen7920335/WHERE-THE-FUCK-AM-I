@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EFT Where Am I - Local Map</title>
+  <link rel="stylesheet" href="map.css">
+</head>
+<body>
+  <main id="app" class="app-shell">
+    <header class="map-toolbar" aria-label="Map controls">
+      <button id="questToggle" type="button" title="Quest pins">Quests</button>
+      <div id="floorButtons" class="floor-buttons" aria-label="Floors"></div>
+      <span class="toolbar-spacer"></span>
+      <button id="wallToggle" type="button" aria-pressed="false">Wall colors: off</button>
+      <button id="markerMode" type="button">Floor markers: arrows</button>
+      <button id="panelPosition" type="button">Panel: right</button>
+      <button id="zoomOut" type="button" aria-label="Zoom out">−</button>
+      <button id="zoomReset" type="button">Fit</button>
+      <button id="zoomIn" type="button" aria-label="Zoom in">+</button>
+    </header>
+
+    <section id="content" class="content panel-right">
+      <aside id="questDrawer" class="quest-drawer" aria-label="Quest list">
+        <div class="drawer-header">
+          <strong>Map quests</strong>
+          <input id="questSearch" type="search" placeholder="Search quests">
+        </div>
+        <div id="questStatus" class="status">Loading quest data…</div>
+        <div id="questList" class="quest-list"></div>
+      </aside>
+
+      <section id="mapViewport" class="map-viewport" aria-label="Tarkov map">
+        <div id="mapWorld" class="map-world">
+          <div id="svgHost" class="svg-host"></div>
+          <div id="markerLayer" class="marker-layer"></div>
+        </div>
+        <div id="mapStatus" class="map-status">Loading map…</div>
+      </section>
+
+      <aside id="requirementsPanel" class="requirements-panel" aria-label="Pinned quest requirements">
+        <div id="requirementsHandle" class="requirements-header">
+          <strong>Pinned quest requirements</strong>
+          <span id="pinCount" class="pin-count">0</span>
+        </div>
+        <div id="requirementsList" class="requirements-list">
+          <p class="empty-state">Pin a quest to show only its requirements here.</p>
+        </div>
+      </aside>
+    </section>
+  </main>
+  <script src="map.js"></script>
+</body>
+</html>

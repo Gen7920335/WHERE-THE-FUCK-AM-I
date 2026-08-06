@@ -142,6 +142,37 @@
     </div>
   </section>
 
+  <section class="mb-6">
+    <p class="mb-2 text-xl">Map interface</p>
+    <div class="flex flex-col items-start space-y-3">
+      <label class="flex items-center space-x-3">
+        <span class="w-48">UI scale</span>
+        <input id="uiScaleSlider" type="range" min="65" max="200" step="5" value="100" oninput="updateFeatureSettings()" class="w-64">
+        <span id="uiScaleValue">100%</span>
+      </label>
+      <label class="flex items-center space-x-3">
+        <span class="w-48">Quest panel position</span>
+        <select id="questPanelPosition" onchange="updateFeatureSettings()" class="border rounded px-3 py-1.5 bg-white text-gray-900">
+          <option value="right">Right</option>
+          <option value="bottom">Bottom</option>
+          <option value="floating">Floating / draggable</option>
+        </select>
+      </label>
+      <label class="flex items-center space-x-3">
+        <span class="w-48">Off-floor quest markers</span>
+        <select id="questFloorMarkerMode" onchange="updateFeatureSettings()" class="border rounded px-3 py-1.5 bg-white text-gray-900">
+          <option value="arrows">Floor arrows</option>
+          <option value="opacity">Semi-transparent</option>
+          <option value="both">Arrows + transparency</option>
+        </select>
+      </label>
+      <label class="flex items-center space-x-3">
+        <input id="tarkovWallColors" type="checkbox" onchange="updateFeatureSettings()">
+        <span>In-game-style wall palette (experimental)</span>
+      </label>
+    </div>
+  </section>
+
   <!-- App Version Settings -->
   <section class="mb-6">
     <p id="appVersionText" class="mb-2 text-xl">
@@ -321,6 +352,27 @@
       } catch (error) {
         console.error("setDeadZonePercent 오류 발생: ", error);
       }
+    }
+
+    function setFeatureSettings(uiScale, panelPosition, markerMode, wallColors) {
+      const scale = document.getElementById('uiScaleSlider');
+      scale.value = Math.round((Number(uiScale) || 1) * 100);
+      document.getElementById('uiScaleValue').textContent = scale.value + '%';
+      document.getElementById('questPanelPosition').value = panelPosition || 'right';
+      document.getElementById('questFloorMarkerMode').value = markerMode || 'arrows';
+      document.getElementById('tarkovWallColors').checked = Boolean(wallColors);
+    }
+
+    function updateFeatureSettings() {
+      const scale = Number(document.getElementById('uiScaleSlider').value) / 100;
+      document.getElementById('uiScaleValue').textContent = Math.round(scale * 100) + '%';
+      window.chrome.webview.postMessage(JSON.stringify({
+        action: 'map-feature-settings-changed',
+        uiScale: scale,
+        panelPosition: document.getElementById('questPanelPosition').value,
+        markerMode: document.getElementById('questFloorMarkerMode').value,
+        wallColors: document.getElementById('tarkovWallColors').checked
+      }));
     }
 
     // 데드존 슬라이더 변경 시 호출

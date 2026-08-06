@@ -411,3 +411,15 @@ FodyWeavers.xsd
 *.sln.iml
 
 # End of https://www.toptal.com/developers/gitignore/api/csharp
+
+# Repository-local SDKs installed by scripts/bootstrap.ps1
+.tools/
+
+# Local build and packaging output
+artifacts/
+
+# Runtime state when the executable is launched outside bin/obj
+app.log
+quest_saves.db
+quest_saves.db-shm
+quest_saves.db-wal

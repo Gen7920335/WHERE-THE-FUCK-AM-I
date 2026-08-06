@@ -309,5 +309,10 @@ namespace eft_where_am_i.Classes
         public string latest_map { get; set; } = "ground-zero";
         public int dead_zone_percent { get; set; } = 93;
         public Dictionary<string, bool> panel_hidden_per_map { get; set; } = new Dictionary<string, bool>();
+        public double ui_scale { get; set; } = 1.0;
+        public string quest_panel_position { get; set; } = "right";
+        public string quest_floor_marker_mode { get; set; } = "arrows";
+        public bool tarkov_wall_colors { get; set; } = false;
+        public string update_feed_url { get; set; } = string.Empty;
     }
 }

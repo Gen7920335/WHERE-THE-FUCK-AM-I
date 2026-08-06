@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using eft_where_am_i;
+using eft_where_am_i.Classes;
 using Velopack;
 using Velopack.Sources;
 namespace eft_where_am_i_chasrp
@@ -119,7 +120,13 @@ namespace eft_where_am_i_chasrp
         {
             try
             {
-                var mgr = new UpdateManager(new GithubSource("https://github.com/karpitony/eft-where-am-i", null, false));
+                string updateFeedUrl = SettingsHandler.Instance.GetSettings().update_feed_url;
+                if (string.IsNullOrWhiteSpace(updateFeedUrl))
+                {
+                    return;
+                }
+
+                var mgr = new UpdateManager(new GithubSource(updateFeedUrl, null, false));
                 
                 // 개발 환경(디버거 모드)일 경우에만 건너뛰고, 무설치(Portable) 형태로 압축을 풀어 쓰는 유저도 업데이트를 받을 수 있게 합니다.
                 if (System.Diagnostics.Debugger.IsAttached)

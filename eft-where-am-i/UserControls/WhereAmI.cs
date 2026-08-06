@@ -52,10 +52,7 @@ namespace eft_where_am_i
             "lighthouse",
             "reserve",
             "streets",
-            "lab",
-            "labyrinth",
-            "terminal",
-            "icebreaker"
+            "lab"
         };
         private string siteUrl;
         private bool whereAmIClick = false;
@@ -76,7 +73,7 @@ namespace eft_where_am_i
             appSettings ??= settingsHandler.GetSettings();
             ApplyTheme();
             ApplyTranslations();
-            siteUrl = $"https://tarkov-market.com/maps/{appSettings.latest_map}";
+            siteUrl = $"https://eft-map.local/map.html?map={Uri.EscapeDataString(appSettings.latest_map)}";
 
             // Load 이벤트 핸들러 등록
             this.Load += WhereAmI_Load;
@@ -129,6 +126,11 @@ namespace eft_where_am_i
             ApplyTheme();
             ApplyTranslations();
             string language = appSettings.language;
+
+            if (webView2.CoreWebView2 != null)
+            {
+                await ApplyMapConfigurationAsync();
+            }
 
             // webView2_panel_ui.CoreWebView2가 null이 아닌지 확인하여
             // 컨트롤이 초기화되었을 때만 스크립트를 실행합니다.
@@ -248,6 +250,11 @@ namespace eft_where_am_i
                 // 사용자 데이터 폴더를 지정하여 새로운 WebView2 환경 생성
                 env = await CoreWebView2Environment.CreateAsync(null, userDataFolder);
                 await webView2.EnsureCoreWebView2Async(env);
+                webView2.CoreWebView2.SetVirtualHostNameToFolderMapping(
+                    "eft-map.local",
+                    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "html"),
+                    CoreWebView2HostResourceAccessKind.Allow
+                );
             }
             catch (COMException comEx) when (comEx.ErrorCode == unchecked((int)0x8007139F))
             {
@@ -509,7 +516,7 @@ namespace eft_where_am_i
             }
         }
 
-        private void HandleMapSelection(string selectedMap)
+        private async void HandleMapSelection(string selectedMap)
         {
             if (!string.IsNullOrEmpty(selectedMap))
             {
@@ -517,10 +524,13 @@ namespace eft_where_am_i
 
                 appSettings.latest_map = selectedMap;
                 SaveSettings();  // 설정 저장
-                siteUrl = $"https://tarkov-market.com/maps/{selectedMap}";
-                webView2.Source = new Uri(siteUrl);
-                whereAmIClick = false;
-                WmiInitialize();
+                siteUrl = $"https://eft-map.local/map.html?map={Uri.EscapeDataString(selectedMap)}";
+                if (webView2.CoreWebView2 != null)
+                {
+                    string mapJson = Newtonsoft.Json.JsonConvert.SerializeObject(selectedMap);
+                    await webView2.ExecuteScriptAsync($"window.eftMap?.setMap({mapJson})");
+                    await RestoreQuestsAsync(selectedMap);
+                }
 
                 // 퀘스트 복원/리스너 주입은 NavigationCompleted 핸들러에서 처리
             }
@@ -529,6 +539,13 @@ namespace eft_where_am_i
         private async void WebView2_NavigationCompleted(object sender, CoreWebView2NavigationCompletedEventArgs e)
         {
             if (!e.IsSuccess) return;
+
+            if (string.Equals(webView2.Source?.Host, "eft-map.local", StringComparison.OrdinalIgnoreCase))
+            {
+                await ApplyMapConfigurationAsync();
+                await RestoreQuestsAsync(appSettings.latest_map);
+                return;
+            }
 
             // jsExecutor가 아직 초기화되지 않은 경우 무시
             if (jsExecutor == null) return;
@@ -570,6 +587,10 @@ namespace eft_where_am_i
 
         private async void CoreWebView2_SourceChanged(object sender, CoreWebView2SourceChangedEventArgs e)
         {
+            if (string.Equals(webView2.Source?.Host, "eft-map.local", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
             // URL 변경 감지: 맵 slug(/maps/{slug})가 실제로 바뀐 경우에만 복원 로직 실행
             string currentUrl = webView2.Source?.ToString();
             string mapName = TryExtractMapNameFromUrl(currentUrl);
@@ -647,6 +668,13 @@ namespace eft_where_am_i
                 return;
             }
 
+            if (string.Equals(webView2.Source?.Host, "eft-map.local", StringComparison.OrdinalIgnoreCase))
+            {
+                bool shouldHide = !forceOpen && appSettings.panel_hidden_per_map.TryGetValue(mapName, out bool hidden) && hidden;
+                await webView2.ExecuteScriptAsync($"document.getElementById('requirementsPanel').hidden = {shouldHide.ToString().ToLowerInvariant()}");
+                return;
+            }
+
             if (forceOpen)
             {
                 await jsExecutor.OpenPanelIfHiddenAsync(3, 100);
@@ -716,8 +744,81 @@ namespace eft_where_am_i
             return files.FirstOrDefault()?.Name;
         }
 
+        private async Task ApplyMapConfigurationAsync()
+        {
+            if (webView2.CoreWebView2 == null)
+            {
+                return;
+            }
+
+            var options = new
+            {
+                map = appSettings.latest_map,
+                uiScale = appSettings.ui_scale,
+                panelPosition = appSettings.quest_panel_position,
+                markerMode = appSettings.quest_floor_marker_mode,
+                wallColors = appSettings.tarkov_wall_colors,
+                autoPanning = appSettings.auto_panning
+            };
+            string optionsJson = Newtonsoft.Json.JsonConvert.SerializeObject(options);
+            await webView2.ExecuteScriptAsync($"window.eftMap?.configure({optionsJson})");
+        }
+
+        private async Task SendScreenshotPositionToMapAsync(string screenshotFileName)
+        {
+            string filename = Path.GetFileNameWithoutExtension(screenshotFileName);
+            string[] parts = filename.Split('_');
+            if (parts.Length < 3)
+            {
+                AppLogger.Warn("WhereAmI", $"Unsupported screenshot filename: {screenshotFileName}");
+                return;
+            }
+
+            string[] coordinates = parts[1].Split(',');
+            string[] quaternion = parts[2].Split(',');
+            if (coordinates.Length < 3 || quaternion.Length < 4)
+            {
+                AppLogger.Warn("WhereAmI", $"Incomplete position data: {screenshotFileName}");
+                return;
+            }
+
+            static bool TryNumber(string value, out double number) => double.TryParse(
+                value.Trim(),
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out number);
+
+            if (!TryNumber(coordinates[0], out double x) ||
+                !TryNumber(coordinates[1], out double y) ||
+                !TryNumber(coordinates[2], out double z) ||
+                !TryNumber(quaternion[0], out double qx) ||
+                !TryNumber(quaternion[1], out double qy) ||
+                !TryNumber(quaternion[2], out double qz) ||
+                !TryNumber(quaternion[3], out double qw))
+            {
+                AppLogger.Warn("WhereAmI", $"Invalid numeric position data: {screenshotFileName}");
+                return;
+            }
+
+            string positionJson = Newtonsoft.Json.JsonConvert.SerializeObject(new { x, y, z, qx, qy, qz, qw });
+            await webView2.ExecuteScriptAsync($"window.eftMap?.setPlayerPosition({positionJson})");
+
+            string floorName = floorManager?.GetFloorName(appSettings.latest_map, x, y, z);
+            if (!string.IsNullOrWhiteSpace(floorName))
+            {
+                string floorJson = Newtonsoft.Json.JsonConvert.SerializeObject(floorName);
+                await webView2.ExecuteScriptAsync($"window.eftMap?.selectFloor({floorJson})");
+            }
+        }
+
         private async void WmiInitialize()
         {
+            if (string.Equals(webView2.Source?.Host, "eft-map.local", StringComparison.OrdinalIgnoreCase))
+            {
+                await ApplyMapConfigurationAsync();
+                return;
+            }
+
             await Task.Delay(4000);
             await jsExecutor.ClickButtonAsync(Constants.FULL_SCREEN_BUTTON_SELECTOR);
             if (!whereAmIClick)
@@ -734,6 +835,12 @@ namespace eft_where_am_i
         {
             string screenshot = GetLatestFile();
             if (screenshot == null) return;
+
+            if (string.Equals(webView2.Source?.Host, "eft-map.local", StringComparison.OrdinalIgnoreCase))
+            {
+                await SendScreenshotPositionToMapAsync(screenshot);
+                return;
+            }
 
             if (!await jsExecutor.CheckInputAble())
             {
@@ -861,11 +968,23 @@ namespace eft_where_am_i
 
         private async void btnHideShowPannel_Click(object sender, EventArgs e)
         {
+            if (string.Equals(webView2.Source?.Host, "eft-map.local", StringComparison.OrdinalIgnoreCase))
+            {
+                await webView2.ExecuteScriptAsync("window.eftMap?.toggleRequirements()");
+                return;
+            }
             await jsExecutor.ClickButtonAsync(Constants.HIDE_SHOW_PANNE_BUTTON_SELECTOR);
         }
 
         private async Task SavePanelStateAsync()
         {
+            if (string.Equals(webView2.Source?.Host, "eft-map.local", StringComparison.OrdinalIgnoreCase))
+            {
+                string result = await webView2.ExecuteScriptAsync("Boolean(document.getElementById('requirementsPanel')?.hidden)");
+                appSettings.panel_hidden_per_map[appSettings.latest_map] = string.Equals(result, "true", StringComparison.OrdinalIgnoreCase);
+                SaveSettings();
+                return;
+            }
             await Task.Delay(500); // 버튼 클릭 처리 완료 대기
             bool isHidden = await jsExecutor.IsPanelHiddenAsync();
             appSettings.panel_hidden_per_map[appSettings.latest_map] = isHidden;
@@ -874,6 +993,11 @@ namespace eft_where_am_i
 
         private async void btnFullScreen_Click(object sender, EventArgs e)
         {
+            if (string.Equals(webView2.Source?.Host, "eft-map.local", StringComparison.OrdinalIgnoreCase))
+            {
+                await webView2.ExecuteScriptAsync("document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()");
+                return;
+            }
             await jsExecutor.ClickButtonAsync(Constants.FULL_SCREEN_BUTTON_SELECTOR);
         }
 
@@ -886,7 +1010,18 @@ namespace eft_where_am_i
         {
             try
             {
+                if (questRepository == null)
+                {
+                    return;
+                }
                 var quests = questRepository.GetQuests(mapName);
+                if (string.Equals(webView2.Source?.Host, "eft-map.local", StringComparison.OrdinalIgnoreCase))
+                {
+                    string questsJson = Newtonsoft.Json.JsonConvert.SerializeObject(quests);
+                    await webView2.ExecuteScriptAsync($"window.eftMap?.setPinnedQuests({questsJson})");
+                    return;
+                }
+
                 foreach (var questName in quests)
                 {
                     await jsExecutor.SelectQuestByNameAsync(questName);
@@ -951,6 +1086,26 @@ namespace eft_where_am_i
 
                 switch (action.ToLower())
                 {
+                    case "map-ready":
+                        await ApplyMapConfigurationAsync();
+                        await RestoreQuestsAsync(appSettings.latest_map);
+                        break;
+
+                    case "panel-position-changed":
+                        appSettings.quest_panel_position = message["position"]?.ToString() ?? "right";
+                        SaveSettings();
+                        break;
+
+                    case "marker-mode-changed":
+                        appSettings.quest_floor_marker_mode = message["mode"]?.ToString() ?? "arrows";
+                        SaveSettings();
+                        break;
+
+                    case "wall-colors-changed":
+                        appSettings.tarkov_wall_colors = message["enabled"]?.Value<bool>() ?? false;
+                        SaveSettings();
+                        break;
+
                     case "polygon-vertex-added":
                         // Vertex added on map - currently handled in JS, no C# action needed
                         break;
@@ -1122,6 +1277,13 @@ namespace eft_where_am_i
             if (this.InvokeRequired)
             {
                 this.Invoke(new Action(() => OnFloorHotkeyPressed(keyIndex)));
+                return;
+            }
+
+            if (string.Equals(webView2.Source?.Host, "eft-map.local", StringComparison.OrdinalIgnoreCase))
+            {
+                int floorIndex = keyIndex == 0 ? 0 : keyIndex;
+                await webView2.ExecuteScriptAsync($"window.eftMap?.selectFloorByIndex({floorIndex})");
                 return;
             }
 
