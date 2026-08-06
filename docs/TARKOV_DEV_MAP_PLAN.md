@@ -26,18 +26,18 @@ EFT screenshot filename
   -> tarkov.dev coordinate rotation and bounds
   -> player marker and heading
 
-TarkovData quest metadata
-  -> objective map id + GPS percentages + SVG floor id
+tarkov.dev task snapshot
+  -> objective world coordinates + current SVG floor extents
   -> pinned quest markers
   -> floor-rank delta
   -> arrows and/or opacity
 ```
 
-The current renderer fetches SVGs from `https://assets.tarkov.dev/maps/svg/`
-and quest metadata from the source-shared TarkovData repository. Both endpoints
-send permissive CORS headers. Keeping the renderer local means the application
-owns its DOM, state, marker behavior, and panel layout; a third-party page DOM is
-no longer part of the runtime contract.
+The current renderer fetches SVGs from `https://assets.tarkov.dev/maps/svg/`.
+Quest and map-marker data are generated from versioned tarkov.dev JSON snapshots
+and bundled locally because the JSON endpoint does not expose a browser CORS
+contract. The application owns its DOM, state, marker behavior, and panel
+layout; a third-party page DOM is no longer part of the runtime contract.
 
 ## Implemented foundation
 
@@ -50,12 +50,15 @@ no longer part of the runtime contract.
 - The settings page and map toolbar can change the new options.
 - Screenshot coordinates and quaternion direction are sent directly to the
   local renderer.
+- Offline snapshots contain 16,188 extraction, transit, spawn, boss, lock,
+  hazard, container, loose-item, switch, stationary-weapon, and BTR positions.
+- Layer filters, item/key/location search, focused item overlays, marker detail
+  cards, ruler measurements, fullscreen, and hide-panels controls are local.
+- Current tarkov.dev height extents and building bounds drive off-floor marker
+  opacity where the source data provides precise rules.
 
 ## Required data work before a public release
 
-- Replace the legacy quest GPS feed with current tarkov.dev objective-zone data
-  where current data supplies equivalent positions. Keep a versioned cache for
-  offline/error fallback.
 - Validate player-coordinate calibration on each map with two or more known EFT
   screenshot positions. Bounds and rotations are implemented, but must be
   checked against live screenshots.
@@ -80,4 +83,3 @@ no longer part of the runtime contract.
   redistribution terms or keep the runtime-fetch model and show source credits.
 - Do not copy RE3MR map assets into a commercial release; their published
   Creative Commons terms include NonCommercial and ShareAlike restrictions.
-

@@ -46,6 +46,7 @@ Write-Host "Validating JSON assets..."
 @(
     (Join-Path $ProjectDir "assets\settings.json"),
     (Join-Path $ProjectDir "floor_db.json"),
+    (Join-Path $ProjectDir "html\map-markers.json"),
     (Join-Path $ProjectDir "html\quest-locations.json"),
     (Join-Path $ProjectDir "translations\en.json"),
     (Join-Path $ProjectDir "translations\ko.json")
@@ -68,6 +69,7 @@ $OutputDir = Join-Path $ProjectDir "bin\$Configuration\net10.0-windows"
     "html\map.css",
     "html\map.html",
     "html\map.js",
+    "html\map-markers.json",
     "html\panel.html",
     "html\quest-locations.json",
     "html\settings.html",

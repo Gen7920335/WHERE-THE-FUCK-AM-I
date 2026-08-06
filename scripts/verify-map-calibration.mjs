@@ -53,4 +53,21 @@ for (const [key, map] of Object.entries(maps)) {
 }
 
 if (maxError > 1e-9) throw new Error(`Anchor projection error ${maxError}% exceeds tolerance`);
-console.log(`Verified ${Object.keys(maps).length} maps × 3 anchors; max projection error ${maxError}%${sourceMaps ? "; source bounds match" : ""}`);
+const markerSnapshot = JSON.parse(await readFile(resolve(repoRoot, "eft-where-am-i/html/map-markers.json"), "utf8"));
+const markerCollections = ["spawns", "bosses", "extracts", "transits", "locks", "hazards", "containers", "looseLoot", "switches", "stationaryWeapons", "btrStops"];
+let markerCount = 0;
+for (const map of Object.values(maps)) {
+  const markerMap = markerSnapshot.maps.find(candidate => candidate.id === map.tdevId);
+  if (!markerMap) throw new Error(`Marker snapshot is missing map ${map.tdevId}`);
+  for (const collection of markerCollections) {
+    for (const marker of markerMap[collection] || []) {
+      const position = marker.position;
+      if (!Array.isArray(position) || position.length !== 3 || position.some(value => !Number.isFinite(value))) {
+        throw new Error(`${markerMap.name}/${collection}: invalid marker position`);
+      }
+      markerCount++;
+    }
+  }
+}
+if (markerCount < 15000) throw new Error(`Marker snapshot unexpectedly contains only ${markerCount} entries`);
+console.log(`Verified ${Object.keys(maps).length} maps × 3 anchors; max projection error ${maxError}%${sourceMaps ? "; source bounds match" : ""}; ${markerCount} marker positions`);

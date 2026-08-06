@@ -2,6 +2,7 @@
   "use strict";
 
   const QUEST_DATA_URL = "quest-locations.json";
+  const MARKER_DATA_URL = "map-markers.json";
   const SVG_ROOT = "https://assets.tarkov.dev/maps/svg";
   const MAPS = {
     factory: { dataKey: "factory", id: 0, tdevId: "55f2d3fd4bdc2d5f408b4567", svg: "Factory.svg", floors: ["Basement", "Ground_Floor", "Second_Floor", "Third_Floor"], defaultFloor: "Ground_Floor", rotation: 90, bounds: [[77, -64.5], [-65.5, 67.4]], anchors: [{ world: [77, 67.4], map: [0, 0] }, { world: [77, -64.5], map: [100, 0] }, { world: [-65.5, 67.4], map: [0, 100] }] },
@@ -16,11 +17,38 @@
     "ground-zero": { dataKey: "groundzero", id: 9, tdevId: "653e6760052c01c1c805532f", svg: "GroundZero.svg", floors: ["Underground_Level", "Ground_Level", "Second_Floor", "Third_Floor"], defaultFloor: "Ground_Level", rotation: 180, bounds: [[249, -124], [-99, 364]], anchors: [{ world: [249, -124], map: [0, 0] }, { world: [-99, -124], map: [100, 0] }, { world: [249, 364], map: [0, 100] }] }
   };
   const FLOOR_ALIASES = {};
+  const LAYERS = [
+    { id: "extract-pmc", group: "Extractions", label: "PMC extraction", symbol: "E", color: "#47d16c" },
+    { id: "extract-scav", group: "Extractions", label: "Scav extraction", symbol: "S", color: "#7fc85a" },
+    { id: "extract-coop", group: "Extractions", label: "Co-op extraction", symbol: "C", color: "#52d4bd" },
+    { id: "transit", group: "Extractions", label: "Transit", symbol: "T", color: "#52a7ff" },
+    { id: "spawn-pmc", group: "Spawns", label: "PMC spawn", symbol: "P", color: "#74b9ff" },
+    { id: "spawn-scav", group: "Spawns", label: "Scav spawn", symbol: "S", color: "#9acd63" },
+    { id: "spawn-aipmc", group: "Spawns", label: "AI PMC spawn", symbol: "A", color: "#82aaff" },
+    { id: "spawn-sniper", group: "Spawns", label: "Sniper Scav", symbol: "N", color: "#ffb65c" },
+    { id: "boss", group: "Spawns", label: "Boss spawn", symbol: "B", color: "#ef6262" },
+    { id: "lock", group: "Usable", label: "Locked door / key", symbol: "K", color: "#d7b96f" },
+    { id: "switch", group: "Usable", label: "Switch", symbol: "W", color: "#cfa7ff" },
+    { id: "stationary", group: "Usable", label: "Stationary weapon", symbol: "G", color: "#ff8e5c" },
+    { id: "btr", group: "Usable", label: "BTR stop", symbol: "R", color: "#ad9b7b" },
+    { id: "hazard-mine", group: "Hazards", label: "Minefield", symbol: "!", color: "#ff5a5a" },
+    { id: "hazard-sniper", group: "Hazards", label: "Sniper boundary", symbol: "!", color: "#ff925a" },
+    { id: "container", group: "Loot", label: "Loot container", symbol: "L", color: "#c99d65" },
+    { id: "loose-item", group: "Loot", label: "Loose item", symbol: "I", color: "#ffd166" }
+  ];
+  const LAYER_BY_ID = new Map(LAYERS.map(layer => [layer.id, layer]));
 
   const state = {
     mapKey: new URLSearchParams(location.search).get("map") || "interchange",
     map: null,
     quests: [],
+    markerData: null,
+    mapMarkers: null,
+    visibleLayers: new Set(["extract-pmc", "extract-scav", "extract-coop", "transit"]),
+    focusedItemId: null,
+    rulerActive: false,
+    measurePoints: [],
+    squadMembers: [],
     pinned: new Set(),
     currentFloor: "",
     markerMode: "arrows",
@@ -34,9 +62,11 @@
   };
 
   const el = Object.fromEntries([
-    "content", "questDrawer", "questList", "questSearch", "questStatus", "floorButtons", "mapViewport",
+    "content", "layerDrawer", "layerList", "layersToggle", "mapSearch", "mapSearchResults", "markerDataStatus",
+    "selectedItem", "questDrawer", "questList", "questSearch", "questStatus", "floorButtons", "mapViewport",
     "mapWorld", "svgHost", "markerLayer", "mapStatus", "requirementsPanel", "requirementsHandle",
     "requirementsList", "pinCount", "wallToggle", "markerMode", "panelPosition", "questToggle",
+    "rulerToggle", "measurementLayer", "rulerReadout", "markerPopup", "hidePanels", "fullScreen",
     "zoomIn", "zoomOut", "zoomReset"
   ].map(id => [id, document.getElementById(id)]));
 
@@ -80,6 +110,9 @@
   async function loadMap(mapKey) {
     state.mapKey = normalizeMapKey(mapKey);
     state.map = MAPS[state.mapKey];
+    state.mapMarkers = state.markerData?.maps?.find(map => map.id === state.map.tdevId) || null;
+    state.focusedItemId = null;
+    state.measurePoints = [];
     state.currentFloor = state.map.defaultFloor;
     el.mapStatus.textContent = `Loading ${state.mapKey}…`;
     renderFloorButtons();
@@ -99,7 +132,10 @@
       applyFloor();
       applyWallPalette();
       renderQuests();
+      renderLayerList();
+      renderSearchResults();
       renderMarkers();
+      renderMeasurement();
       resetView();
       el.mapStatus.textContent = "tarkov.dev SVG · wheel to zoom · drag to pan";
       post("map-ready", { map: state.mapKey });
@@ -121,6 +157,22 @@
     } catch (error) {
       el.questStatus.hidden = false;
       el.questStatus.textContent = `Quest data load failed: ${error.message}`;
+    }
+  }
+
+  async function loadMarkerData() {
+    try {
+      const response = await fetch(MARKER_DATA_URL, { cache: "no-cache" });
+      if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+      state.markerData = await response.json();
+      state.mapMarkers = state.markerData.maps?.find(map => map.id === state.map?.tdevId) || null;
+      el.markerDataStatus.hidden = true;
+      renderLayerList();
+      renderSearchResults();
+      renderMarkers();
+    } catch (error) {
+      el.markerDataStatus.hidden = false;
+      el.markerDataStatus.textContent = `Map marker data load failed: ${error.message}`;
     }
   }
 
@@ -263,9 +315,273 @@
     svg.append(style);
   }
 
+  function readPosition(position) {
+    if (Array.isArray(position)) return { x: Number(position[0]), y: Number(position[1]), z: Number(position[2]) };
+    return { x: Number(position?.x), y: Number(position?.y), z: Number(position?.z) };
+  }
+
+  function markerItemName(id) {
+    return state.markerData?.itemNames?.[id] || id;
+  }
+
+  function markerContainerName(id) {
+    return state.markerData?.containerNames?.[id] || id;
+  }
+
+  function extractLayerId(faction) {
+    if (faction === "pmc") return "extract-pmc";
+    if (faction === "scav") return "extract-scav";
+    return "extract-coop";
+  }
+
+  function spawnLayerId(spawn) {
+    const categories = new Set(spawn.categories || []);
+    if (categories.has("sniper")) return "spawn-sniper";
+    if (categories.has("botpmc")) return "spawn-aipmc";
+    if (categories.has("player")) return "spawn-pmc";
+    if (categories.has("bot")) return "spawn-scav";
+    return null;
+  }
+
+  function layerCounts() {
+    const counts = Object.fromEntries(LAYERS.map(layer => [layer.id, 0]));
+    const map = state.mapMarkers;
+    if (!map) return counts;
+    for (const extract of map.extracts || []) counts[extractLayerId(extract.faction)]++;
+    counts.transit = map.transits?.length || 0;
+    for (const spawn of map.spawns || []) {
+      const layerId = spawnLayerId(spawn);
+      if (layerId) counts[layerId]++;
+    }
+    counts.boss = map.bosses?.length || 0;
+    counts.lock = map.locks?.length || 0;
+    counts.switch = map.switches?.length || 0;
+    counts.stationary = map.stationaryWeapons?.length || 0;
+    counts.btr = map.btrStops?.length || 0;
+    for (const hazard of map.hazards || []) counts[hazard.type === "minefield" ? "hazard-mine" : "hazard-sniper"]++;
+    counts.container = map.containers?.length || 0;
+    counts["loose-item"] = state.focusedItemId
+      ? (map.looseLoot || []).filter(loot => loot.items?.includes(state.focusedItemId)).length
+      : map.looseLoot?.length || 0;
+    return counts;
+  }
+
+  function renderLayerList() {
+    if (!el.layerList) return;
+    const counts = layerCounts();
+    const fragment = document.createDocumentFragment();
+    for (const groupName of [...new Set(LAYERS.map(layer => layer.group))]) {
+      const section = document.createElement("section");
+      section.className = "layer-group";
+      const heading = document.createElement("h3");
+      heading.textContent = groupName;
+      section.append(heading);
+      for (const layer of LAYERS.filter(candidate => candidate.group === groupName)) {
+        const label = document.createElement("label");
+        label.className = "layer-row";
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.checked = state.visibleLayers.has(layer.id);
+        checkbox.disabled = counts[layer.id] === 0;
+        checkbox.addEventListener("change", () => toggleLayer(layer.id, checkbox.checked));
+        const swatch = document.createElement("span");
+        swatch.className = "layer-swatch";
+        swatch.style.setProperty("--marker-color", layer.color);
+        const name = document.createElement("span");
+        name.textContent = layer.label;
+        const count = document.createElement("small");
+        count.className = "layer-count";
+        count.textContent = String(counts[layer.id]);
+        label.append(checkbox, swatch, name, count);
+        section.append(label);
+      }
+      fragment.append(section);
+    }
+    el.layerList.replaceChildren(fragment);
+    renderSelectedItem();
+  }
+
+  function toggleLayer(layerId, enabled) {
+    enabled ? state.visibleLayers.add(layerId) : state.visibleLayers.delete(layerId);
+    localStorage.setItem("eft-visible-layers", JSON.stringify([...state.visibleLayers]));
+    renderMarkers();
+  }
+
+  function renderSelectedItem() {
+    if (!el.selectedItem) return;
+    if (!state.focusedItemId) {
+      el.selectedItem.hidden = true;
+      el.selectedItem.replaceChildren();
+      return;
+    }
+    const id = state.focusedItemId;
+    el.selectedItem.hidden = false;
+    el.selectedItem.innerHTML = `<div class="selected-item-row"><img src="https://assets.tarkov.dev/${encodeURIComponent(id)}-icon.webp" alt=""><div><strong>${escapeHtml(markerItemName(id))}</strong><small>Loose item locations</small></div><button type="button" aria-label="Clear item overlay">×</button></div>`;
+    el.selectedItem.querySelector("button").addEventListener("click", clearFocusedItem);
+  }
+
+  function focusItem(itemId) {
+    state.focusedItemId = itemId;
+    state.visibleLayers.add("loose-item");
+    localStorage.setItem("eft-visible-layers", JSON.stringify([...state.visibleLayers]));
+    renderLayerList();
+    renderSearchResults();
+    renderMarkers();
+  }
+
+  function clearFocusedItem() {
+    state.focusedItemId = null;
+    renderLayerList();
+    renderSearchResults();
+    renderMarkers();
+  }
+
+  function addSearchResult(fragment, title, detail, action) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "search-result";
+    button.innerHTML = `<span>${escapeHtml(title)}</span><small>${escapeHtml(detail)}</small>`;
+    button.addEventListener("click", action);
+    fragment.append(button);
+  }
+
+  function renderSearchResults() {
+    if (!el.mapSearchResults || !state.markerData) return;
+    const query = el.mapSearch.value.trim().toLowerCase();
+    if (query.length < 2) {
+      el.mapSearchResults.replaceChildren();
+      return;
+    }
+    const fragment = document.createDocumentFragment();
+    const currentItems = new Map();
+    for (const loot of state.mapMarkers?.looseLoot || []) {
+      for (const id of loot.items || []) currentItems.set(id, (currentItems.get(id) || 0) + 1);
+    }
+    const itemMatches = [...currentItems]
+      .map(([id, count]) => ({ id, count, name: markerItemName(id) }))
+      .filter(item => item.name.toLowerCase().includes(query))
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .slice(0, 40);
+    if (itemMatches.length) {
+      const heading = document.createElement("h3");
+      heading.className = "search-heading";
+      heading.textContent = "Loose items";
+      fragment.append(heading);
+      for (const item of itemMatches) addSearchResult(fragment, item.name, `${item.count} locations`, () => focusItem(item.id));
+    }
+
+    const locations = [];
+    for (const extract of state.mapMarkers?.extracts || []) locations.push({ title: extract.name, detail: "Extraction", layer: extractLayerId(extract.faction), position: extract.position });
+    for (const transit of state.mapMarkers?.transits || []) locations.push({ title: transit.name, detail: "Transit", layer: "transit", position: transit.position });
+    for (const boss of state.mapMarkers?.bosses || []) locations.push({ title: boss.name, detail: "Boss spawn", layer: "boss", position: boss.position });
+    for (const lock of state.mapMarkers?.locks || []) locations.push({ title: markerItemName(lock.keyId), detail: "Required key", layer: "lock", position: lock.position });
+    const seen = new Set();
+    const locationMatches = locations.filter(result => {
+      const key = `${result.layer}:${result.title}`;
+      if (seen.has(key) || !result.title.toLowerCase().includes(query)) return false;
+      seen.add(key);
+      return true;
+    }).slice(0, 30);
+    if (locationMatches.length) {
+      const heading = document.createElement("h3");
+      heading.className = "search-heading";
+      heading.textContent = "Map locations";
+      fragment.append(heading);
+      for (const result of locationMatches) addSearchResult(fragment, result.title, result.detail, () => {
+        state.visibleLayers.add(result.layer);
+        renderLayerList();
+        renderMarkers();
+        panToWorld(readPosition(result.position));
+      });
+    }
+    if (!itemMatches.length && !locationMatches.length) {
+      const empty = document.createElement("p");
+      empty.className = "empty-state";
+      empty.textContent = "No matching item or location on this map.";
+      fragment.append(empty);
+    }
+    el.mapSearchResults.replaceChildren(fragment);
+  }
+
+  function showMarkerPopup(details) {
+    const image = details.itemId ? `<img src="https://assets.tarkov.dev/${encodeURIComponent(details.itemId)}-icon.webp" alt="">` : "";
+    el.markerPopup.innerHTML = `<div class="marker-popup-head"><strong>${escapeHtml(details.title)}</strong><button type="button" aria-label="Close">×</button></div>${image}${details.body ? `<p>${escapeHtml(details.body)}</p>` : ""}<small>${escapeHtml(details.coordinates || "")}</small>`;
+    el.markerPopup.hidden = false;
+    el.markerPopup.querySelector("button").addEventListener("click", () => { el.markerPopup.hidden = true; });
+  }
+
+  function addMapMarker(fragment, layerId, rawPosition, title, body = "", itemId = null) {
+    if (!state.visibleLayers.has(layerId)) return;
+    const layer = LAYER_BY_ID.get(layerId);
+    const position = readPosition(rawPosition);
+    if (![position.x, position.y, position.z].every(Number.isFinite)) return;
+    const projected = worldToPercent(position.x, position.z);
+    if (projected.left < 0 || projected.left > 100 || projected.top < 0 || projected.top > 100) return;
+    const marker = document.createElement("div");
+    marker.className = "map-marker";
+    marker.dataset.layer = layerId;
+    if (itemId && itemId === state.focusedItemId) marker.classList.add("item-focused");
+    marker.style.left = `${projected.left}%`;
+    marker.style.top = `${projected.top}%`;
+    marker.style.setProperty("--marker-color", layer.color);
+    const targetRank = objectiveFloorRank(position);
+    const currentRank = mapFloorRank(state.currentFloor);
+    if (targetRank != null && currentRank != null && targetRank !== currentRank) marker.classList.add("off-level");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "map-marker-button";
+    button.textContent = layer.symbol;
+    button.setAttribute("aria-label", `${layer.label}: ${title}`);
+    button.title = `${title}${body ? ` — ${body}` : ""}`;
+    button.addEventListener("click", event => {
+      event.stopPropagation();
+      showMarkerPopup({ title, body, itemId, coordinates: `X ${position.x.toFixed(1)} · Y ${position.y.toFixed(1)} · Z ${position.z.toFixed(1)}` });
+    });
+    marker.append(button);
+    fragment.append(marker);
+  }
+
+  function renderMapDataMarkers(fragment) {
+    const map = state.mapMarkers;
+    if (!map) return;
+    for (const extract of map.extracts || []) {
+      const conditions = [];
+      if (extract.switches?.length) conditions.push("switch activation required");
+      if (extract.transferItem) conditions.push(`${extract.transferItem.count}× ${markerItemName(extract.transferItem.item)}`);
+      addMapMarker(fragment, extractLayerId(extract.faction), extract.position, extract.name,
+        `${extract.faction.toUpperCase()} extraction${conditions.length ? ` · ${conditions.join(" · ")}` : ""}`,
+        extract.transferItem?.item || null);
+    }
+    for (const transit of map.transits || []) addMapMarker(fragment, "transit", transit.position, transit.name, "Transit extraction");
+    for (const spawn of map.spawns || []) {
+      const layerId = spawnLayerId(spawn);
+      if (layerId) addMapMarker(fragment, layerId, spawn.position, LAYER_BY_ID.get(layerId).label, (spawn.sides || []).join(", "));
+    }
+    for (const boss of map.bosses || []) addMapMarker(fragment, "boss", boss.position, boss.name, `${Math.round((boss.chance || 0) * 100)}% map spawn chance${boss.area ? ` · ${boss.area}` : ""}`);
+    for (const lock of map.locks || []) addMapMarker(fragment, "lock", lock.position, markerItemName(lock.keyId), `${lock.lockType || "Lock"}${lock.needsPower ? " · power required" : ""}`, lock.keyId);
+    for (const sw of map.switches || []) addMapMarker(fragment, "switch", sw.position, "Switch", sw.type || "Usable switch");
+    for (const weapon of map.stationaryWeapons || []) addMapMarker(fragment, "stationary", weapon.position, weapon.name, "Stationary weapon");
+    for (const stop of map.btrStops || []) addMapMarker(fragment, "btr", stop.position, "BTR stop", "Armored transport stop");
+    for (const hazard of map.hazards || []) {
+      const layerId = hazard.type === "minefield" ? "hazard-mine" : "hazard-sniper";
+      addMapMarker(fragment, layerId, hazard.position, LAYER_BY_ID.get(layerId).label, "Danger zone");
+    }
+    for (const container of map.containers || []) addMapMarker(fragment, "container", container.position, markerContainerName(container.id), "Loot container");
+    for (const loot of map.looseLoot || []) {
+      const ids = loot.items || [];
+      if (state.focusedItemId && !ids.includes(state.focusedItemId)) continue;
+      const focusId = state.focusedItemId || ids[0];
+      const names = ids.slice(0, 5).map(markerItemName);
+      const extra = ids.length > 5 ? ` +${ids.length - 5} more` : "";
+      addMapMarker(fragment, "loose-item", loot.position, markerItemName(focusId), `${names.join(", ")}${extra}`, focusId);
+    }
+  }
+
   function renderMarkers() {
     el.markerLayer.replaceChildren();
     if (!state.map) return;
+    const fragment = document.createDocumentFragment();
+    renderMapDataMarkers(fragment);
     const currentRank = mapFloorRank(state.currentFloor);
     for (const quest of pinnedQuests()) {
       for (const objective of quest.objectives || []) {
@@ -293,10 +609,22 @@
             arrows.title = `${Math.abs(delta)} floor${Math.abs(delta) === 1 ? "" : "s"} ${delta > 0 ? "above" : "below"}`;
             marker.append(arrows);
           }
-          el.markerLayer.append(marker);
+          fragment.append(marker);
         }
       }
     }
+    for (const member of state.squadMembers) {
+      const position = readPosition(member);
+      const pos = worldToPercent(position.x, position.z);
+      const marker = document.createElement("div");
+      marker.className = "squad-marker";
+      marker.style.left = `${pos.left}%`;
+      marker.style.top = `${pos.top}%`;
+      marker.textContent = String(member.name || "S").slice(0, 2).toUpperCase();
+      marker.title = member.name || "Squad member";
+      fragment.append(marker);
+    }
+    el.markerLayer.append(fragment);
     if (state.player) renderPlayerMarker();
   }
 
@@ -330,9 +658,99 @@
     return projectWorld(state.map, x, z);
   }
 
+  function percentToWorld(left, top) {
+    const [a, b, c] = state.map.anchors;
+    const abX = b.map[0] - a.map[0];
+    const abY = b.map[1] - a.map[1];
+    const acX = c.map[0] - a.map[0];
+    const acY = c.map[1] - a.map[1];
+    const pointX = left - a.map[0];
+    const pointY = top - a.map[1];
+    const determinant = abX * acY - abY * acX;
+    if (Math.abs(determinant) < 1e-9) return { x: 0, z: 0 };
+    const alongTop = (pointX * acY - pointY * acX) / determinant;
+    const alongLeft = (abX * pointY - abY * pointX) / determinant;
+    return {
+      x: a.world[0] + alongTop * (b.world[0] - a.world[0]) + alongLeft * (c.world[0] - a.world[0]),
+      z: a.world[1] + alongTop * (b.world[1] - a.world[1]) + alongLeft * (c.world[1] - a.world[1])
+    };
+  }
+
+  function screenToPercent(clientX, clientY) {
+    const rect = el.mapViewport.getBoundingClientRect();
+    const localX = (clientX - rect.left - state.mapFrame.left - state.transform.x) / state.transform.scale;
+    const localY = (clientY - rect.top - state.mapFrame.top - state.transform.y) / state.transform.scale;
+    return { left: localX / state.mapFrame.width * 100, top: localY / state.mapFrame.height * 100 };
+  }
+
+  function setRuler(enabled) {
+    state.rulerActive = Boolean(enabled);
+    state.measurePoints = [];
+    el.rulerToggle.setAttribute("aria-pressed", String(state.rulerActive));
+    el.mapViewport.classList.toggle("ruler-active", state.rulerActive);
+    renderMeasurement();
+  }
+
+  function addRulerPoint(clientX, clientY) {
+    const point = screenToPercent(clientX, clientY);
+    if (point.left < 0 || point.left > 100 || point.top < 0 || point.top > 100) return;
+    if (state.measurePoints.length >= 2) state.measurePoints = [];
+    state.measurePoints.push(point);
+    renderMeasurement();
+  }
+
+  function renderMeasurement() {
+    el.measurementLayer.replaceChildren();
+    el.rulerReadout.hidden = true;
+    if (!state.measurePoints.length) return;
+    const ns = "http://www.w3.org/2000/svg";
+    for (const point of state.measurePoints) {
+      const circle = document.createElementNS(ns, "circle");
+      circle.setAttribute("class", "measurement-point");
+      circle.setAttribute("cx", point.left);
+      circle.setAttribute("cy", point.top);
+      circle.setAttribute("r", ".7");
+      el.measurementLayer.append(circle);
+    }
+    if (state.measurePoints.length !== 2) {
+      el.rulerReadout.hidden = false;
+      el.rulerReadout.textContent = "Select the second point";
+      return;
+    }
+    const [first, second] = state.measurePoints;
+    const line = document.createElementNS(ns, "line");
+    line.setAttribute("class", "measurement-line");
+    line.setAttribute("x1", first.left);
+    line.setAttribute("y1", first.top);
+    line.setAttribute("x2", second.left);
+    line.setAttribute("y2", second.top);
+    el.measurementLayer.prepend(line);
+    const worldA = percentToWorld(first.left, first.top);
+    const worldB = percentToWorld(second.left, second.top);
+    const distance = Math.hypot(worldB.x - worldA.x, worldB.z - worldA.z);
+    el.rulerReadout.hidden = false;
+    el.rulerReadout.textContent = `${distance.toFixed(1)} m`;
+  }
+
   function objectiveFloorRank(location) {
     const y = Number(location.y);
     if (!Number.isFinite(y)) return null;
+    const rules = state.mapMarkers?.floorRules || [];
+    const matchesExtent = extent => {
+      if (extent.height && (y < extent.height[0] || y >= extent.height[1])) return false;
+      if (!extent.bounds?.length) return true;
+      return extent.bounds.some(bounds => {
+        const xs = [Number(bounds[0]?.[0]), Number(bounds[1]?.[0])];
+        const zs = [Number(bounds[0]?.[1]), Number(bounds[1]?.[1])];
+        return location.x >= Math.min(...xs) && location.x <= Math.max(...xs) &&
+          location.z >= Math.min(...zs) && location.z <= Math.max(...zs);
+      });
+    };
+    for (const rule of rules.filter(rule => !rule.primary)) {
+      if (rule.extents?.some(matchesExtent)) return mapFloorRank(rule.floor);
+    }
+    const primary = rules.find(rule => rule.primary);
+    if (primary) return mapFloorRank(primary.floor);
     switch (state.mapKey) {
       case "factory": return y < -1 ? mapFloorRank("Basement") : y < 3 ? mapFloorRank("Ground_Floor") : y < 6 ? mapFloorRank("Second_Floor") : mapFloorRank("Third_Floor");
       case "lab": return y < -0.9 ? mapFloorRank("Technical_Level") : y < 3 ? mapFloorRank("First_Level") : mapFloorRank("Second_Level");
@@ -385,13 +803,23 @@
   }
 
   function panToPlayer() {
-    const pos = worldToPercent(state.player.x, state.player.z);
+    panToWorld(state.player);
+  }
+
+  function panToWorld(position) {
+    const pos = worldToPercent(position.x, position.z);
     const rect = el.mapViewport.getBoundingClientRect();
     const worldX = state.mapFrame.width * pos.left / 100;
     const worldY = state.mapFrame.height * pos.top / 100;
     state.transform.x = rect.width / 2 - state.mapFrame.left - worldX * state.transform.scale;
     state.transform.y = rect.height / 2 - state.mapFrame.top - worldY * state.transform.scale;
     applyTransform();
+  }
+
+  function setSquadMembers(members) {
+    state.squadMembers = Array.isArray(members) ? members.filter(member =>
+      [member?.x, member?.z].every(value => Number.isFinite(Number(value)))) : [];
+    renderMarkers();
   }
 
   function setScale(scale) {
@@ -495,6 +923,11 @@
   let drag = null;
   el.mapViewport.addEventListener("pointerdown", event => {
     if (event.target.closest("button")) return;
+    if (state.rulerActive) {
+      addRulerPoint(event.clientX, event.clientY);
+      return;
+    }
+    el.markerPopup.hidden = true;
     drag = { x: event.clientX, y: event.clientY, tx: state.transform.x, ty: state.transform.y };
     el.mapViewport.setPointerCapture(event.pointerId);
     el.mapViewport.classList.add("dragging");
@@ -525,8 +958,22 @@
   });
   el.requirementsHandle.addEventListener("pointerup", () => { panelDrag = null; });
 
-  el.questToggle.addEventListener("click", () => el.questDrawer.classList.toggle("open"));
+  el.layersToggle.addEventListener("click", () => {
+    el.questDrawer.classList.remove("open");
+    el.layerDrawer.classList.toggle("open");
+  });
+  el.questToggle.addEventListener("click", () => {
+    el.layerDrawer.classList.remove("open");
+    el.questDrawer.classList.toggle("open");
+  });
+  el.mapSearch.addEventListener("input", renderSearchResults);
   el.questSearch.addEventListener("input", renderQuests);
+  el.rulerToggle.addEventListener("click", () => setRuler(!state.rulerActive));
+  el.hidePanels.addEventListener("click", () => {
+    const hidden = el.content.classList.toggle("panels-hidden");
+    el.hidePanels.textContent = hidden ? "Show panels" : "Hide panels";
+  });
+  el.fullScreen.addEventListener("click", () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen());
   el.wallToggle.addEventListener("click", () => { setWallColors(!state.wallColors); post("wall-colors-changed", { enabled: state.wallColors }); });
   el.markerMode.addEventListener("click", () => { const modes = ["arrows", "opacity", "both"]; setMarkerMode(modes[(modes.indexOf(state.markerMode) + 1) % modes.length]); post("marker-mode-changed", { mode: state.markerMode }); });
   el.panelPosition.addEventListener("click", () => { const positions = ["right", "bottom", "floating"]; setPanelPosition(positions[(positions.indexOf(state.panelPosition) + 1) % positions.length]); post("panel-position-changed", { position: state.panelPosition }); });
@@ -543,16 +990,24 @@
     setMap: loadMap,
     setPinnedQuests,
     setPlayerPosition,
+    setSquadMembers,
+    focusItem,
+    toggleLayer,
     selectFloor,
     selectFloorByIndex: index => state.map?.floors[index] ? selectFloor(state.map.floors[index]) : false,
     toggleRequirements: () => { el.requirementsPanel.hidden = !el.requirementsPanel.hidden; return el.requirementsPanel.hidden; },
     resetView,
     getCalibrationReport: calibrationReport,
-    getState: () => ({ map: state.mapKey, floor: state.currentFloor, pinned: [...state.pinned], markerMode: state.markerMode, panelPosition: state.panelPosition, wallColors: state.wallColors })
+    getState: () => ({ map: state.mapKey, floor: state.currentFloor, pinned: [...state.pinned], markerMode: state.markerMode, panelPosition: state.panelPosition, wallColors: state.wallColors, visibleLayers: [...state.visibleLayers], focusedItemId: state.focusedItemId })
   };
 
+  try {
+    const savedLayers = JSON.parse(localStorage.getItem("eft-visible-layers") || "null");
+    if (Array.isArray(savedLayers)) state.visibleLayers = new Set(savedLayers.filter(id => LAYER_BY_ID.has(id)));
+  } catch { }
   state.panelPosition = localStorage.getItem("eft-panel-position") || "right";
   setPanelPosition(state.panelPosition);
   loadMap(state.mapKey);
   loadQuests();
+  loadMarkerData();
 })();

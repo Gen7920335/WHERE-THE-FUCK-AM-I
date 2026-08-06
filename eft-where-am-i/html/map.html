@@ -9,9 +9,13 @@
 <body>
   <main id="app" class="app-shell">
     <header class="map-toolbar" aria-label="Map controls">
+      <button id="layersToggle" type="button" title="Map layers and item search">Layers</button>
       <button id="questToggle" type="button" title="Quest pins">Quests</button>
+      <button id="rulerToggle" type="button" aria-pressed="false">Ruler</button>
       <div id="floorButtons" class="floor-buttons" aria-label="Floors"></div>
       <span class="toolbar-spacer"></span>
+      <button id="hidePanels" type="button">Hide panels</button>
+      <button id="fullScreen" type="button">Full screen</button>
       <button id="wallToggle" type="button" aria-pressed="false">Wall colors: off</button>
       <button id="markerMode" type="button">Floor markers: arrows</button>
       <button id="panelPosition" type="button">Panel: right</button>
@@ -21,6 +25,17 @@
     </header>
 
     <section id="content" class="content panel-right">
+      <aside id="layerDrawer" class="side-drawer layer-drawer" aria-label="Map layers">
+        <div class="drawer-header">
+          <strong>Map layers</strong>
+          <input id="mapSearch" type="search" placeholder="Search item, key, extract, boss…">
+        </div>
+        <div id="markerDataStatus" class="status">Loading map marker data…</div>
+        <div id="selectedItem" class="selected-item" hidden></div>
+        <div id="mapSearchResults" class="map-search-results"></div>
+        <div id="layerList" class="layer-list"></div>
+      </aside>
+
       <aside id="questDrawer" class="quest-drawer" aria-label="Quest list">
         <div class="drawer-header">
           <strong>Map quests</strong>
@@ -33,8 +48,11 @@
       <section id="mapViewport" class="map-viewport" aria-label="Tarkov map">
         <div id="mapWorld" class="map-world">
           <div id="svgHost" class="svg-host"></div>
+          <svg id="measurementLayer" class="measurement-layer" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
           <div id="markerLayer" class="marker-layer"></div>
         </div>
+        <div id="markerPopup" class="marker-popup" hidden></div>
+        <div id="rulerReadout" class="ruler-readout" hidden></div>
         <div id="mapStatus" class="map-status">Loading map…</div>
       </section>
 
