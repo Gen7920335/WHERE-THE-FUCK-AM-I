@@ -11,6 +11,7 @@ $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $ProjectDir = Join-Path $RepoRoot "eft-where-am-i"
 $ProjectFile = Join-Path $ProjectDir "eft-where-am-i.csproj"
 $SquadSmokeProject = Join-Path $RepoRoot "tests\SquadSyncSmoke\SquadSyncSmoke.csproj"
+$ReleaseWorkflow = Join-Path $RepoRoot ".github\workflows\release.yml"
 
 if (-not (Test-Path -LiteralPath (Join-Path $RepoRoot ".tools\dotnet\dotnet.exe"))) {
     & (Join-Path $PSScriptRoot "bootstrap.ps1")
@@ -103,6 +104,24 @@ if ($AssemblyIdentity.Name -ne "WHERE THE FUCK AM I") {
 $VersionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($AppExePath)
 if ($VersionInfo.ProductName -ne "WHERE THE FUCK AM I" -or $VersionInfo.FileDescription -ne "WHERE THE FUCK AM I") {
     throw "Unexpected application branding: ProductName='$($VersionInfo.ProductName)', FileDescription='$($VersionInfo.FileDescription)'"
+}
+
+Write-Host "Checking installer and portable release workflow..."
+$ReleaseWorkflowText = Get-Content -Raw -Encoding UTF8 -LiteralPath $ReleaseWorkflow
+@(
+    'github.repository',
+    'WHERE THE FUCK AM I.exe',
+    '*-Setup.exe',
+    '*-Portable.zip',
+    '--self-contained true',
+    'gh release create'
+) | ForEach-Object {
+    if (-not $ReleaseWorkflowText.Contains($_)) {
+        throw "Release workflow is missing required token: $_"
+    }
+}
+if ($ReleaseWorkflowText.Contains('https://github.com/karpitony/eft-where-am-i') -or $ReleaseWorkflowText.Contains('EFT-Where-Am-I.exe')) {
+    throw "Release workflow still targets the upstream repository or old executable name."
 }
 
 git -C $RepoRoot diff --check
