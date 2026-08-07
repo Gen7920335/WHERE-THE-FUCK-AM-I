@@ -417,11 +417,12 @@
   function renderFloorButtons() {
     if (!state.map) return;
     const fragment = document.createDocumentFragment();
-    for (const floor of state.map.floors) {
+    for (const floor of [...state.map.floors].reverse()) {
       const button = document.createElement("button");
       button.type = "button";
       button.textContent = friendlyFloor(floor);
       button.classList.toggle("active", floor === state.currentFloor);
+      button.setAttribute("aria-pressed", String(floor === state.currentFloor));
       button.addEventListener("click", () => selectFloor(floor));
       fragment.append(button);
     }

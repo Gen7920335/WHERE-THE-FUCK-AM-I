@@ -162,6 +162,15 @@ if (!mapCss.includes("--marker-scale") || !mapCss.includes("scale: var(--map-inv
 if (!mapHtml.includes("iconScaleSlider") || !settingsHtml.includes("iconScaleSlider")) {
   throw new Error("Icon-scale controls must be present in the map panel and settings page");
 }
+const requirementsPanelIndex = mapHtml.indexOf('id="requirementsPanel"');
+const floorButtonsIndex = mapHtml.indexOf('id="floorButtons"');
+const rightPanelTabsIndex = mapHtml.indexOf('class="right-panel-tabs"');
+if (requirementsPanelIndex < 0 || floorButtonsIndex < requirementsPanelIndex || rightPanelTabsIndex < floorButtonsIndex) {
+  throw new Error("The level selector must be the first section of the right-side panel");
+}
+if (!mapCss.includes(".level-shortcut") || !mapCss.includes("grid-template-columns: minmax(0,1fr) calc(92px * var(--ui-scale))")) {
+  throw new Error("The original-style level selector layout is missing");
+}
 if (!floorManagerCs.includes("IsPointInPolygon(x, z") || !floorManagerCs.includes("y < zone.z_min")) {
   throw new Error("Floor zones must use X/Z polygons and Y height");
 }

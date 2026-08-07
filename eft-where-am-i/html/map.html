@@ -16,7 +16,6 @@
           <div id="selectedItem" class="selected-item" hidden></div>
           <div id="mapSearchResults" class="map-search-results"></div>
           <div id="layerList" class="layer-list"></div>
-          <section class="level-section"><div class="section-caption"><strong>Levels</strong><span>Alt + Wheel</span></div><div id="floorButtons" class="floor-buttons" aria-label="Levels"></div></section>
         </section>
         <footer class="panel-actions"><button id="progressToggle" type="button">Filters</button><button id="squadToggle" type="button">Auth Squad <span id="squadCount">0</span></button></footer>
       </aside>
@@ -36,6 +35,7 @@
       </section>
 
       <aside id="requirementsPanel" class="requirements-panel" aria-label="Quests and pinned requirements">
+        <section class="level-section" aria-label="Map levels"><div class="level-picker"><div class="section-caption"><strong>Levels</strong><span class="level-settings-icon" title="Nearby levels" aria-hidden="true">⚙</span></div><div id="floorButtons" class="floor-buttons" aria-label="Levels"></div></div><div class="level-shortcut" title="Alt + mouse wheel"><strong>Alt + ↕</strong><span>Switch<br>Level</span></div></section>
         <nav class="right-panel-tabs"><button id="questToggle" class="active" type="button">Quests <span id="questCount"></span></button><button id="pinnedToggle" type="button">Pinned <span id="pinCount" class="pin-count">0</span></button></nav>
         <section id="questDrawer" class="right-panel-page open quest-drawer"><div class="drawer-header"><input id="questSearch" type="search" placeholder="Search quests"><div id="questFilterSummary" class="filter-summary">All quests</div></div><div id="questStatus" class="status">Loading quest data…</div><div id="questList" class="quest-list"></div></section>
         <section id="pinnedDrawer" class="right-panel-page"><div id="requirementsHandle" class="requirements-header"><strong>Pinned quest requirements</strong></div><div id="requirementsList" class="requirements-list"><p class="empty-state">Pin a quest to show only its requirements here.</p></div></section>
