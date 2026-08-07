@@ -36,8 +36,9 @@ jobs:
             -c Release `
             -r win-x64 `
             --self-contained true `
-            -p:PublishSingleFile=false `
-            -p:IncludeNativeLibrariesForSelfExtract=false `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:EnableCompressionInSingleFile=true `
             -p:DebugType=None `
             -p:DebugSymbols=false `
             -o ./publish_output
@@ -47,6 +48,18 @@ jobs:
         run: |
           $version = '${{ github.ref_name }}'.TrimStart('v')
           $archive = "WHERE-THE-FUCK-AM-I-v$version-win-x64-portable.zip"
+          @(
+            './publish_output/Microsoft.Web.WebView2.Core.xml',
+            './publish_output/Microsoft.Web.WebView2.WinForms.xml',
+            './publish_output/Microsoft.Web.WebView2.Wpf.xml',
+            './publish_output/WHERE THE FUCK AM I.dll.config',
+            './publish_output/app.log',
+            './publish_output/quest_saves.db'
+          ) | ForEach-Object {
+            if (Test-Path -LiteralPath $_) {
+              Remove-Item -LiteralPath $_ -Force
+            }
+          }
           Compress-Archive -Path './publish_output/*' -DestinationPath $archive -CompressionLevel Optimal
           "PORTABLE_ARCHIVE=$archive" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
