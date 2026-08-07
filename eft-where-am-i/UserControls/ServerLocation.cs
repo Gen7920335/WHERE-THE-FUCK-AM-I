@@ -352,7 +352,7 @@ namespace eft_where_am_i
                     string apiUrl = $"http://ip-api.com/json/{ipAddress}";
                     using (WebClient client = new WebClient())
                     {
-                        client.Headers.Add("User-Agent", "EFT-Where-Am-I Desktop App");
+                        client.Headers.Add("User-Agent", "WHERE-THE-FUCK-AM-I Desktop App");
                         string response = await Task.Run(() => client.DownloadString(apiUrl));
                         geoInfo = JsonConvert.DeserializeObject(response);
                         

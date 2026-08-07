@@ -74,7 +74,7 @@ Assert-LastExitCode "direct squad smoke test"
 
 $OutputDir = Join-Path $ProjectDir "bin\$Configuration\net10.0-windows"
 @(
-    "EFT-Where-Am-I.exe",
+    "WHERE THE FUCK AM I.exe",
     "assets\css\tailwind.css",
     "assets\settings.json",
     "floor_db.json",
@@ -93,6 +93,17 @@ $OutputDir = Join-Path $ProjectDir "bin\$Configuration\net10.0-windows"
     if (-not (Test-Path -LiteralPath $RequiredPath)) {
         throw "Required build output is missing: $RequiredPath"
     }
+}
+
+$AppExePath = Join-Path $OutputDir "WHERE THE FUCK AM I.exe"
+$AppDllPath = Join-Path $OutputDir "WHERE THE FUCK AM I.dll"
+$AssemblyIdentity = [System.Reflection.AssemblyName]::GetAssemblyName($AppDllPath)
+if ($AssemblyIdentity.Name -ne "WHERE THE FUCK AM I") {
+    throw "Unexpected assembly name: $($AssemblyIdentity.Name)"
+}
+$VersionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($AppExePath)
+if ($VersionInfo.ProductName -ne "WHERE THE FUCK AM I" -or $VersionInfo.FileDescription -ne "WHERE THE FUCK AM I") {
+    throw "Unexpected application branding: ProductName='$($VersionInfo.ProductName)', FileDescription='$($VersionInfo.FileDescription)'"
 }
 
 git -C $RepoRoot diff --check

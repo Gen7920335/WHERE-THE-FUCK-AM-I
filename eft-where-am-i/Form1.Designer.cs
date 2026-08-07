@@ -154,7 +154,7 @@ namespace eft_where_am_i_chasrp
             Icon = (Icon)resources.GetObject("$this.Icon");
             Margin = new Padding(3, 4, 3, 4);
             Name = "Form1";
-            Text = "EFT Where am I? (v2.2.3)";
+            Text = "WHERE THE FUCK AM I";
             Load += Form1_Load;
             panelSideMenu.ResumeLayout(false);
             ResumeLayout(false);

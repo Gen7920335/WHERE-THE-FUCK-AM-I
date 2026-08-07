@@ -21,7 +21,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $RepoRoot ".tools\dotnet\dotnet.exe"
 if ($LASTEXITCODE -ne 0) { throw "Build failed with exit code $LASTEXITCODE." }
 
 $OutputDir = Join-Path $RepoRoot "eft-where-am-i\bin\$Configuration\net10.0-windows"
-$AppExe = Join-Path $OutputDir "EFT-Where-Am-I.exe"
+$AppExe = Join-Path $OutputDir "WHERE THE FUCK AM I.exe"
 if (-not (Test-Path -LiteralPath $AppExe)) {
     throw "Application executable is missing: $AppExe"
 }

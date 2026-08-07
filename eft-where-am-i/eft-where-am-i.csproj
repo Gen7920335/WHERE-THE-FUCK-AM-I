@@ -10,8 +10,10 @@
 
     <!-- 버전을 여기서만 관리 -->
     <Version>2.3.6</Version>
-    <AssemblyName>EFT-Where-Am-I</AssemblyName>
-    <AssemblyTitle>EFT WHERE AM I v$(Version)</AssemblyTitle>
+    <AssemblyName>WHERE THE FUCK AM I</AssemblyName>
+    <AssemblyTitle>WHERE THE FUCK AM I</AssemblyTitle>
+    <Product>WHERE THE FUCK AM I</Product>
+    <Description>WHERE THE FUCK AM I</Description>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <SupportedOSPlatformVersion>7.0</SupportedOSPlatformVersion>

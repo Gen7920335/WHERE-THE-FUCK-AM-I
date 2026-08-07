@@ -66,7 +66,7 @@ namespace eft_where_am_i_chasrp
                 btnSetting.Image = null;
                 btnServerLocation.Text = "Server Location";
                 btnServerLocation.Image = null;
-                btnWhereAmI.Text = "Where Am I";
+                btnWhereAmI.Text = "WHERE THE FUCK AM I";
                 btnWhereAmI.Image = null;
                 checkBoxHide.Text = "<";
             }
@@ -111,7 +111,7 @@ namespace eft_where_am_i_chasrp
             var version = Assembly.GetExecutingAssembly()
                 .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
                 ?? Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "?";
-            this.Text = $"EFT Where am I? (v{version})";
+            this.Text = $"WHERE THE FUCK AM I (v{version})";
 
             await CheckForUpdatesAsync();
         }
