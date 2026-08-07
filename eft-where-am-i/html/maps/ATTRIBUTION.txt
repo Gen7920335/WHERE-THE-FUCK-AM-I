@@ -1,0 +1,26 @@
+Bundled Escape from Tarkov map artwork
+======================================
+
+SVG maps
+--------
+
+Source: https://github.com/the-hideout/tarkov-dev-svg-maps
+Creator attribution: Shebuka and the repository contributors
+License: Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International
+License text: CC-BY-NC-SA-4.0.txt
+
+The application distributes unmodified SVG source files and applies optional
+display-only colors at runtime. The SVG artwork may only be reused under the
+license above, including its attribution, non-commercial, share-alike, and
+use-restriction terms.
+
+Raster tile maps
+----------------
+
+Icebreaker interactive map: TarkovBOT.eu (https://tarkovbot.eu/)
+Labyrinth interactive map: Tarkov.dev (https://tarkov.dev/)
+Tile delivery source: https://assets.tarkov.dev/maps/
+
+Escape from Tarkov and related names and assets are the property of their
+respective rights holders. This project is not affiliated with or endorsed by
+Battlestate Games or Tarkov.dev.

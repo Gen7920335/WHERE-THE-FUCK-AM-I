@@ -8,45 +8,46 @@
 </head>
 <body>
   <main id="app" class="app-shell">
-    <header class="map-toolbar" aria-label="Map controls">
-      <button id="layersToggle" type="button" title="Map layers and item search">Layers</button>
-      <button id="questToggle" type="button" title="Quest pins">Quests</button>
-      <button id="progressToggle" type="button">Progress</button>
-      <button id="squadToggle" type="button">Squad <span id="squadCount">0</span></button>
-      <button id="floorEditToggle" type="button">Floor editor</button>
-      <button id="rulerToggle" type="button" aria-pressed="false">Ruler</button>
-      <div id="floorButtons" class="floor-buttons" aria-label="Floors"></div>
-      <span class="toolbar-spacer"></span>
-      <button id="hidePanels" type="button">Hide panels</button>
-      <button id="fullScreen" type="button">Full screen</button>
-      <button id="wallToggle" type="button" aria-pressed="false">Wall colors: off</button>
-      <button id="markerMode" type="button">Floor markers: arrows</button>
-      <button id="panelPosition" type="button">Panel: right</button>
-      <button id="zoomOut" type="button" aria-label="Zoom out">−</button>
-      <button id="zoomReset" type="button">Fit</button>
-      <button id="zoomIn" type="button" aria-label="Zoom in">+</button>
-    </header>
-
     <section id="content" class="content panel-right">
-      <aside id="layerDrawer" class="side-drawer layer-drawer" aria-label="Map layers">
-        <div class="drawer-header"><strong>Map layers</strong><input id="mapSearch" type="search" placeholder="Search item, key, extract, boss…"></div>
-        <div id="markerDataStatus" class="status">Loading map marker data…</div>
-        <div id="selectedItem" class="selected-item" hidden></div>
-        <div id="mapSearchResults" class="map-search-results"></div>
-        <div id="layerList" class="layer-list"></div>
-      </aside>
+      <aside id="leftPanel" class="map-side-panel left-panel" aria-label="Map information panels">
+        <nav class="panel-tabs" aria-label="Left panel sections">
+          <button id="layersToggle" class="active" type="button" title="Map layers and item search">Overlays</button>
+          <button id="questToggle" type="button" title="Quest pins">Quests</button>
+        </nav>
 
-      <aside id="questDrawer" class="quest-drawer" aria-label="Quest list">
-        <div class="drawer-header">
-          <strong>Map quests</strong>
-          <input id="questSearch" type="search" placeholder="Search quests">
-          <div id="questFilterSummary" class="filter-summary">All quests</div>
-        </div>
-        <div id="questStatus" class="status">Loading quest data…</div>
-        <div id="questList" class="quest-list"></div>
+        <section id="layerDrawer" class="panel-page side-drawer layer-drawer open" aria-label="Map layers">
+          <div class="drawer-header"><strong>Map overlays</strong><input id="mapSearch" type="search" placeholder="Search item, key, extract, boss…"></div>
+          <div id="markerDataStatus" class="status">Loading map marker data…</div>
+          <div id="selectedItem" class="selected-item" hidden></div>
+          <div id="mapSearchResults" class="map-search-results"></div>
+          <div id="layerList" class="layer-list"></div>
+        </section>
+
+        <section id="questDrawer" class="panel-page quest-drawer" aria-label="Quest list">
+          <div class="drawer-header">
+            <strong>Map quests</strong>
+            <input id="questSearch" type="search" placeholder="Search quests">
+            <div id="questFilterSummary" class="filter-summary">All quests</div>
+          </div>
+          <div id="questStatus" class="status">Loading quest data…</div>
+          <div id="questList" class="quest-list"></div>
+        </section>
+
+        <footer class="panel-actions">
+          <button id="progressToggle" type="button">Progress</button>
+          <button id="squadToggle" type="button">Squad <span id="squadCount">0</span></button>
+        </footer>
       </aside>
 
       <section id="mapViewport" class="map-viewport" aria-label="Tarkov map">
+        <nav class="map-hud" aria-label="Map view controls">
+          <div id="floorButtons" class="floor-buttons" aria-label="Floors"></div>
+          <span class="hud-divider"></span>
+          <button id="rulerToggle" type="button" aria-pressed="false">Ruler</button>
+          <button id="zoomOut" type="button" aria-label="Zoom out">−</button>
+          <button id="zoomReset" type="button">Fit</button>
+          <button id="zoomIn" type="button" aria-label="Zoom in">+</button>
+        </nav>
         <div id="mapWorld" class="map-world">
           <div id="svgHost" class="svg-host"></div>
           <svg id="measurementLayer" class="measurement-layer" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
@@ -59,9 +60,21 @@
 
       <aside id="requirementsPanel" class="requirements-panel" aria-label="Pinned quest requirements">
         <div id="requirementsHandle" class="requirements-header"><strong>Pinned quest requirements</strong><span id="pinCount" class="pin-count">0</span></div>
+        <section class="view-controls" aria-label="Map display options">
+          <strong>Map display</strong>
+          <button id="wallToggle" type="button" aria-pressed="false">Wall colors: off</button>
+          <button id="markerMode" type="button">Floor markers: arrows</button>
+          <button id="panelPosition" type="button">Panel: right</button>
+          <button id="floorEditToggle" type="button">Floor editor</button>
+        </section>
         <div id="requirementsList" class="requirements-list"><p class="empty-state">Pin a quest to show only its requirements here.</p></div>
       </aside>
     </section>
+
+    <div class="internal-command-hooks" aria-hidden="true">
+      <button id="hidePanels" type="button" tabindex="-1">Hide panels</button>
+      <button id="fullScreen" type="button" tabindex="-1">Full screen</button>
+    </div>
   </main>
 
   <dialog id="progressDialog" class="settings-dialog">

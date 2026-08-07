@@ -680,7 +680,7 @@ namespace eft_where_am_i
             if (string.Equals(webView2.Source?.Host, "eft-map.local", StringComparison.OrdinalIgnoreCase))
             {
                 bool shouldHide = !forceOpen && appSettings.panel_hidden_per_map.TryGetValue(mapName, out bool hidden) && hidden;
-                await webView2.ExecuteScriptAsync($"document.getElementById('requirementsPanel').hidden = {shouldHide.ToString().ToLowerInvariant()}");
+                await webView2.ExecuteScriptAsync($"window.eftMap?.setPanelsHidden({shouldHide.ToString().ToLowerInvariant()})");
                 return;
             }
 
@@ -1003,7 +1003,7 @@ namespace eft_where_am_i
         {
             if (string.Equals(webView2.Source?.Host, "eft-map.local", StringComparison.OrdinalIgnoreCase))
             {
-                await webView2.ExecuteScriptAsync("window.eftMap?.toggleRequirements()");
+                await webView2.ExecuteScriptAsync("window.eftMap?.togglePanels()");
                 return;
             }
             await jsExecutor.ClickButtonAsync(Constants.HIDE_SHOW_PANNE_BUTTON_SELECTOR);
@@ -1013,7 +1013,7 @@ namespace eft_where_am_i
         {
             if (string.Equals(webView2.Source?.Host, "eft-map.local", StringComparison.OrdinalIgnoreCase))
             {
-                string result = await webView2.ExecuteScriptAsync("Boolean(document.getElementById('requirementsPanel')?.hidden)");
+                string result = await webView2.ExecuteScriptAsync("document.getElementById('content')?.classList.contains('panels-hidden') === true");
                 appSettings.panel_hidden_per_map[appSettings.latest_map] = string.Equals(result, "true", StringComparison.OrdinalIgnoreCase);
                 SaveSettings();
                 return;
@@ -1028,7 +1028,7 @@ namespace eft_where_am_i
         {
             if (string.Equals(webView2.Source?.Host, "eft-map.local", StringComparison.OrdinalIgnoreCase))
             {
-                string result = await webView2.ExecuteScriptAsync("window.eftMap?.toggleRequirements()");
+                string result = await webView2.ExecuteScriptAsync("window.eftMap?.togglePanels()");
                 appSettings.panel_hidden_per_map[appSettings.latest_map] = string.Equals(result, "true", StringComparison.OrdinalIgnoreCase);
                 SaveSettings();
                 return;

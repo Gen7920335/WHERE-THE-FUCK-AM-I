@@ -4,7 +4,7 @@
   const QUEST_DATA_URL = "quest-locations.json";
   const MARKER_DATA_URL = "map-markers.json";
   const BATTLE_PASS_DATA_URL = "battle-pass-locations.json";
-  const SVG_ROOT = "https://assets.tarkov.dev/maps/svg";
+  const SVG_ROOT = "maps/svg";
   const MAPS = {
     factory: { dataKey: "factory", id: 0, tdevId: "55f2d3fd4bdc2d5f408b4567", svg: "Factory.svg", floors: ["Basement", "Ground_Floor", "Second_Floor", "Third_Floor"], defaultFloor: "Ground_Floor", rotation: 90, bounds: [[77, -64.5], [-65.5, 67.4]], anchors: [{ world: [77, 67.4], map: [0, 0] }, { world: [77, -64.5], map: [100, 0] }, { world: [-65.5, 67.4], map: [0, 100] }] },
     customs: { dataKey: "customs", id: 1, tdevId: "56f40101d2720b2a4d8b45d6", svg: "Customs.svg", floors: ["Underground_Level", "Ground_Level", "Second_Floor", "Third_Floor"], defaultFloor: "Ground_Level", rotation: 180, bounds: [[698, -307], [-372, 237]], anchors: [{ world: [698, -307], map: [0, 0] }, { world: [-372, -307], map: [100, 0] }, { world: [698, 237], map: [0, 100] }] },
@@ -17,8 +17,8 @@
     streets: { dataKey: "streetsoftarkov", id: 8, tdevId: "5714dc692459777137212e12", svg: "StreetsOfTarkov.svg", floors: ["Underground_Level", "Ground_Level", "Second_Floor", "Third_Floor", "Fourth_Floor", "Fifth_Floor"], defaultFloor: "Ground_Level", rotation: 180, bounds: [[323, -295], [-280, 532]], anchors: [{ world: [323, -295], map: [0, 0] }, { world: [-280, -295], map: [100, 0] }, { world: [323, 532], map: [0, 100] }] },
     "ground-zero": { dataKey: "groundzero", id: 9, tdevId: "653e6760052c01c1c805532f", svg: "GroundZero.svg", floors: ["Underground_Level", "Ground_Level", "Second_Floor", "Third_Floor"], defaultFloor: "Ground_Level", rotation: 180, bounds: [[249, -124], [-99, 364]], anchors: [{ world: [249, -124], map: [0, 0] }, { world: [-99, -124], map: [100, 0] }, { world: [249, 364], map: [0, 100] }] },
     terminal: { dataKey: "terminal", id: 10, tdevId: "65cc8f81a9aac3e77d0cfd3e", svg: "Terminal.svg", floors: ["Ground_Level"], defaultFloor: "Ground_Level", rotation: 180, bounds: [[463, -580], [-433, 475]], anchors: [{ world: [463, -580], map: [0, 0] }, { world: [-433, -580], map: [100, 0] }, { world: [463, 475], map: [0, 100] }] },
-    labyrinth: { dataKey: "the-labyrinth", id: 11, tdevId: "6733700029c367a3d40b02af", tiles: "https://assets.tarkov.dev/maps/labyrinth/main/{z}/{x}/{y}.png", tileZoom: 2, floors: ["Main"], defaultFloor: "Main", rotation: 270, bounds: [[-52, -37], [53, 76]], anchors: [{ world: [-52, -37], map: [0, 0] }, { world: [-52, 76], map: [100, 0] }, { world: [53, -37], map: [0, 100] }] },
-    icebreaker: { dataKey: "icebreaker", id: 12, tdevId: "69af492a4819ea4ba10a69c5", tiles: "https://assets.tarkov.dev/maps/icebreaker/{layer}/{z}/{x}/{y}.png", tileZoom: 2, tileLayers: { "Control_Room": "00_control_room", "Engine_Room": "01_engine_room", "Engine_Room_Upper": "02_engine_room_upper", "Fuel_Pumps_Lower": "03_fuel_pumps_lower", "Fuel_Pumps": "04_fuel_pumps", "Storage_Security": "05_storage_ecurity", "Infirmary": "06_infirmary", "Helipad": "07_helipad", "Gym_Canteen": "08_gym-canteen", "Accommodation_Lower": "09_accommodation_lower", "Accommodation_Mid": "10_accommodation_mid", "Accommodation_Upper": "11_accommodation_upper", "Officers_Deck": "12_officers_deck", "Stairs_Blocked": "13_stairs_blocked", "Bridge": "14_bridge", "Bridge_Roof": "15_bridge_roof" }, floors: ["Control_Room", "Engine_Room", "Engine_Room_Upper", "Fuel_Pumps_Lower", "Fuel_Pumps", "Storage_Security", "Infirmary", "Helipad", "Gym_Canteen", "Accommodation_Lower", "Accommodation_Mid", "Accommodation_Upper", "Officers_Deck", "Stairs_Blocked", "Bridge", "Bridge_Roof"], defaultFloor: "Infirmary", rotation: 180, bounds: [[77, -64.5], [-65.5, 67.4]], anchors: [{ world: [77, -64.5], map: [0, 0] }, { world: [-65.5, -64.5], map: [100, 0] }, { world: [77, 67.4], map: [0, 100] }] }
+    labyrinth: { dataKey: "the-labyrinth", id: 11, tdevId: "6733700029c367a3d40b02af", tiles: "maps/tiles/labyrinth/main/{z}/{x}/{y}.png", tileZoom: 2, floors: ["Main"], defaultFloor: "Main", rotation: 270, bounds: [[-52, -37], [53, 76]], anchors: [{ world: [-52, -37], map: [0, 0] }, { world: [-52, 76], map: [100, 0] }, { world: [53, -37], map: [0, 100] }] },
+    icebreaker: { dataKey: "icebreaker", id: 12, tdevId: "69af492a4819ea4ba10a69c5", tiles: "maps/tiles/icebreaker/{layer}/{z}/{x}/{y}.png", tileZoom: 2, tileLayers: { "Control_Room": "00_control_room", "Engine_Room": "01_engine_room", "Engine_Room_Upper": "02_engine_room_upper", "Fuel_Pumps_Lower": "03_fuel_pumps_lower", "Fuel_Pumps": "04_fuel_pumps", "Storage_Security": "05_storage_ecurity", "Infirmary": "06_infirmary", "Helipad": "07_helipad", "Gym_Canteen": "08_gym-canteen", "Accommodation_Lower": "09_accommodation_lower", "Accommodation_Mid": "10_accommodation_mid", "Accommodation_Upper": "11_accommodation_upper", "Officers_Deck": "12_officers_deck", "Stairs_Blocked": "13_stairs_blocked", "Bridge": "14_bridge", "Bridge_Roof": "15_bridge_roof" }, floors: ["Control_Room", "Engine_Room", "Engine_Room_Upper", "Fuel_Pumps_Lower", "Fuel_Pumps", "Storage_Security", "Infirmary", "Helipad", "Gym_Canteen", "Accommodation_Lower", "Accommodation_Mid", "Accommodation_Upper", "Officers_Deck", "Stairs_Blocked", "Bridge", "Bridge_Roof"], defaultFloor: "Infirmary", rotation: 180, bounds: [[77, -64.5], [-65.5, 67.4]], anchors: [{ world: [77, -64.5], map: [0, 0] }, { world: [-65.5, -64.5], map: [100, 0] }, { world: [77, 67.4], map: [0, 100] }] }
   };
   const FLOOR_ALIASES = {};
   const LAYERS = [
@@ -115,7 +115,7 @@
   };
 
   const el = Object.fromEntries([
-    "content", "layerDrawer", "layerList", "layersToggle", "mapSearch", "mapSearchResults", "markerDataStatus",
+    "content", "leftPanel", "layerDrawer", "layerList", "layersToggle", "mapSearch", "mapSearchResults", "markerDataStatus",
     "selectedItem", "questDrawer", "questList", "questSearch", "questStatus", "floorButtons", "mapViewport",
     "mapWorld", "svgHost", "markerLayer", "mapStatus", "requirementsPanel", "requirementsHandle",
     "requirementsList", "pinCount", "wallToggle", "markerMode", "panelPosition", "questToggle",
@@ -601,7 +601,7 @@
     }
     const id = state.focusedItemId;
     el.selectedItem.hidden = false;
-    el.selectedItem.innerHTML = `<div class="selected-item-row"><img src="https://assets.tarkov.dev/${encodeURIComponent(id)}-icon.webp" alt=""><div><strong>${escapeHtml(markerItemName(id))}</strong><small>Loose item locations</small></div><button type="button" aria-label="Clear item overlay">×</button></div>`;
+    el.selectedItem.innerHTML = `<div class="selected-item-row"><span class="item-icon-placeholder" aria-hidden="true">I</span><div><strong>${escapeHtml(markerItemName(id))}</strong><small>Loose item locations</small></div><button type="button" aria-label="Clear item overlay">×</button></div>`;
     el.selectedItem.querySelector("button").addEventListener("click", clearFocusedItem);
   }
 
@@ -690,7 +690,7 @@
   }
 
   function showMarkerPopup(details) {
-    const image = details.itemId ? `<img src="https://assets.tarkov.dev/${encodeURIComponent(details.itemId)}-icon.webp" alt="">` : "";
+    const image = details.itemId ? `<span class="item-icon-placeholder" aria-hidden="true">I</span>` : "";
     el.markerPopup.innerHTML = `<div class="marker-popup-head"><strong>${escapeHtml(details.title)}</strong><button type="button" aria-label="Close">×</button></div>${image}${details.body ? `<p>${escapeHtml(details.body)}</p>` : ""}<small>${escapeHtml(details.coordinates || "")}</small>`;
     el.markerPopup.hidden = false;
     el.markerPopup.querySelector("button").addEventListener("click", () => { el.markerPopup.hidden = true; });
@@ -1242,7 +1242,7 @@
   }
 
   const KOREAN = {
-    Layers: "레이어", Quests: "퀘스트", Progress: "진행도", Squad: "분대", "Floor editor": "층 편집", Ruler: "거리 측정",
+    Overlays: "오버레이", Quests: "퀘스트", Progress: "진행도", Squad: "분대", "Floor editor": "층 편집", Ruler: "거리 측정",
     "Hide panels": "패널 숨기기", "Show panels": "패널 보이기", "Full screen": "전체 화면", Fit: "맞춤",
     "Wall colors": "벽 색상", "Floor markers": "층 마커", Panel: "패널", right: "오른쪽", bottom: "아래", floating: "이동식",
     arrows: "화살표", opacity: "반투명", both: "둘 다"
@@ -1251,13 +1251,32 @@
   KOREAN["Battle Pass"] = "배틀패스";
   function t(value) { return state.language === "ko" ? (KOREAN[value] || value) : value; }
   function applyLanguage() {
-    el.layersToggle.textContent = t("Layers"); el.questToggle.textContent = t("Quests"); el.progressToggle.textContent = t("Progress");
+    el.layersToggle.textContent = t("Overlays"); el.questToggle.textContent = t("Quests"); el.progressToggle.textContent = t("Progress");
     el.floorEditToggle.textContent = t("Floor editor");
     el.squadToggle.firstChild.textContent = `${t("Squad")} `; el.rulerToggle.textContent = t("Ruler");
     el.fullScreen.textContent = t("Full screen"); el.zoomReset.textContent = t("Fit");
     const hidden = el.content.classList.contains("panels-hidden"); el.hidePanels.textContent = t(hidden ? "Show panels" : "Hide panels");
     setPanelPosition(state.panelPosition); setMarkerMode(state.markerMode); setWallColors(state.wallColors);
     renderLayerList();
+  }
+
+  function setPanelsHidden(hidden) {
+    el.content.classList.toggle("panels-hidden", Boolean(hidden));
+    el.hidePanels.textContent = t(hidden ? "Show panels" : "Hide panels");
+    requestAnimationFrame(() => { layoutMapWorld(); resetView(); });
+    return Boolean(hidden);
+  }
+
+  function togglePanels() {
+    return setPanelsHidden(!el.content.classList.contains("panels-hidden"));
+  }
+
+  function showLeftPanelPage(page) {
+    const showQuests = page === "quests";
+    el.layerDrawer.classList.toggle("open", !showQuests);
+    el.questDrawer.classList.toggle("open", showQuests);
+    el.layersToggle.classList.toggle("active", !showQuests);
+    el.questToggle.classList.toggle("active", showQuests);
   }
 
   function setPanelPosition(position) {
@@ -1431,20 +1450,15 @@
   });
 
   el.layersToggle.addEventListener("click", () => {
-    el.questDrawer.classList.remove("open");
-    el.layerDrawer.classList.toggle("open");
+    showLeftPanelPage("overlays");
   });
   el.questToggle.addEventListener("click", () => {
-    el.layerDrawer.classList.remove("open");
-    el.questDrawer.classList.toggle("open");
+    showLeftPanelPage("quests");
   });
   el.mapSearch.addEventListener("input", renderSearchResults);
   el.questSearch.addEventListener("input", renderQuests);
   el.rulerToggle.addEventListener("click", () => setRuler(!state.rulerActive));
-  el.hidePanels.addEventListener("click", () => {
-    const hidden = el.content.classList.toggle("panels-hidden");
-    el.hidePanels.textContent = t(hidden ? "Show panels" : "Hide panels");
-  });
+  el.hidePanels.addEventListener("click", togglePanels);
   el.fullScreen.addEventListener("click", () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen());
   el.wallToggle.addEventListener("click", () => { setWallColors(!state.wallColors); post("wall-colors-changed", { enabled: state.wallColors }); });
   el.markerMode.addEventListener("click", () => { const modes = ["arrows", "opacity", "both"]; setMarkerMode(modes[(modes.indexOf(state.markerMode) + 1) % modes.length]); post("marker-mode-changed", { mode: state.markerMode }); });
@@ -1502,7 +1516,9 @@
     selectFloorByHotkey,
     setProgress,
     setFloorEditor,
-    toggleRequirements: () => { el.requirementsPanel.hidden = !el.requirementsPanel.hidden; return el.requirementsPanel.hidden; },
+    setPanelsHidden,
+    togglePanels,
+    toggleRequirements: togglePanels,
     resetView,
     getCalibrationReport: calibrationReport,
     getState: () => ({ map: state.mapKey, floor: state.currentFloor, pinned: [...state.pinned], markerMode: state.markerMode, panelPosition: state.panelPosition, wallColors: state.wallColors, visibleLayers: [...state.visibleLayers], focusedItemId: state.focusedItemId, progress: progressPayload(), floorEditor: { enabled: state.floorEditor.enabled, zones: state.floorEditor.zones.length } })
