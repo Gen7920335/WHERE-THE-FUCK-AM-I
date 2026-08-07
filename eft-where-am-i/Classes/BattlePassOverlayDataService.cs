@@ -22,7 +22,12 @@ namespace eft_where_am_i.Classes
     {
         private sealed record MapDefinition(
             string Slug,
-            (double X, double Z, double Left, double Top)[] Anchors);
+            double Width,
+            double Height,
+            double Rotation,
+            double XOffset,
+            double YOffset,
+            double Ratio);
 
         private static readonly Dictionary<string, MapDefinition> Maps = CreateMapDefinitions();
         private readonly Dictionary<string, BattlePassOverlaySnapshot> cache = new(StringComparer.OrdinalIgnoreCase);
@@ -57,11 +62,16 @@ namespace eft_where_am_i.Classes
                         continue;
                     }
 
+                    string confidenceLabel = location["coordinateBasis"]?.ToString() == "reported-poi-center"
+                        ? "제보 POI 기준 추정 좌표"
+                        : location["confidence"]?.ToString() == "reported"
+                            ? "단일/추가 제보 좌표"
+                            : "복수 제보 확인 좌표";
                     string details = string.Join(" · ", new[]
                     {
                         location["documents"]?.ToString(),
                         location["detail"]?.ToString(),
-                        location["confidence"] is JToken confidence ? $"Confidence: {confidence}" : null,
+                        confidenceLabel,
                         location["coordinateNote"]?.ToString()
                     }.Where(value => !string.IsNullOrWhiteSpace(value)));
 
@@ -97,26 +107,23 @@ namespace eft_where_am_i.Classes
         {
             left = 0;
             top = 0;
-            var a = map.Anchors[0];
-            var b = map.Anchors[1];
-            var c = map.Anchors[2];
-            double abX = b.X - a.X;
-            double abZ = b.Z - a.Z;
-            double acX = c.X - a.X;
-            double acZ = c.Z - a.Z;
-            double pointX = worldX - a.X;
-            double pointZ = worldZ - a.Z;
-            double determinant = (abX * acZ) - (abZ * acX);
-            if (Math.Abs(determinant) < 0.000001)
+            if (map.Width <= 0 || map.Height <= 0 || map.Ratio <= 0)
             {
                 return false;
             }
 
-            double alongTop = ((pointX * acZ) - (pointZ * acX)) / determinant;
-            double alongLeft = ((abX * pointZ) - (abZ * pointX)) / determinant;
-            left = a.Left + (alongTop * (b.Left - a.Left)) + (alongLeft * (c.Left - a.Left));
-            top = a.Top + (alongTop * (b.Top - a.Top)) + (alongLeft * (c.Top - a.Top));
-            return true;
+            // Tarkov Market's native marker plane is geometry.x = EFT world Z and
+            // geometry.y = EFT world X. Apply its production gamePosToMapPos logic.
+            double gameX = worldZ;
+            double gameY = worldX;
+            double radians = -map.Rotation * Math.PI / 180.0;
+            double rotatedX = (gameX * Math.Cos(radians)) - (gameY * Math.Sin(radians));
+            double rotatedY = (gameX * Math.Sin(radians)) + (gameY * Math.Cos(radians));
+            double mapX = map.XOffset - (rotatedX * map.Ratio);
+            double mapY = map.YOffset - (rotatedY * map.Ratio);
+            left = (mapX / map.Width) * 100.0;
+            top = (mapY / map.Height) * 100.0;
+            return double.IsFinite(left) && double.IsFinite(top);
         }
 
         private static bool TryReadDouble(JToken? token, out double value)
@@ -127,22 +134,22 @@ namespace eft_where_am_i.Classes
 
         private static Dictionary<string, MapDefinition> CreateMapDefinitions()
         {
-            static (double, double, double, double)[] A(params (double, double, double, double)[] values) => values;
             return new Dictionary<string, MapDefinition>(StringComparer.OrdinalIgnoreCase)
             {
-                ["factory"] = new("factory", A((77, 67.4, 0, 0), (77, -64.5, 100, 0), (-65.5, 67.4, 0, 100))),
-                ["customs"] = new("customs", A((698, -307, 0, 0), (-372, -307, 100, 0), (698, 237, 0, 100))),
-                ["woods"] = new("woods", A((646, -914, 0, 0), (-761, -914, 100, 0), (646, 442, 0, 100))),
-                ["shoreline"] = new("shoreline", A((504, -415, 0, 0), (-1056, -415, 100, 0), (504, 618, 0, 100))),
-                ["interchange"] = new("interchange", A((598, -442, 0, 0), (-433, -442, 100, 0), (598, 426, 0, 100))),
-                ["lab"] = new("lab", A((-287, -477, 0, 0), (-287, -193, 100, 0), (-80, -477, 0, 100))),
-                ["reserve"] = new("reserve", A((289, -274, 0, 0), (-303, -274, 100, 0), (289, 272, 0, 100))),
-                ["lighthouse"] = new("lighthouse", A((515, -998, 0, 0), (-545, -998, 100, 0), (515, 725, 0, 100))),
-                ["streets"] = new("streets", A((323, -295, 0, 0), (-280, -295, 100, 0), (323, 532, 0, 100))),
-                ["ground-zero"] = new("ground-zero", A((249, -124, 0, 0), (-99, -124, 100, 0), (249, 364, 0, 100))),
-                ["terminal"] = new("terminal", A((463, -580, 0, 0), (-433, -580, 100, 0), (463, 475, 0, 100))),
-                ["labyrinth"] = new("labyrinth", A((-52, -37, 0, 0), (-52, 76, 100, 0), (53, -37, 0, 100))),
-                ["icebreaker"] = new("icebreaker", A((77, -64.5, 0, 0), (-65.5, -64.5, 100, 0), (77, 67.4, 0, 100)))
+                // Tarkov Market map settings observed from its production map bundle
+                // on 2026-08-08 (size + transform passed to gamePosToMapPos).
+                ["factory"] = new("factory", 3600, 3600, 0, 1800, 1850, 10),
+                ["customs"] = new("customs", 4400, 3200, 90, 2600, 1600, 2),
+                ["interchange"] = new("interchange", 4000, 3900, 90, 2166, 2004, 2),
+                ["woods"] = new("woods", 4800, 4800, 90, 2200, 2840, 2),
+                ["shoreline"] = new("shoreline", 3700, 3100, 90, 1570, 1450, 1),
+                ["reserve"] = new("reserve", 3200, 3000, 105, 1600, 1520, 2),
+                ["lighthouse"] = new("lighthouse", 3100, 3700, 90, 1550, 2050, 1),
+                ["streets"] = new("streets", 3260, 3500, 90, 1660, 1420, 2),
+                ["lab"] = new("lab", 5500, 4200, 180, 6100, 4050, 10),
+                ["ground-zero"] = new("ground-zero", 2800, 3100, 90, 1600, 1300, 2),
+                ["labyrinth"] = new("labyrinth", 3300, 3200, 180, 1485, 1602, 10),
+                ["icebreaker"] = new("icebreaker", 5000, 8400, 90, 2500, 4200, 25)
             };
         }
     }

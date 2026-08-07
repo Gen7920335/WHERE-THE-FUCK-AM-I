@@ -1,7 +1,34 @@
 {
-  "version": 1,
-  "updatedAt": "2026-08-07",
-  "coordinatePolicy": "Exact tarkov.dev/EFT world coordinates where public data identifies the room; otherwise the center of the reported room, furniture group, or POI.",
+  "version": 2,
+  "updatedAt": "2026-08-08",
+  "coordinatePolicy": "EFT world positions are projected with Tarkov Market's production gamePosToMapPos transforms. Tarkov Market geometry.x maps to EFT world Z and geometry.y maps to EFT world X. reported-poi-center entries remain estimates and are labeled as such in the tooltip.",
+  "verification": {
+    "mapBasis": "Tarkov Market production maps",
+    "mapUrl": "https://tarkov-market.com/maps/",
+    "checkedAt": "2026-08-08",
+    "productionBundle": "https://tarkov-market.com/_nuxt3/CjfN-RoL.js",
+    "markerApi": "https://tarkov-market.com/api/be/markers/list",
+    "markerHash": "42605c5d0e2dc7b0a408d88a691d79de",
+    "nativeMarkerCount": 5004,
+    "nativeBattlePassCategoryPresent": false,
+    "projectedLocationCount": 140,
+    "projectedLocationsInsideMap": 140,
+    "confidencePolicy": {
+      "confirmed": "Location reported by multiple community observations; exact point is aligned to an EFT/Tarkov Market world-coordinate reference where available.",
+      "reported": "Single or additional community report; verify in raid.",
+      "reported-poi-center": "No public exact point was available; marker is an estimated POI center and is not an exact spawn pin."
+    },
+    "notes": [
+      "Tarkov Market did not expose a native Battle Pass/document marker category at verification time.",
+      "Icebreaker reports exist, but exact per-spawn coordinates were not published; they are intentionally not rendered as fake precise pins."
+    ],
+    "currentCommunitySources": [
+      "https://www.reddit.com/r/EscapefromTarkov/comments/1veo5dt/seasonal_documents_loot/",
+      "https://www.reddit.com/r/EscapefromTarkov/comments/1vgp0wa/loot_factory_document_locations/",
+      "https://www.reddit.com/r/EscapefromTarkov/comments/1vf531s/discussion_kord_breach_battlepass_guide/",
+      "https://www.reddit.com/r/EscapefromTarkov/comments/1vgnd80/discussion_i_havent_found_any_of_the_documents_on/"
+    ]
+  },
   "maps": {
     "factory": [
       {"title":"Office 3F - safe desk drawer","documents":"프로젝트 / 설계도·기술 도면","detail":"금고 책상 오른쪽 열린 서랍","confidence":"confirmed","position":[23.25,8.54,39.40]},
@@ -148,7 +175,7 @@
       {"title":"Dome RB-KORL bookshelf","documents":"PMC 인원 파일 / 프로젝트","detail":"입구 바로 오른쪽 나무 책장","confidence":"confirmed","position":[-2.51,23.42,174.91]},
       {"title":"Dome RB-KPRL windowsill","documents":"PMC 인원 파일 / 프로젝트","detail":"창턱","confidence":"confirmed","position":[-40.45,19.66,173.89]},
       {"title":"K Buildings K4 front desk","documents":"PMC 인원 파일 / 프로젝트","detail":"잠긴 상자 맞은편 앞쪽 책상","confidence":"confirmed","position":[100.00,0.50,-40.00]},
-      {"title":"Checkpoint Fence guard tower","documents":"프로젝트","detail":"책상 서랍 안쪽 공간","confidence":"confirmed","coordinateBasis":"reported-poi-center","coordinateNote":"공개 제보의 Checkpoint Fence 경비초소를 POI 중심으로 환산한 추정 좌표","position":[222.00,1.00,95.00]},
+      {"title":"Checkpoint Fence guard tower","documents":"프로젝트","detail":"책상 서랍 안쪽 공간","confidence":"confirmed","coordinateBasis":"reported-poi-center","coordinateNote":"Tarkov Market 네이티브 Checkpoint Fence 탈출구 중심을 기준으로 한 POI 추정 좌표","position":[61.8752,1.00,131.9897]},
       {"title":"D2 command center switch desks","documents":"PMC 인원 파일 / 프로젝트","detail":"D2 전원 스위치 주변 책상 앞 바닥","confidence":"confirmed","position":[-114.36,-13.71,27.36]},
       {"title":"White Horse building","documents":"PMC 인원 파일 / 프로젝트","detail":"건물 내부 루스 스폰","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"공개 제보의 White Horse 건물을 POI 중심으로 환산한 추정 좌표","position":[-35.00,1.00,-85.00]},
       {"title":"No Backpack outer two-story shack","documents":"PMC 인원 파일 / 프로젝트","detail":"첫 나무 책상, 열린 서랍 아래","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"공개 제보의 No Backpack 외곽 2층 오두막을 POI 중심으로 환산한 추정 좌표","position":[280.00,1.00,-240.00]}
