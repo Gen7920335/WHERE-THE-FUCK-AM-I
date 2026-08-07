@@ -66,7 +66,7 @@
     { id: "container-ration", group: "Loot", label: "Ration supply crate", icon: "box", color: "#9a8866" },
     { id: "container-other", group: "Loot", label: "Other container", icon: "box", color: "#9a8866" },
     { id: "loose-item", group: "Loot", label: "Loose item", icon: "item", color: "#9a8866" },
-    { id: "battle-pass", group: "Loot", label: "Battle Pass", icon: "star", color: "#2196ff" }
+    { id: "battle-pass", group: "Loot", label: "Battle Pass", icon: "star", color: "#0b63d8" }
   ];
   const LAYER_BY_ID = new Map(LAYERS.map(layer => [layer.id, layer]));
   const CONTAINER_LAYER_BY_TYPE = {
