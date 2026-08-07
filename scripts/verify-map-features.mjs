@@ -6,7 +6,7 @@ const repoRoot = resolve(import.meta.dirname, "..");
 const mapJs = await readFile(resolve(repoRoot, "eft-where-am-i/html/map.js"), "utf8");
 const mapCss = await readFile(resolve(repoRoot, "eft-where-am-i/html/map.css"), "utf8");
 const mapHtml = await readFile(resolve(repoRoot, "eft-where-am-i/html/map.html"), "utf8");
-const settingsHtml = await readFile(resolve(repoRoot, "eft-where-am-i/html/settings.html"), "utf8");
+const panelHtml = await readFile(resolve(repoRoot, "eft-where-am-i/html/panel.html"), "utf8");
 const whereAmICs = await readFile(resolve(repoRoot, "eft-where-am-i/UserControls/WhereAmI.cs"), "utf8");
 const settingsCs = await readFile(resolve(repoRoot, "eft-where-am-i/Classes/SettingsHandler.cs"), "utf8");
 const floorManagerCs = await readFile(resolve(repoRoot, "eft-where-am-i/Classes/FloorManager.cs"), "utf8");
@@ -150,8 +150,11 @@ for (const task of quests.tasks) {
     if (!traderIds.has(String(requirement.trader))) throw new Error(`${task.name}: unknown trader requirement`);
 }
 
-for (const token of ["questAvailable", "questMatchesFilter", "progress-settings-changed", "completedQuests", "selectFloorByHotkey", "setFloorEditor", "save-floor-zones", "setIconScale", "--map-inverse-scale", "icon-scale-changed"]) {
+for (const token of ["questAvailable", "questMatchesFilter", "progress-settings-changed", "completedQuests", "selectFloorByHotkey", "setFloorEditor", "save-floor-zones", "setIconScale", "--map-inverse-scale"]) {
   if (!mapJs.includes(token)) throw new Error(`Local parity feature is missing: ${token}`);
+}
+for (const token of ["icon-scale-preview", "icon-scale-changed", "setIconScaleControl"]) {
+  if (!panelHtml.includes(token)) throw new Error(`Top-panel icon scaling is missing: ${token}`);
 }
 for (const token of ["map_use_progress", "map_quest_filter", "trader_levels", "completed_quests", "squad_enabled", "squad_mode", "squad_room", "squad_host", "map_visible_layers", "quest_panel_offset_x", "icon_scale"]) {
   if (!settingsCs.includes(token)) throw new Error(`Persistent setting is missing: ${token}`);
@@ -159,8 +162,8 @@ for (const token of ["map_use_progress", "map_quest_filter", "trader_levels", "c
 if (!mapCss.includes("--marker-scale") || !mapCss.includes("scale: var(--map-inverse-scale)")) {
   throw new Error("Map icons must support independent sizing and zoom-invariant screen dimensions");
 }
-if (!mapHtml.includes("iconScaleSlider") || !settingsHtml.includes("iconScaleSlider")) {
-  throw new Error("Icon-scale controls must be present in the map panel and settings page");
+if (!panelHtml.includes('id="iconScaleSlider"') || !panelHtml.includes('min="50" max="250"') || mapHtml.includes('id="iconScaleSlider"')) {
+  throw new Error("The 50%-250% icon-scale control must live in the top control panel");
 }
 const requirementsPanelIndex = mapHtml.indexOf('id="requirementsPanel"');
 const floorButtonsIndex = mapHtml.indexOf('id="floorButtons"');

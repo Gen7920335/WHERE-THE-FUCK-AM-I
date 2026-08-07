@@ -11,12 +11,8 @@ namespace eft_where_am_i_chasrp
 {
     public partial class Form1 : Form
     {
-        private string currentScreen = "WhereAmI";
-
         // UserControl을 캐싱해서 상태 유지
         private WhereAmI whereAmIControl;
-        private SettingPage settingPageControl;
-        private ServerLocation serverLocationControl;
 
         public Form1()
         {
@@ -35,22 +31,14 @@ namespace eft_where_am_i_chasrp
         {
             // 화면 3개 생성 (딱 1번만)
             whereAmIControl = new WhereAmI();
-            settingPageControl = new SettingPage();
-            serverLocationControl = new ServerLocation();
 
             // Panel에 미리 추가
             panel1.Controls.Add(whereAmIControl);
-            panel1.Controls.Add(settingPageControl);
-            panel1.Controls.Add(serverLocationControl);
 
             whereAmIControl.Dock = DockStyle.Fill;
-            settingPageControl.Dock = DockStyle.Fill;
-            serverLocationControl.Dock = DockStyle.Fill;
 
             // 시작 화면 설정
             whereAmIControl.Visible = true;
-            settingPageControl.Visible = false;
-            serverLocationControl.Visible = false;
         }
 
         const int MAX_SLIDING_WIDTH = 200;
@@ -62,20 +50,12 @@ namespace eft_where_am_i_chasrp
         {
             if (checkBoxHide.Checked == true)
             {
-                btnSetting.Text = "Setting Page";
-                btnSetting.Image = null;
-                btnServerLocation.Text = "Server Location";
-                btnServerLocation.Image = null;
                 btnWhereAmI.Text = "WHERE THE FUCK AM I";
                 btnWhereAmI.Image = null;
                 checkBoxHide.Text = "<";
             }
             else
             {
-                btnSetting.Text = "";
-                btnSetting.Image = Image.FromFile(@"assets\images\settings_icon2_resize.png");
-                btnServerLocation.Text = "";
-                btnServerLocation.Image = Image.FromFile(@"assets\images\server.png");
                 btnWhereAmI.Text = "";
                 btnWhereAmI.Image = Image.FromFile(@"assets\images\eft-where-am-i_icon_resize.png");
                 checkBoxHide.Text = ">";
@@ -158,39 +138,10 @@ namespace eft_where_am_i_chasrp
             }
         }
 
-        private void btnSetting_Click(object sender, EventArgs e)
-        {
-            if (currentScreen != "SettingPage")
-            {
-                SwitchUserControl(settingPageControl);
-                currentScreen = "SettingPage";
-            }
-        }
-
-        private void btnWhereAmI_Click(object sender, EventArgs e)
-        {
-            if (currentScreen != "WhereAmI")
-            {
-                SwitchUserControl(whereAmIControl);
-                currentScreen = "WhereAmI";
-            }
-        }
-
-        private void btnServerLocation_Click(object sender, EventArgs e)
-        {
-            if (currentScreen != "ServerLocation")
-            {
-                SwitchUserControl(serverLocationControl);
-                currentScreen = "ServerLocation";
-            }
-        }
-
         private void SwitchUserControl(UserControl control)
         {
             // 모든 화면 숨기기
             whereAmIControl.Visible = false;
-            settingPageControl.Visible = false;
-            serverLocationControl.Visible = false;
 
             // 새 화면만 보이기
             control.Visible = true;

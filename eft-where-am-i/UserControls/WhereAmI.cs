@@ -152,6 +152,8 @@ namespace eft_where_am_i
                     string mapListJson = Newtonsoft.Json.JsonConvert.SerializeObject(GetMapListForLanguage(language));
                     await webView2_panel_ui.ExecuteScriptAsync($"populateMapList('{mapListJson}', '{appSettings.latest_map}')");
                     await webView2_panel_ui.ExecuteScriptAsync($"setTheme('{appSettings.theme_mode}')");
+                    await webView2_panel_ui.ExecuteScriptAsync(
+                        $"setIconScaleControl({appSettings.icon_scale.ToString(System.Globalization.CultureInfo.InvariantCulture)})");
                 }
                 catch (Exception ex)
                 {
@@ -372,6 +374,9 @@ namespace eft_where_am_i
                         await webView2_panel_ui.ExecuteScriptAsync(
                             $"setAutoScreenshotCleanupCheckboxState({appSettings.auto_screenshot_cleanup.ToString().ToLower()})");
 
+                        await webView2_panel_ui.ExecuteScriptAsync(
+                            $"setIconScaleControl({appSettings.icon_scale.ToString(System.Globalization.CultureInfo.InvariantCulture)})");
+
                         // 디버그 모드 플래그 전송
 #if DEBUG
                         await webView2_panel_ui.ExecuteScriptAsync("setDebugMode(true)");
@@ -489,6 +494,20 @@ namespace eft_where_am_i
                             else if (!isChecked && !appSettings.auto_map_detection)
                                 logWatcher.Stop();
                         }
+                        break;
+
+                    case "icon-scale-preview":
+                        double previewScale = Math.Clamp(message["scale"]?.Value<double>() ?? 1.0, 0.5, 2.5);
+                        if (webView2.CoreWebView2 != null)
+                        {
+                            await webView2.ExecuteScriptAsync(
+                                $"window.eftMap?.setIconScale({previewScale.ToString(System.Globalization.CultureInfo.InvariantCulture)})");
+                        }
+                        break;
+
+                    case "icon-scale-changed":
+                        appSettings.icon_scale = Math.Clamp(message["scale"]?.Value<double>() ?? 1.0, 0.5, 2.5);
+                        SaveSettings();
                         break;
 
                     case "theme-updated":
@@ -1176,7 +1195,7 @@ namespace eft_where_am_i
                         break;
 
                     case "icon-scale-changed":
-                        appSettings.icon_scale = Math.Clamp(message["scale"]?.Value<double>() ?? 1.0, 0.5, 2.0);
+                        appSettings.icon_scale = Math.Clamp(message["scale"]?.Value<double>() ?? 1.0, 0.5, 2.5);
                         SaveSettings();
                         break;
 

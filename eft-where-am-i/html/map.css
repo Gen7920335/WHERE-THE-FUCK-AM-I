@@ -333,9 +333,6 @@ button:hover, button.active, button[aria-pressed="true"] { border-color: var(--a
 .view-controls { gap: 0; padding: 0; border-top: 1px solid #302b21; border-bottom: 0; background: #050505; }
 .view-controls > strong { padding: 8px 9px; color: #a99a78; font-size: .83em; text-transform: none; }
 .view-controls button { min-height: calc(28px * var(--ui-scale)); border: 0; border-top: 1px solid #211f19; padding: 4px 9px; color: #948e80; background: #090909; font-size: .8em; }
-.icon-scale-control { display: grid; grid-template-columns: auto minmax(58px,1fr) 38px; align-items: center; gap: 6px; min-height: calc(31px * var(--ui-scale)); padding: 4px 9px; border-top: 1px solid #211f19; color: #aaa395; background: #090909; font-size: .8em; }
-.icon-scale-control input { width: 100%; min-width: 0; accent-color: #8d7a50; }
-.icon-scale-control output { color: #c9ba91; text-align: right; font-variant-numeric: tabular-nums; }
 .pin-count { padding: 0 5px; border-radius: 0; background: transparent; color: inherit; }
 .map-marker-button { width: calc(15px * var(--marker-scale)); height: calc(15px * var(--marker-scale)); border: 0; border-radius: 0; color: var(--marker-color, #9a8866); background: transparent; box-shadow: none; filter: none; }
 .map-marker-button .marker-icon { width: 100%; height: 100%; overflow: visible; fill: currentColor; filter: drop-shadow(0 1px 1px #000) drop-shadow(0 0 1.5px currentColor); }
