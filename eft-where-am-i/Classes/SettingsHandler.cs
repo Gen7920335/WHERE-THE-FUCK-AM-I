@@ -315,6 +315,6 @@ namespace eft_where_am_i.Classes
         public Dictionary<string, bool> battle_pass_visible_per_map { get; set; } = new Dictionary<string, bool>();
         public string squad_name { get; set; } = string.Empty;
         public string squad_host { get; set; } = "127.0.0.1";
-        public int squad_port { get; set; } = 27655;
+        public int squad_port { get; set; } = 16243;
     }
 }

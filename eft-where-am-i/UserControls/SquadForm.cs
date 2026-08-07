@@ -77,7 +77,7 @@ namespace eft_where_am_i
             passwordBox.UseSystemPasswordChar = true;
             portBox.Minimum = 1024;
             portBox.Maximum = 65535;
-            portBox.Value = 27655;
+            portBox.Value = 16243;
             portBox.Dock = DockStyle.Fill;
             portBox.BackColor = Color.FromArgb(58, 58, 58);
             portBox.ForeColor = Color.WhiteSmoke;
