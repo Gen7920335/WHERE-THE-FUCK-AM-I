@@ -764,6 +764,7 @@ namespace eft_where_am_i
             {
                 map = appSettings.latest_map,
                 uiScale = appSettings.ui_scale,
+                iconScale = appSettings.icon_scale,
                 panelPosition = appSettings.quest_panel_position,
                 panelOffset = new { x = appSettings.quest_panel_offset_x, y = appSettings.quest_panel_offset_y },
                 markerMode = appSettings.quest_floor_marker_mode,
@@ -1171,6 +1172,11 @@ namespace eft_where_am_i
 
                     case "wall-colors-changed":
                         appSettings.tarkov_wall_colors = message["enabled"]?.Value<bool>() ?? false;
+                        SaveSettings();
+                        break;
+
+                    case "icon-scale-changed":
+                        appSettings.icon_scale = Math.Clamp(message["scale"]?.Value<double>() ?? 1.0, 0.5, 2.0);
                         SaveSettings();
                         break;
 

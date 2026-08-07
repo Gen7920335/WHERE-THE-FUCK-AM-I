@@ -151,6 +151,11 @@
         <span id="uiScaleValue">100%</span>
       </label>
       <label class="flex items-center space-x-3">
+        <span class="w-48">Map icon scale</span>
+        <input id="iconScaleSlider" type="range" min="50" max="200" step="5" value="100" oninput="updateFeatureSettings()" class="w-64">
+        <span id="iconScaleValue">100%</span>
+      </label>
+      <label class="flex items-center space-x-3">
         <span class="w-48">Quest panel position</span>
         <select id="questPanelPosition" onchange="updateFeatureSettings()" class="border rounded px-3 py-1.5 bg-white text-gray-900">
           <option value="right">Right</option>
@@ -354,10 +359,13 @@
       }
     }
 
-    function setFeatureSettings(uiScale, panelPosition, markerMode, wallColors) {
+    function setFeatureSettings(uiScale, panelPosition, markerMode, wallColors, iconScale) {
       const scale = document.getElementById('uiScaleSlider');
       scale.value = Math.round((Number(uiScale) || 1) * 100);
       document.getElementById('uiScaleValue').textContent = scale.value + '%';
+      const icons = document.getElementById('iconScaleSlider');
+      icons.value = Math.round((Number(iconScale) || 1) * 100);
+      document.getElementById('iconScaleValue').textContent = icons.value + '%';
       document.getElementById('questPanelPosition').value = panelPosition || 'right';
       document.getElementById('questFloorMarkerMode').value = markerMode || 'arrows';
       document.getElementById('tarkovWallColors').checked = Boolean(wallColors);
@@ -365,10 +373,13 @@
 
     function updateFeatureSettings() {
       const scale = Number(document.getElementById('uiScaleSlider').value) / 100;
+      const iconScale = Number(document.getElementById('iconScaleSlider').value) / 100;
       document.getElementById('uiScaleValue').textContent = Math.round(scale * 100) + '%';
+      document.getElementById('iconScaleValue').textContent = Math.round(iconScale * 100) + '%';
       window.chrome.webview.postMessage(JSON.stringify({
         action: 'map-feature-settings-changed',
         uiScale: scale,
+        iconScale: iconScale,
         panelPosition: document.getElementById('questPanelPosition').value,
         markerMode: document.getElementById('questFloorMarkerMode').value,
         wallColors: document.getElementById('tarkovWallColors').checked

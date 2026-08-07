@@ -1,6 +1,8 @@
 :root {
   color-scheme: dark;
   --ui-scale: 1;
+  --marker-scale: 1;
+  --map-inverse-scale: 1;
   --toolbar-height: calc(38px * var(--ui-scale));
   --panel-width: calc(300px * var(--ui-scale));
   --font-size: calc(14px * var(--ui-scale));
@@ -165,15 +167,15 @@ button:hover, button.active, button[aria-pressed="true"] { border-color: var(--a
 .requirement-card .objective { color: #cbd3d7; }
 .empty-state { color: var(--muted); }
 
-.quest-marker, .player-marker, .map-marker, .squad-marker { position: absolute; translate: -50% -50%; pointer-events: auto; }
-.quest-marker { display: grid; place-items: center; width: calc(26px * var(--ui-scale)); height: calc(26px * var(--ui-scale)); }
+.quest-marker, .player-marker, .map-marker, .squad-marker { position: absolute; translate: -50% -50%; scale: var(--map-inverse-scale); transform-origin: center; pointer-events: auto; }
+.quest-marker { display: grid; place-items: center; width: calc(26px * var(--marker-scale)); height: calc(26px * var(--marker-scale)); }
 .quest-dot { width: calc(18px * var(--ui-scale)); height: calc(18px * var(--ui-scale)); border: 2px solid #fff4c8; border-radius: 50%; background: #c78f25; box-shadow: 0 1px 7px #000; cursor: pointer; }
 .quest-marker.off-level.opacity-mode { opacity: .34; }
-.floor-arrows { position: absolute; left: 50%; translate: -50% 0; display: flex; flex-direction: column; align-items: center; white-space: pre; line-height: calc(8px * var(--ui-scale)); font-size: calc(11px * var(--ui-scale)); font-weight: 900; text-shadow: 0 1px 2px #000; }
-.floor-arrows.up { bottom: calc(22px * var(--ui-scale)); color: var(--success); }
-.floor-arrows.down { top: calc(22px * var(--ui-scale)); color: var(--danger); }
-.player-marker { width: calc(30px * var(--ui-scale)); height: calc(30px * var(--ui-scale)); z-index: 20; filter: drop-shadow(0 2px 3px #000); }
-.player-marker::before { content: ""; position: absolute; left: 50%; top: calc(6.5px * var(--ui-scale)); translate: -50% 0; border-left: calc(8px * var(--ui-scale)) solid transparent; border-right: calc(8px * var(--ui-scale)) solid transparent; border-bottom: calc(11px * var(--ui-scale)) solid #55c8ff; transform-origin: 50% 65%; transform: rotate(var(--heading)); }
+.floor-arrows { position: absolute; left: 50%; translate: -50% 0; display: flex; flex-direction: column; align-items: center; white-space: pre; line-height: calc(8px * var(--marker-scale)); font-size: calc(11px * var(--marker-scale)); font-weight: 900; text-shadow: 0 1px 2px #000; }
+.floor-arrows.up { bottom: calc(22px * var(--marker-scale)); color: var(--success); }
+.floor-arrows.down { top: calc(22px * var(--marker-scale)); color: var(--danger); }
+.player-marker { width: calc(30px * var(--marker-scale)); height: calc(30px * var(--marker-scale)); z-index: 20; filter: drop-shadow(0 2px 3px #000); }
+.player-marker::before { content: ""; position: absolute; left: 50%; top: calc(6.5px * var(--marker-scale)); translate: -50% 0; border-left: calc(8px * var(--marker-scale)) solid transparent; border-right: calc(8px * var(--marker-scale)) solid transparent; border-bottom: calc(11px * var(--marker-scale)) solid #55c8ff; transform-origin: 50% 65%; transform: rotate(var(--heading)); }
 
 .map-marker { z-index: 10; }
 .map-marker.off-level { opacity: .28; }
@@ -210,7 +212,7 @@ button:hover, button.active, button[aria-pressed="true"] { border-color: var(--a
 }
 .map-marker.layer-battle-pass.off-level { opacity: .38; }
 @keyframes marker-pulse { 50% { box-shadow: 0 0 0 6px rgba(255,209,102,.22), 0 1px 7px #000; } }
-.squad-marker { z-index: 19; display: grid; place-items: center; width: calc(24px * var(--ui-scale)); height: calc(24px * var(--ui-scale)); border: 2px solid white; border-radius: 4px; background: #b86bff; color: white; font-size: calc(9px * var(--ui-scale)); font-weight: 800; }
+.squad-marker { z-index: 19; display: grid; place-items: center; width: calc(24px * var(--marker-scale)); height: calc(24px * var(--marker-scale)); border: 2px solid white; border-radius: 4px; background: #b86bff; color: white; font-size: calc(9px * var(--marker-scale)); font-weight: 800; }
 .marker-popup, .ruler-readout {
   position: absolute;
   z-index: 45;
@@ -324,16 +326,19 @@ button:hover, button.active, button[aria-pressed="true"] { border-color: var(--a
 .view-controls { gap: 0; padding: 0; border-top: 1px solid #302b21; border-bottom: 0; background: #050505; }
 .view-controls > strong { padding: 8px 9px; color: #a99a78; font-size: .83em; text-transform: none; }
 .view-controls button { min-height: calc(28px * var(--ui-scale)); border: 0; border-top: 1px solid #211f19; padding: 4px 9px; color: #948e80; background: #090909; font-size: .8em; }
+.icon-scale-control { display: grid; grid-template-columns: auto minmax(58px,1fr) 38px; align-items: center; gap: 6px; min-height: calc(31px * var(--ui-scale)); padding: 4px 9px; border-top: 1px solid #211f19; color: #aaa395; background: #090909; font-size: .8em; }
+.icon-scale-control input { width: 100%; min-width: 0; accent-color: #8d7a50; }
+.icon-scale-control output { color: #c9ba91; text-align: right; font-variant-numeric: tabular-nums; }
 .pin-count { padding: 0 5px; border-radius: 0; background: transparent; color: inherit; }
-.map-marker-button { width: calc(15px * var(--ui-scale)); height: calc(15px * var(--ui-scale)); border: 0; border-radius: 0; color: var(--marker-color, #9a8866); background: transparent; box-shadow: none; filter: none; }
+.map-marker-button { width: calc(15px * var(--marker-scale)); height: calc(15px * var(--marker-scale)); border: 0; border-radius: 0; color: var(--marker-color, #9a8866); background: transparent; box-shadow: none; filter: none; }
 .map-marker-button .marker-icon { width: 100%; height: 100%; overflow: visible; fill: currentColor; filter: drop-shadow(0 1px 1px #000) drop-shadow(0 0 1.5px currentColor); }
-.map-marker.item-focused .map-marker-button { width: calc(16.2px * var(--ui-scale)); height: calc(16.2px * var(--ui-scale)); animation: none; }
+.map-marker.item-focused .map-marker-button { width: calc(16.2px * var(--marker-scale)); height: calc(16.2px * var(--marker-scale)); animation: none; }
 .map-marker.item-focused .marker-icon { animation: marker-icon-pulse 1.4s infinite; }
-.quest-dot { display: grid; place-items: center; width: calc(13.8px * var(--ui-scale)); height: calc(13.8px * var(--ui-scale)); padding: 0; border: 0; color: #d6b545; background: transparent; box-shadow: none; filter: none; }
+.quest-dot { display: grid; place-items: center; width: calc(13.8px * var(--marker-scale)); height: calc(13.8px * var(--marker-scale)); padding: 0; border: 0; color: #d6b545; background: transparent; box-shadow: none; filter: none; }
 .quest-dot .marker-icon { width: 100%; height: 100%; overflow: visible; fill: currentColor; filter: drop-shadow(0 1px 1px #000) drop-shadow(0 0 1.5px currentColor); }
 .map-marker-button:hover { color: #efe3bd; background: transparent; transform: scale(1.16); }
 .map-marker.edge-clamped .map-marker-button { border: 1px dashed #df5b55; box-shadow: none; }
-.map-marker.layer-battle-pass .map-marker-button { width: calc(6.3px * var(--ui-scale)); height: calc(6.3px * var(--ui-scale)); color: #0b63d8; background: transparent; box-shadow: none; clip-path: none; }
+.map-marker.layer-battle-pass .map-marker-button { width: calc(6.3px * var(--marker-scale)); height: calc(6.3px * var(--marker-scale)); color: #0b63d8; background: transparent; box-shadow: none; clip-path: none; }
 .map-marker.layer-battle-pass .marker-icon { filter: drop-shadow(0 0 1px #0b63d8) drop-shadow(0 0 2.5px #0b63d8); }
 .map-marker.layer-hazard-mine .map-marker-button, .map-marker.layer-hazard-sniper .map-marker-button { color: #ff2626; }
 @keyframes marker-icon-pulse {

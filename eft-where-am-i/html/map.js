@@ -103,6 +103,7 @@
     panelOffset: { x: -1, y: -1 },
     wallColors: false,
     uiScale: 1,
+    iconScale: 1,
     transform: { x: 0, y: 0, scale: 1 },
     svgAspect: 1,
     mapFrame: { left: 0, top: 0, width: 1, height: 1 },
@@ -118,7 +119,7 @@
     "content", "leftPanel", "layerDrawer", "layerList", "layersToggle", "mapSearch", "mapSearchResults", "markerDataStatus",
     "selectedItem", "questDrawer", "questList", "questSearch", "questStatus", "floorButtons", "mapViewport",
     "mapWorld", "svgHost", "markerLayer", "mapStatus", "requirementsPanel", "requirementsHandle",
-    "requirementsList", "pinCount", "wallToggle", "markerMode", "panelPosition", "questToggle", "pinnedToggle", "pinnedDrawer", "questCount",
+    "requirementsList", "pinCount", "wallToggle", "markerMode", "panelPosition", "iconScaleLabel", "iconScaleSlider", "iconScaleValue", "questToggle", "pinnedToggle", "pinnedDrawer", "questCount",
     "rulerToggle", "measurementLayer", "rulerReadout", "markerPopup", "hidePanels", "fullScreen", "whereAmI", "coordinatesReadout", "mapHelp",
     "zoomIn", "zoomOut", "zoomReset", "progressToggle", "floorEditToggle", "progressDialog", "progressForm", "useProgress",
     "questFilterButtons", "gameEdition", "playerFaction", "playerLevel", "traderLevels", "resetProgress",
@@ -1318,15 +1319,29 @@
     renderFloorEditor();
   }
 
+  function applyScaleVariables() {
+    document.documentElement.style.setProperty("--ui-scale", state.uiScale);
+    document.documentElement.style.setProperty("--marker-scale", state.uiScale * state.iconScale);
+  }
+
   function setScale(scale) {
     state.uiScale = Math.min(2, Math.max(.65, Number(scale) || 1));
-    document.documentElement.style.setProperty("--ui-scale", state.uiScale);
+    applyScaleVariables();
+  }
+
+  function setIconScale(scale) {
+    state.iconScale = Math.min(2, Math.max(.5, Number(scale) || 1));
+    applyScaleVariables();
+    if (el.iconScaleSlider) el.iconScaleSlider.value = String(Math.round(state.iconScale * 100));
+    if (el.iconScaleValue) el.iconScaleValue.textContent = `${Math.round(state.iconScale * 100)}%`;
+    localStorage.setItem("eft-icon-scale", String(state.iconScale));
+    return state.iconScale;
   }
 
   const KOREAN = {
     Overlays: "오버레이", Quests: "퀘스트", Progress: "진행도", Squad: "분대", "Floor editor": "층 편집", Ruler: "거리 측정",
     "Hide panels": "패널 숨기기", "Show panels": "패널 보이기", "Full screen": "전체 화면", Fit: "맞춤",
-    "Wall colors": "벽 색상", "Floor markers": "층 마커", Panel: "패널", right: "오른쪽", bottom: "아래", floating: "이동식",
+    "Wall colors": "벽 색상", "Floor markers": "층 마커", "Icon scale": "아이콘 크기", Panel: "패널", right: "오른쪽", bottom: "아래", floating: "이동식",
     arrows: "화살표", opacity: "반투명", both: "둘 다"
   };
   KOREAN.Loot = "아이템 스폰";
@@ -1337,6 +1352,7 @@
     el.floorEditToggle.textContent = t("Floor editor");
     el.squadToggle.firstChild.textContent = `${t("Squad")} `; el.rulerToggle.textContent = t("Ruler");
     el.fullScreen.textContent = t("Full screen"); el.zoomReset.textContent = t("Fit");
+    el.iconScaleLabel.textContent = t("Icon scale");
     const hidden = el.content.classList.contains("panels-hidden"); el.hidePanels.textContent = state.language === "ko" ? t(hidden ? "Show panels" : "Hide panels") : (hidden ? "Show pannels" : "Hide pannels");
     setPanelPosition(state.panelPosition); setMarkerMode(state.markerMode); setWallColors(state.wallColors);
     renderLayerList();
@@ -1397,6 +1413,7 @@
     if (options.panelOffset && Number.isFinite(Number(options.panelOffset.x)) && Number.isFinite(Number(options.panelOffset.y)))
       state.panelOffset = { x: Number(options.panelOffset.x), y: Number(options.panelOffset.y) };
     setScale(options.uiScale);
+    setIconScale(options.iconScale ?? state.iconScale);
     setPanelPosition(options.panelPosition || state.panelPosition);
     setMarkerMode(options.markerMode || state.markerMode);
     setWallColors(options.wallColors);
@@ -1422,6 +1439,7 @@
   function applyTransform() {
     const { x, y, scale } = state.transform;
     el.mapWorld.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
+    document.documentElement.style.setProperty("--map-inverse-scale", 1 / Math.max(scale, .001));
   }
 
   function layoutMapWorld() {
@@ -1541,6 +1559,8 @@
   el.fullScreen.addEventListener("click", () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen());
   el.whereAmI.addEventListener("click", () => post("force-run"));
   el.wallToggle.addEventListener("click", () => { setWallColors(!state.wallColors); post("wall-colors-changed", { enabled: state.wallColors }); });
+  el.iconScaleSlider.addEventListener("input", () => setIconScale(Number(el.iconScaleSlider.value) / 100));
+  el.iconScaleSlider.addEventListener("change", () => post("icon-scale-changed", { scale: state.iconScale }));
   el.markerMode.addEventListener("click", () => { const modes = ["arrows", "opacity", "both"]; setMarkerMode(modes[(modes.indexOf(state.markerMode) + 1) % modes.length]); post("marker-mode-changed", { mode: state.markerMode }); });
   el.panelPosition.addEventListener("click", () => { const positions = ["right", "bottom", "floating"]; setPanelPosition(positions[(positions.indexOf(state.panelPosition) + 1) % positions.length]); post("panel-position-changed", { position: state.panelPosition }); });
   el.zoomIn.addEventListener("click", () => zoomAt(1.2, innerWidth / 2, innerHeight / 2));
@@ -1584,6 +1604,7 @@
 
   window.eftMap = {
     configure,
+    setIconScale,
     setMap: loadMap,
     setPinnedQuests,
     setPlayerPosition,
@@ -1601,7 +1622,7 @@
     toggleRequirements: togglePanels,
     resetView,
     getCalibrationReport: calibrationReport,
-    getState: () => ({ map: state.mapKey, floor: state.currentFloor, pinned: [...state.pinned], markerMode: state.markerMode, panelPosition: state.panelPosition, wallColors: state.wallColors, visibleLayers: [...state.visibleLayers], focusedItemId: state.focusedItemId, progress: progressPayload(), floorEditor: { enabled: state.floorEditor.enabled, zones: state.floorEditor.zones.length } })
+    getState: () => ({ map: state.mapKey, floor: state.currentFloor, pinned: [...state.pinned], markerMode: state.markerMode, panelPosition: state.panelPosition, wallColors: state.wallColors, iconScale: state.iconScale, visibleLayers: [...state.visibleLayers], focusedItemId: state.focusedItemId, progress: progressPayload(), floorEditor: { enabled: state.floorEditor.enabled, zones: state.floorEditor.zones.length } })
   };
 
   try {
@@ -1610,6 +1631,7 @@
   } catch { }
   state.panelPosition = localStorage.getItem("eft-panel-position") || "right";
   setPanelPosition(state.panelPosition);
+  setIconScale(Number(localStorage.getItem("eft-icon-scale")) || 1);
   loadMap(state.mapKey);
   loadQuests();
   loadMarkerData();
