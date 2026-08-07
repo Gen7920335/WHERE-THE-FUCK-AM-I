@@ -178,7 +178,9 @@ namespace eft_where_am_i.Classes
                 foreach (var zone in config.zones)
                 {
                     // 1. 외곽 폴리곤 안에 있는가?
-                    if (!IsPointInPolygon(x, y, zone.polygon))
+                    // Floor polygons use the horizontal EFT world plane (X/Z).
+                    // PolygonPoint.y is retained for JSON compatibility, but stores world Z.
+                    if (!IsPointInPolygon(x, z, zone.polygon))
                         continue;
 
                     // 2. hole 안에 있는가?
@@ -187,7 +189,7 @@ namespace eft_where_am_i.Classes
                     {
                         foreach (var hole in zone.holes)
                         {
-                            if (IsPointInPolygon(x, y, hole))
+                            if (IsPointInPolygon(x, z, hole))
                             {
                                 inHole = true;
                                 break;
@@ -197,8 +199,8 @@ namespace eft_where_am_i.Classes
                     if (inHole)
                         continue;
 
-                    // 3. Z좌표 범위 체크
-                    if (z < zone.z_min || z >= zone.z_max)
+                    // 3. Unity Y(높이) 범위 체크
+                    if (y < zone.z_min || y >= zone.z_max)
                         return defaultFloor;
 
                     // 4. 모두 통과 → 해당 zone의 층
@@ -209,8 +211,8 @@ namespace eft_where_am_i.Classes
                 return defaultFloor;
             }
 
-            // zones가 없으면 기존 z-range 폴백
-            return GetFloorNameByZ(config, z);
+            // zones가 없으면 기존 높이 범위 폴백
+            return GetFloorNameByZ(config, y);
         }
 
         /// <summary>

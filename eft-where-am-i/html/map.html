@@ -1,72 +1,129 @@
 <!doctype html>
-<html lang="ko">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>EFT Where Am I - Local Map</title>
+  <title>WHERE THE FUCK AM I - Local Map</title>
   <link rel="stylesheet" href="map.css">
 </head>
 <body>
   <main id="app" class="app-shell">
-    <header class="map-toolbar" aria-label="Map controls">
-      <button id="layersToggle" type="button" title="Map layers and item search">Layers</button>
-      <button id="questToggle" type="button" title="Quest pins">Quests</button>
-      <button id="rulerToggle" type="button" aria-pressed="false">Ruler</button>
-      <div id="floorButtons" class="floor-buttons" aria-label="Floors"></div>
-      <span class="toolbar-spacer"></span>
-      <button id="hidePanels" type="button">Hide panels</button>
-      <button id="fullScreen" type="button">Full screen</button>
-      <button id="wallToggle" type="button" aria-pressed="false">Wall colors: off</button>
-      <button id="markerMode" type="button">Floor markers: arrows</button>
-      <button id="panelPosition" type="button">Panel: right</button>
-      <button id="zoomOut" type="button" aria-label="Zoom out">−</button>
-      <button id="zoomReset" type="button">Fit</button>
-      <button id="zoomIn" type="button" aria-label="Zoom in">+</button>
-    </header>
-
     <section id="content" class="content panel-right">
-      <aside id="layerDrawer" class="side-drawer layer-drawer" aria-label="Map layers">
-        <div class="drawer-header">
-          <strong>Map layers</strong>
-          <input id="mapSearch" type="search" placeholder="Search item, key, extract, boss…">
-        </div>
-        <div id="markerDataStatus" class="status">Loading map marker data…</div>
-        <div id="selectedItem" class="selected-item" hidden></div>
-        <div id="mapSearchResults" class="map-search-results"></div>
-        <div id="layerList" class="layer-list"></div>
+      <aside id="leftPanel" class="map-side-panel left-panel" aria-label="Map layers">
+        <section id="layerDrawer" class="panel-page side-drawer layer-drawer open">
+          <div class="drawer-header"><button id="layersToggle" class="panel-title active" type="button">Layers</button><input id="mapSearch" type="search" placeholder="Search quest / key"></div>
+          <div id="markerDataStatus" class="status">Loading map marker data…</div>
+          <div id="selectedItem" class="selected-item" hidden></div>
+          <div id="mapSearchResults" class="map-search-results"></div>
+          <div id="layerList" class="layer-list"></div>
+        </section>
+        <footer class="panel-actions"><button id="progressToggle" type="button">Filters</button><button id="squadToggle" type="button">Squad <span id="squadCount">0</span></button></footer>
       </aside>
 
-      <aside id="questDrawer" class="quest-drawer" aria-label="Quest list">
-        <div class="drawer-header">
-          <strong>Map quests</strong>
-          <input id="questSearch" type="search" placeholder="Search quests">
-        </div>
-        <div id="questStatus" class="status">Loading quest data…</div>
-        <div id="questList" class="quest-list"></div>
-      </aside>
+      <div id="leftPanelResize" class="panel-resize-handle left-resize-handle" role="separator" aria-label="Resize left panel" aria-orientation="vertical" tabindex="0" title="Drag to resize · Double-click to reset"></div>
 
       <section id="mapViewport" class="map-viewport" aria-label="Tarkov map">
-        <div id="mapWorld" class="map-world">
-          <div id="svgHost" class="svg-host"></div>
-          <svg id="measurementLayer" class="measurement-layer" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
-          <div id="markerLayer" class="marker-layer"></div>
-        </div>
-        <div id="markerPopup" class="marker-popup" hidden></div>
-        <div id="rulerReadout" class="ruler-readout" hidden></div>
-        <div id="mapStatus" class="map-status">Loading map…</div>
+        <nav class="map-hud" aria-label="Map view controls">
+          <button id="hidePanels" type="button">Hide pannels</button>
+          <button id="fullScreen" class="no-wrap" type="button">Full screen</button>
+          <button id="whereAmI" class="no-wrap" type="button">Where am i?</button>
+          <button id="rulerToggle" class="icon-command" type="button" aria-pressed="false" title="Ruler"><svg viewBox="0 0 24 24"><path d="M3 17.25 17.25 3 21 6.75 6.75 21 3 17.25Zm4.3-.55 1.4 1.4 1.4-1.4-1.4-1.4 1.4-1.4 1.4 1.4 1.4-1.4-1.4-1.4 1.4-1.4 1.4 1.4 1.4-1.4-1.4-1.4L6.1 17.25l.65.65.55-1.2Z"/></svg><span>Ruler</span></button>
+          <span id="coordinatesReadout" class="coordinates-readout">X — · Y — · Z —</span>
+          <button id="zoomOut" class="square-command" type="button" aria-label="Zoom out">−</button><button id="zoomReset" type="button">Fit</button><button id="zoomIn" class="square-command" type="button" aria-label="Zoom in">+</button>
+          <button id="mapHelp" class="help-command" type="button" title="Mouse wheel: zoom · Alt + wheel: switch level">?</button>
+        </nav>
+        <div id="mapWorld" class="map-world"><div id="svgHost" class="svg-host"></div><div id="mapLabelLayer" class="map-label-layer" aria-hidden="true"></div><svg id="measurementLayer" class="measurement-layer" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg><div id="markerLayer" class="marker-layer"></div></div>
+        <div id="markerPopup" class="marker-popup" hidden></div><div id="rulerReadout" class="ruler-readout" hidden></div><div id="mapStatus" class="map-status">Loading map…</div>
       </section>
 
-      <aside id="requirementsPanel" class="requirements-panel" aria-label="Pinned quest requirements">
-        <div id="requirementsHandle" class="requirements-header">
-          <strong>Pinned quest requirements</strong>
-          <span id="pinCount" class="pin-count">0</span>
-        </div>
-        <div id="requirementsList" class="requirements-list">
-          <p class="empty-state">Pin a quest to show only its requirements here.</p>
-        </div>
+      <div id="rightPanelResize" class="panel-resize-handle right-resize-handle" role="separator" aria-label="Resize right panel" aria-orientation="vertical" tabindex="0" title="Drag to resize · Double-click to reset"></div>
+
+      <aside id="requirementsPanel" class="requirements-panel" aria-label="Quests and pinned requirements">
+        <section class="level-section" aria-label="Map levels"><div class="level-picker"><div class="section-caption"><strong>Levels</strong><span class="level-settings-icon" title="Nearby levels" aria-hidden="true">⚙</span></div><div id="floorButtons" class="floor-buttons" aria-label="Levels"></div></div><div class="level-shortcut" title="Alt + mouse wheel"><strong>Alt + ↕</strong><span>Switch<br>Level</span></div></section>
+        <nav class="right-panel-tabs"><button id="questToggle" class="active" type="button">Quests <span id="questCount"></span></button><button id="pinnedToggle" type="button">Pinned <span id="pinCount" class="pin-count">0</span></button></nav>
+        <section id="questDrawer" class="right-panel-page open quest-drawer"><div class="drawer-header"><input id="questSearch" type="search" placeholder="Search quests"><div id="questFilterSummary" class="filter-summary">All quests</div></div><div id="questStatus" class="status">Loading quest data…</div><div id="questList" class="quest-list"></div></section>
+        <section id="pinnedDrawer" class="right-panel-page"><div id="requirementsHandle" class="requirements-header"><strong id="requirementsTitle">Pinned quest requirements</strong></div><div id="requirementsList" class="requirements-list"><p class="empty-state">Pin a quest to show only its requirements here.</p></div></section>
+        <section class="view-controls" aria-label="Map display options"><strong>Pro Settings</strong><button id="wallToggle" type="button" aria-pressed="false">Wall colors: off</button><button id="markerMode" type="button">Floor markers: arrows</button><button id="panelPosition" type="button">Panel: right</button><button id="floorEditToggle" type="button">Floor editor</button></section>
       </aside>
     </section>
+
+    <svg class="icon-sprite" aria-hidden="true">
+      <symbol id="icon-extraction" viewBox="0 0 32 32"><circle cx="18" cy="5" r="3"/><path d="m14 9 6 1 4 6 5 2-1.5 3-6.5-2.5-3-4-2 6 5 8-3 2-6-8-3 8-3.5-1.5L10 17l1-5-4 4-2-2 6-6 3 1Z"/></symbol>
+      <symbol id="icon-transit" viewBox="0 0 32 32"><path d="M4 10h17V5l8 7-8 7v-5H4v-4Zm24 12H11v5l-8-7 8-7v5h17v4Z"/></symbol>
+      <symbol id="icon-spawn" viewBox="0 0 32 32"><path d="M16 30 2 3l14 6L30 3 16 30Zm0-8 6-12-6 3-6-3 6 12Z"/></symbol>
+      <symbol id="icon-sniper" viewBox="0 0 32 32"><path d="M14.5 1h3v5.2A10 10 0 0 1 25.8 14H31v3h-5.2a10 10 0 0 1-8.3 8.8V31h-3v-5.2A10 10 0 0 1 6.2 17H1v-3h5.2a10 10 0 0 1 8.3-7.8V1Zm1.5 9a6 6 0 1 0 0 12 6 6 0 0 0 0-12Zm0 4a2 2 0 1 1 0 4 2 2 0 0 1 0-4Z"/></symbol>
+      <symbol id="icon-skull" viewBox="0 0 32 32"><path d="M16 2C8.8 2 4 7.2 4 14c0 4 1.8 7 5 8.8V29h4v-4h2v4h2v-4h2v4h4v-6.2c3.2-1.8 5-4.8 5-8.8C28 7.2 23.2 2 16 2Zm-5 15a3 3 0 1 1 0-6 3 3 0 0 1 0 6Zm10 0a3 3 0 1 1 0-6 3 3 0 0 1 0 6Zm-7 4 2-3 2 3h-4Z"/></symbol>
+      <symbol id="icon-quest" viewBox="0 0 32 32"><path fill-rule="evenodd" d="M16 1a15 15 0 1 0 0 30 15 15 0 0 0 0-30Zm-2 7h4v11h-4V8Zm0 14h4v4h-4v-4Z"/></symbol>
+      <symbol id="icon-lock" viewBox="0 0 32 32"><path d="M8 13V9a8 8 0 0 1 16 0v4h3v18H5V13h3Zm4 0h8V9a4 4 0 1 0-8 0v4Zm2 7v6h4v-6h-4Z"/></symbol>
+      <symbol id="icon-key" viewBox="0 0 32 32"><path d="M20 3a9 9 0 0 0-7.8 13.5L2 26.7V31h4.3l2-2H12v-3.7l2-2h3.7l2.1-2.1A9 9 0 1 0 20 3Zm4 9a3 3 0 1 1 0-6 3 3 0 0 1 0 6Z"/></symbol>
+      <symbol id="icon-box" viewBox="0 0 32 32"><path d="m3 9 13-7 13 7v15l-13 7-13-7V9Zm4 2v10l7 3.8V15L7 11Zm18 0-7 4v9.8l7-3.8V11ZM9 8.7l7 3.8 7-3.8L16 5 9 8.7Z"/></symbol>
+      <symbol id="icon-bullet" viewBox="0 0 32 32"><path d="M11 2h10v6l3 5v16H8V13l3-5V2Zm1 13v10h8V15h-8Z"/></symbol>
+      <symbol id="icon-grenade" viewBox="0 0 32 32"><path d="M12 2h9v4h-3v3c6 1 10 5.5 10 11.5C28 27 23 31 16 31S4 27 4 20.5C4 15 7.5 10.7 13 9V6h-3V2h2Zm10 3h7v3h-4l-3-3Z"/></symbol>
+      <symbol id="icon-weapon" viewBox="0 0 32 32"><path d="M2 14 25 5l4 4-9 5-2 5-5-1-4 10H4l2-12-4 1v-3Zm17-3 5-2-1-1-6 2 2 1Z"/></symbol>
+      <symbol id="icon-cash" viewBox="0 0 32 32"><path d="M5 2h22l3 16v12H2V18L5 2Zm4 5v4h14V7H9Zm-2 9v4h18v-4H7Zm8 7v4h4v-4h-4Z"/></symbol>
+      <symbol id="icon-body" viewBox="0 0 32 32"><circle cx="16" cy="6" r="4"/><path d="M9 11h14l3 8-4 2-2-5v14h-4v-8h-1v8h-4V16l-2 5-4-2 4-8Z"/></symbol>
+      <symbol id="icon-jacket" viewBox="0 0 32 32"><path d="m10 3 6 4 6-4 7 6-4 7-3-2v17H10V14l-3 2-4-7 7-6Zm4 5v19h4V8l-2 2-2-2Z"/></symbol>
+      <symbol id="icon-drawer" viewBox="0 0 32 32"><path d="M3 2h26v28H3V2Zm4 4v6h18V6H7Zm0 10v10h18V16H7Zm7-7h4v2h-4V9Zm0 11h4v2h-4v-2Z"/></symbol>
+      <symbol id="icon-bag" viewBox="0 0 32 32"><path d="M10 8a6 6 0 0 1 12 0h5l3 7v14H2V15l3-7h5Zm4 0h4a2 2 0 0 0-4 0Zm-8 8v9h20v-9H6Z"/></symbol>
+      <symbol id="icon-suitcase" viewBox="0 0 32 32"><path d="M10 5V2h12v3h7v25H3V5h7Zm4 0h4v2h-4V5Zm-7 5v15h18V10H7Zm7 5h4v6h-4v-6Z"/></symbol>
+      <symbol id="icon-tools" viewBox="0 0 32 32"><path d="m4 2 8 7-3 3L2 4l2-2Zm8 10 15 15-4 4L8 16l4-4Zm11-10a7 7 0 0 0-6 10L6 23l3 3 11-11A7 7 0 0 0 29 7l-5 5-4-4 5-5-2-1Z"/></symbol>
+      <symbol id="icon-pc" viewBox="0 0 32 32"><path d="M5 2h22v28H5V2Zm4 4v13h14V6H9Zm0 17v3h4v-3H9Zm7 0v3h7v-3h-7Z"/></symbol>
+      <symbol id="icon-med" viewBox="0 0 32 32"><path d="M11 2h10v7h7v14h-7v7H11v-7H4V9h7V2Zm4 5v6H9v6h6v6h2v-6h6v-6h-6V7h-2Z"/></symbol>
+      <symbol id="icon-safe" viewBox="0 0 32 32"><path d="M3 2h26v28H3V2Zm5 5v18h16V7H8Zm3 2h10v3H11V9Zm5 6a4 4 0 1 1 0 8 4 4 0 0 1 0-8Zm0 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z"/></symbol>
+      <symbol id="icon-switch" viewBox="0 0 32 32"><path d="M14 1h4v14h-4V1Zm-6 5 3 3a9 9 0 1 0 10 0l3-3a13 13 0 1 1-16 0Z"/></symbol>
+      <symbol id="icon-btr" viewBox="0 0 32 32"><path d="M3 8h19l7 7v10h-4a5 5 0 0 1-10 0h-2a5 5 0 0 1-10 0H1V10l2-2Zm2 4v7h19v-2l-5-5H5Zm3 10a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm12 0a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"/></symbol>
+      <symbol id="icon-mine" viewBox="0 0 32 32"><path d="m16 1 2.5 7.5L25 4l-1.5 8.5L32 11l-7 5 7 5-8.5-1.5L25 28l-6.5-4.5L16 31l-2.5-7.5L7 28l1.5-8.5L0 21l7-5-7-5 8.5 1.5L7 4l6.5 4.5L16 1Zm0 10a5 5 0 1 0 0 10 5 5 0 0 0 0-10Z"/></symbol>
+      <symbol id="icon-item" viewBox="0 0 32 32"><path d="m16 2 12 9-4.5 15H8.5L4 11l12-9Zm0 6-6 5 2 8h8l2-8-6-5Z"/></symbol>
+      <symbol id="icon-star" viewBox="0 0 32 32"><path d="m16 0 3.5 12.5L32 16l-12.5 3.5L16 32l-3.5-12.5L0 16l12.5-3.5L16 0Z"/></symbol>
+    </svg>
   </main>
+
+  <dialog id="progressDialog" class="settings-dialog">
+    <form method="dialog" class="dialog-card" id="progressForm">
+      <header><strong>Quest progress</strong><button value="cancel" aria-label="Close">×</button></header>
+      <label class="toggle-row"><input id="useProgress" type="checkbox"> Use my progress to show available quests</label>
+      <div class="segmented" id="questFilterButtons"><button type="button" data-filter="story">Story</button><button type="button" data-filter="kappa">Kappa</button><button type="button" data-filter="all">All</button></div>
+      <div class="form-grid">
+        <label>Game edition<select id="gameEdition"><option value="standard">Standard</option><option value="left-behind">Left Behind</option><option value="prepare-for-escape">Prepare for Escape</option><option value="edge-of-darkness">Edge of Darkness</option><option value="the-unheard">The Unheard</option><option value="eod-unheard">EOD + The Unheard</option></select></label>
+        <label>Faction<select id="playerFaction"><option value="Any">Any</option><option value="USEC">USEC</option><option value="BEAR">BEAR</option></select></label>
+        <label>Player level<input id="playerLevel" type="number" min="1" max="100" value="1"></label>
+      </div>
+      <section><strong>Trader loyalty levels</strong><div id="traderLevels" class="trader-grid"></div></section>
+      <p class="dialog-help">Mark quests complete from the quest list. Progress is stored locally in this app.</p>
+      <footer><button id="resetProgress" type="button">Reset completed</button><button id="saveProgress" value="default">Save</button></footer>
+    </form>
+  </dialog>
+
+  <dialog id="squadDialog" class="settings-dialog">
+    <form method="dialog" class="dialog-card" id="squadForm">
+      <header><strong>Squad connection</strong><button value="cancel" aria-label="Close">×</button></header>
+      <div class="form-grid">
+        <label>Mode<select id="squadMode"><option value="off">Off</option><option value="lan">LAN</option><option value="host">Host</option><option value="client">Client</option></select></label>
+        <label>Name<input id="squadName" maxlength="32" value="Player"></label>
+        <label>UDP port<input id="squadPort" type="number" min="1024" max="65535" value="38473"></label>
+      </div>
+      <div class="form-grid">
+        <label id="squadRoomLabel">LAN room<input id="squadRoom" maxlength="64" value="eft-local"></label>
+        <label id="squadHostLabel">Host IP or DNS<input id="squadHost" maxlength="255" placeholder="203.0.113.10"></label>
+        <label id="squadPasswordLabel">Password<span class="password-row"><input id="squadPassword" type="password" minlength="8" maxlength="128" autocomplete="new-password"><button id="generateSquadPassword" type="button">Generate</button></span></label>
+      </div>
+      <p id="squadHelp" class="dialog-help"></p>
+      <p id="squadStatus" class="squad-status" data-state="off">Squad sharing is off.</p>
+      <div id="squadMembers" class="member-list">No squad members online.</div>
+      <footer><button id="saveSquad" value="default">Save</button></footer>
+    </form>
+  </dialog>
+
+  <aside id="floorEditorPanel" class="floor-editor" hidden>
+    <header><strong>Floor zone editor</strong><button id="floorEditorExit" type="button">×</button></header>
+    <p>Click the map to draw a zone in EFT world X/Z coordinates.</p>
+    <label>Name<input id="floorZoneName" value="Zone"></label>
+    <label>Floor<select id="floorZoneFloor"></select></label>
+    <div class="form-grid"><label>Height min<input id="floorZoneMin" type="number" step="0.1" value="-100"></label><label>Height max<input id="floorZoneMax" type="number" step="0.1" value="100"></label></div>
+    <div class="editor-actions"><button id="floorUndo" type="button">Undo point</button><button id="floorComplete" type="button">Complete zone</button><button id="floorDelete" type="button">Delete last</button></div>
+    <div id="floorEditorStatus" class="dialog-help">0 zones · 0 points</div>
+    <button id="floorSave" type="button">Save zones</button>
+  </aside>
   <script src="map.js"></script>
 </body>
 </html>

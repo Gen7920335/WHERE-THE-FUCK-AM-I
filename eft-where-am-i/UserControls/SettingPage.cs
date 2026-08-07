@@ -57,8 +57,10 @@ namespace eft_where_am_i
             _ = webView2_Settings.ExecuteScriptAsync($"setTheme('{appSettings.theme_mode}')");
             _ = webView2_Settings.ExecuteScriptAsync(
                 $"setFeatureSettings({appSettings.ui_scale.ToString(System.Globalization.CultureInfo.InvariantCulture)}, " +
+                $"{appSettings.font_scale.ToString(System.Globalization.CultureInfo.InvariantCulture)}, " +
                 $"'{appSettings.quest_panel_position}', '{appSettings.quest_floor_marker_mode}', " +
-                $"{appSettings.tarkov_wall_colors.ToString().ToLowerInvariant()})");
+                $"{appSettings.tarkov_wall_colors.ToString().ToLowerInvariant()}, " +
+                $"{appSettings.icon_scale.ToString(System.Globalization.CultureInfo.InvariantCulture)})");
         }
 
         private async Task InitializeWebViewUI()
@@ -128,8 +130,10 @@ namespace eft_where_am_i
 
                         await webView2_Settings.ExecuteScriptAsync(
                             $"setFeatureSettings({appSettings.ui_scale.ToString(System.Globalization.CultureInfo.InvariantCulture)}, " +
+                            $"{appSettings.font_scale.ToString(System.Globalization.CultureInfo.InvariantCulture)}, " +
                             $"'{appSettings.quest_panel_position}', '{appSettings.quest_floor_marker_mode}', " +
-                            $"{appSettings.tarkov_wall_colors.ToString().ToLowerInvariant()})");
+                            $"{appSettings.tarkov_wall_colors.ToString().ToLowerInvariant()}, " +
+                            $"{appSettings.icon_scale.ToString(System.Globalization.CultureInfo.InvariantCulture)})");
 
                         // 앱 버전 정보 전송
                         var version = Assembly.GetExecutingAssembly()
@@ -234,6 +238,8 @@ namespace eft_where_am_i
 
                     case "map-feature-settings-changed":
                         appSettings.ui_scale = Math.Clamp(message["uiScale"]?.Value<double>() ?? 1.0, 0.65, 2.0);
+                        appSettings.font_scale = Math.Clamp(message["fontScale"]?.Value<double>() ?? 1.0, 0.5, 1.5);
+                        appSettings.icon_scale = Math.Clamp(message["iconScale"]?.Value<double>() ?? 1.0, 0.5, 6.5);
                         appSettings.quest_panel_position = message["panelPosition"]?.ToString() ?? "right";
                         appSettings.quest_floor_marker_mode = message["markerMode"]?.ToString() ?? "arrows";
                         appSettings.tarkov_wall_colors = message["wallColors"]?.Value<bool>() ?? false;

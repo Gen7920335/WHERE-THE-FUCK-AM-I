@@ -19,7 +19,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $RepoRoot ".tools\dotnet\dotnet.exe"
 . (Join-Path $PSScriptRoot "use-local-toolchain.ps1")
 
 $Mode = if ($FrameworkDependent) { "framework-dependent" } else { "self-contained" }
-$OutputDir = Join-Path $RepoRoot "artifacts\publish\$Runtime-$Mode"
+$OutputDir = Join-Path $RepoRoot "artifacts\publish\WHERE-THE-FUCK-AM-I-$Runtime-$Mode"
 $SelfContained = if ($FrameworkDependent) { "false" } else { "true" }
 
 & $NpmExe ci --prefix (Join-Path $RepoRoot "eft-where-am-i")
@@ -35,5 +35,10 @@ if ($LASTEXITCODE -ne 0) { throw "CSS build failed with exit code $LASTEXITCODE.
     -p:IncludeNativeLibrariesForSelfExtract=false `
     -o $OutputDir
 if ($LASTEXITCODE -ne 0) { throw "Publish failed with exit code $LASTEXITCODE." }
+
+$ExpectedExe = Join-Path $OutputDir "WHERE THE FUCK AM I.exe"
+if (-not (Test-Path -LiteralPath $ExpectedExe)) {
+    throw "Renamed executable is missing: $ExpectedExe"
+}
 
 Write-Host "Publish complete: $OutputDir"

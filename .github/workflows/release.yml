@@ -3,126 +3,117 @@ name: Release App
 on:
   push:
     tags:
-      - 'v*' # v로 시작하는 태그(예: v1.0.0, v1.1.2) 푸시 시 동작
+      - "v*"
+
+permissions:
+  contents: write
 
 jobs:
   build_and_release:
     runs-on: windows-latest
-    permissions:
-      contents: write # Release 생성 및 파일 업로드를 위해 필수
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '10.0.x'
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            9.0.x
+            10.0.x
 
-    # Node.js 설치 (Tailwind CSS 빌드를 위해 필요)
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '24'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: eft-where-am-i/package-lock.json
 
-    # 1. Velopack CLI(vpk) 도구 설치
-    - name: Install vpk
-      run: |
-        dotnet tool install -g vpk
-        echo "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Validate release version
+        shell: pwsh
+        run: |
+          $tagVersion = "${{ github.ref_name }}".TrimStart("v")
+          [xml]$project = Get-Content -Raw "eft-where-am-i/eft-where-am-i.csproj"
+          $projectVersion = [string]$project.Project.PropertyGroup.Version
+          if ($tagVersion -ne $projectVersion) {
+            throw "Tag version $tagVersion does not match project version $projectVersion."
+          }
+          "RELEASE_VERSION=$tagVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-    # 2. Tailwind CSS 빌드
-    - name: Build Tailwind CSS
-      working-directory: eft-where-am-i
-      run: |
-        npm install
-        npm run build:css
+      - name: Install dependencies and build CSS
+        working-directory: eft-where-am-i
+        run: |
+          npm ci
+          npm run build:css
 
-    # 3. 앱 빌드 및 Publish (런타임 미포함 - 기존)
-    - name: Publish App (Framework Dependent)
-      run: |
-        dotnet publish eft-where-am-i/eft-where-am-i.csproj `
-          -c Release `
-          -r win-x64 `
-          --self-contained false `
-          -p:PublishSingleFile=false `
-          -p:IncludeNativeLibrariesForSelfExtract=false `
-          -o ./publish_output_fd
+      - name: Install Velopack CLI
+        shell: pwsh
+        run: |
+          dotnet tool install -g vpk --version 0.0.1298
+          "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
-    # 4. 앱 빌드 및 Publish (런타임 포함 - 독립 실행형)
-    - name: Publish App (Self-Contained)
-      run: |
-        dotnet publish eft-where-am-i/eft-where-am-i.csproj `
-          -c Release `
-          -r win-x64 `
-          --self-contained true `
-          -p:PublishSingleFile=false `
-          -p:IncludeNativeLibrariesForSelfExtract=false `
-          -o ./publish_output_sc
+      - name: Publish self-contained Windows app
+        shell: pwsh
+        run: |
+          dotnet publish eft-where-am-i/eft-where-am-i.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            -p:Version=$env:RELEASE_VERSION `
+            -p:PublishSingleFile=false `
+            -p:IncludeNativeLibrariesForSelfExtract=false `
+            -o ./publish_output
 
-    # 5. Velopack 패키징 (런타임 미포함)
-    - name: Pack App with Velopack (Framework Dependent)
-      shell: bash
-      run: |
-        VERSION="${{ github.ref_name }}"
-        VERSION=${VERSION#v}
-        vpk pack \
-          -u eft-where-am-i \
-          -v $VERSION \
-          -p ./publish_output_fd \
-          -e "EFT-Where-Am-I.exe" \
-          -o ./ReleaseBuild_FD
+          if (-not (Test-Path -LiteralPath "./publish_output/WHERE THE FUCK AM I.exe")) {
+            throw "Published application executable is missing."
+          }
 
-    # 6. Velopack 패키징 (런타임 포함)
-    # '-c win-sc' 채널을 지정하여 기존(런타임 미포함) 업데이트 파이프라인과 분리합니다.
-    - name: Pack App with Velopack (Self-Contained)
-      shell: bash
-      run: |
-        VERSION="${{ github.ref_name }}"
-        VERSION=${VERSION#v}
-        vpk pack \
-          -u eft-where-am-i \
-          -v $VERSION \
-          -c win-sc \
-          -p ./publish_output_sc \
-          -e "EFT-Where-Am-I.exe" \
-          -o ./ReleaseBuild_SC
+      - name: Build installer and portable packages
+        shell: pwsh
+        run: |
+          vpk pack `
+            -u where-the-fuck-am-i `
+            -v $env:RELEASE_VERSION `
+            -c win-sc `
+            -p ./publish_output `
+            -e "WHERE THE FUCK AM I.exe" `
+            --packTitle "WHERE THE FUCK AM I" `
+            --packAuthors "Gen7920335" `
+            -i ./eft-where-am-i/eft-where-am-i.ico `
+            -o ./release_output
 
-    # 7. GitHub Release 생성 및 파일 업로드 (Velopack Setup)
-    - name: Upload Velopack Releases to GitHub
-      shell: bash
-      run: |
-        vpk upload github \
-          -o ./ReleaseBuild_FD \
-          --repoUrl "https://github.com/karpitony/eft-where-am-i" \
-          --token "${{ secrets.GITHUB_TOKEN }}" \
-          --tag "${{ github.ref_name }}" \
-          --merge
-        
-        vpk upload github \
-          -o ./ReleaseBuild_SC \
-          -c win-sc \
-          --repoUrl "https://github.com/karpitony/eft-where-am-i" \
-          --token "${{ secrets.GITHUB_TOKEN }}" \
-          --tag "${{ github.ref_name }}" \
-          --merge
+          $setup = @(Get-ChildItem -LiteralPath "./release_output" -Filter "*-Setup.exe")
+          $portable = @(Get-ChildItem -LiteralPath "./release_output" -Filter "*-Portable.zip")
+          if ($setup.Count -ne 1 -or $portable.Count -ne 1) {
+            throw "Expected one installer and one portable archive; found $($setup.Count) installer(s) and $($portable.Count) portable archive(s)."
+          }
+          $portableEntries = tar -tf $portable[0].FullName
+          if ($portableEntries -notcontains "WHERE THE FUCK AM I.exe" -or $portableEntries -notcontains "current/WHERE THE FUCK AM I.exe") {
+            throw "Portable archive is missing its launcher or branded application executable."
+          }
 
-    # 8. 릴리즈 노트에 설치 가이드 README 링크 추가
-    - name: Append install guide to Release notes
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      shell: bash
-      run: |
-        EXISTING_BODY=$(gh release view "${{ github.ref_name }}" --json body -q .body 2>/dev/null || echo "")
-        NOTICE="
-        
-        ---
-        ### 📖 설치 안내 및 권장사항 (Installation & Recommendation)
+      - name: Create GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $setup = Get-ChildItem -LiteralPath "./release_output" -Filter "*-Setup.exe"
+          $portable = Get-ChildItem -LiteralPath "./release_output" -Filter "*-Portable.zip"
+          @"
+          ## 다운로드
 
-        - **🔥 권장(Recommended): \`*win-sc-Portable.zip\`**
-          - 백신 오탐(False Positive)이 적고 .NET 런타임 설치가 필요 없는 해당 버전을 권장합니다.
-          - We highly recommend this version as it has fewer antivirus false positives and requires no .NET runtime installation.
-        - 자세한 안내는 [**README 문서**](https://github.com/karpitony/eft-where-am-i#%EB%8B%A4%EC%9A%B4%EB%A1%9C%EB%93%9C-%EB%B0%8F-%EC%84%A4%EC%B9%98)를 확인해 주세요.
-        - For detailed instructions, please refer to the [**README**](https://github.com/karpitony/eft-where-am-i/blob/main/README_en.md#download--installation)."
-        gh release edit "${{ github.ref_name }}" --notes "${EXISTING_BODY}${NOTICE}"
+          - **권장:** ``$($portable.Name)`` — 압축 해제 후 ``WHERE THE FUCK AM I.exe`` 실행
+          - **설치형:** ``$($setup.Name)`` — 설치 마법사로 설치
+
+          두 파일 모두 Windows x64용이며 .NET Desktop Runtime을 포함합니다.
+          "@ | Set-Content -LiteralPath "./release-notes.md" -Encoding utf8
+
+          gh release create "${{ github.ref_name }}" `
+            "$($setup.FullName)" `
+            "$($portable.FullName)" `
+            --repo "${{ github.repository }}" `
+            --target "${{ github.sha }}" `
+            --title "WHERE THE FUCK AM I ${{ github.ref_name }}" `
+            --notes-file "./release-notes.md" `
+            --verify-tag

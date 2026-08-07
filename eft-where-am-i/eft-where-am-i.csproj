@@ -9,9 +9,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
 
     <!-- 버전을 여기서만 관리 -->
-    <Version>2.3.6</Version>
-    <AssemblyName>EFT-Where-Am-I</AssemblyName>
-    <AssemblyTitle>EFT WHERE AM I v$(Version)</AssemblyTitle>
+    <Version>1.0.0</Version>
+    <AssemblyName>WHERE THE FUCK AM I</AssemblyName>
+    <AssemblyTitle>WHERE THE FUCK AM I</AssemblyTitle>
+    <Product>WHERE THE FUCK AM I</Product>
+    <Description>WHERE THE FUCK AM I</Description>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <SupportedOSPlatformVersion>7.0</SupportedOSPlatformVersion>
@@ -38,9 +40,6 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="assets\images\eft-where-am-i_icon_resize.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="assets\images\server.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="assets\images\settings_icon2_resize.png">
@@ -73,7 +72,13 @@
     <None Update="html\map.js">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="html\maps\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="html\map-markers.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="html\battle-pass-locations.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="html\quest-locations.json">
