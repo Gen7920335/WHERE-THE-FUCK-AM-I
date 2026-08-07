@@ -6,16 +6,16 @@
   const BATTLE_PASS_DATA_URL = "battle-pass-locations.json";
   const SVG_ROOT = "maps/svg";
   const MAPS = {
-    factory: { dataKey: "factory", id: 0, tdevId: "55f2d3fd4bdc2d5f408b4567", svg: "Factory.svg", floors: ["Basement", "Ground_Floor", "Second_Floor", "Third_Floor"], defaultFloor: "Ground_Floor", rotation: 90, bounds: [[77, -64.5], [-65.5, 67.4]], anchors: [{ world: [77, 67.4], map: [0, 0] }, { world: [77, -64.5], map: [100, 0] }, { world: [-65.5, 67.4], map: [0, 100] }] },
+    factory: { dataKey: "factory", id: 0, tdevId: "55f2d3fd4bdc2d5f408b4567", tdevAliases: ["59fc81d786f774390775787e"], svg: "Factory.svg", floors: ["Basement", "Ground_Floor", "Second_Floor", "Third_Floor"], defaultFloor: "Ground_Floor", rotation: 90, bounds: [[77, -64.5], [-65.5, 67.4]], anchors: [{ world: [77, 67.4], map: [0, 0] }, { world: [77, -64.5], map: [100, 0] }, { world: [-65.5, 67.4], map: [0, 100] }] },
     customs: { dataKey: "customs", id: 1, tdevId: "56f40101d2720b2a4d8b45d6", svg: "Customs.svg", floors: ["Underground_Level", "Ground_Level", "Second_Floor", "Third_Floor"], defaultFloor: "Ground_Level", rotation: 180, bounds: [[698, -307], [-372, 237]], anchors: [{ world: [698, -307], map: [0, 0] }, { world: [-372, -307], map: [100, 0] }, { world: [698, 237], map: [0, 100] }] },
     woods: { dataKey: "woods", id: 2, tdevId: "5704e3c2d2720bac5b8b4567", svg: "Woods.svg", floors: ["Ground_Level"], defaultFloor: "Ground_Level", rotation: 180, bounds: [[646, -914], [-761, 442]], anchors: [{ world: [646, -914], map: [0, 0] }, { world: [-761, -914], map: [100, 0] }, { world: [646, 442], map: [0, 100] }] },
     shoreline: { dataKey: "shoreline", id: 3, tdevId: "5704e554d2720bac5b8b456e", svg: "Shoreline.svg", floors: ["Underground_Level", "Ground_Level", "Second_Floor", "Third_Floor"], defaultFloor: "Ground_Level", rotation: 180, bounds: [[504, -415], [-1056, 618]], anchors: [{ world: [504, -415], map: [0, 0] }, { world: [-1056, -415], map: [100, 0] }, { world: [504, 618], map: [0, 100] }] },
     interchange: { dataKey: "interchange", id: 4, tdevId: "5714dbc024597771384a510d", svg: "Interchange.svg", floors: ["Ground_Level", "First_Floor", "Second_Floor"], defaultFloor: "Ground_Level", rotation: 180, bounds: [[598, -442], [-433, 426]], anchors: [{ world: [598, -442], map: [0, 0] }, { world: [-433, -442], map: [100, 0] }, { world: [598, 426], map: [0, 100] }] },
-    lab: { dataKey: "lab", id: 5, tdevId: "5b0fc42d86f7744a585f9105", svg: "Labs.svg", floors: ["Technical_Level", "First_Level", "Second_Level"], defaultFloor: "Technical_Level", rotation: 270, bounds: [[-80, -477], [-287, -193]], anchors: [{ world: [-287, -477], map: [0, 0] }, { world: [-287, -193], map: [100, 0] }, { world: [-80, -477], map: [0, 100] }] },
+    lab: { dataKey: "lab", id: 5, tdevId: "5b0fc42d86f7744a585f9105", tdevAliases: ["6a294a5b5eb5f9a1700417b7"], svg: "Labs.svg", floors: ["Technical_Level", "First_Level", "Second_Level"], defaultFloor: "Technical_Level", rotation: 270, bounds: [[-80, -477], [-287, -193]], anchors: [{ world: [-287, -477], map: [0, 0] }, { world: [-287, -193], map: [100, 0] }, { world: [-80, -477], map: [0, 100] }] },
     reserve: { dataKey: "reserve", id: 6, tdevId: "5704e5fad2720bc05b8b4567", svg: "Reserve.svg", floors: ["Bunkers", "Ground_Level"], defaultFloor: "Ground_Level", rotation: 180, bounds: [[289, -274], [-303, 272]], anchors: [{ world: [289, -274], map: [0, 0] }, { world: [-303, -274], map: [100, 0] }, { world: [289, 272], map: [0, 100] }] },
     lighthouse: { dataKey: "lighthouse", id: 7, tdevId: "5704e4dad2720bb55b8b4567", svg: "Lighthouse.svg", floors: ["Ground_Level"], defaultFloor: "Ground_Level", rotation: 180, bounds: [[515, -998], [-545, 725]], anchors: [{ world: [515, -998], map: [0, 0] }, { world: [-545, -998], map: [100, 0] }, { world: [515, 725], map: [0, 100] }] },
     streets: { dataKey: "streetsoftarkov", id: 8, tdevId: "5714dc692459777137212e12", svg: "StreetsOfTarkov.svg", floors: ["Underground_Level", "Ground_Level", "Second_Floor", "Third_Floor", "Fourth_Floor", "Fifth_Floor"], defaultFloor: "Ground_Level", rotation: 180, bounds: [[323, -295], [-280, 532]], anchors: [{ world: [323, -295], map: [0, 0] }, { world: [-280, -295], map: [100, 0] }, { world: [323, 532], map: [0, 100] }] },
-    "ground-zero": { dataKey: "groundzero", id: 9, tdevId: "653e6760052c01c1c805532f", svg: "GroundZero.svg", floors: ["Underground_Level", "Ground_Level", "Second_Floor", "Third_Floor"], defaultFloor: "Ground_Level", rotation: 180, bounds: [[249, -124], [-99, 364]], anchors: [{ world: [249, -124], map: [0, 0] }, { world: [-99, -124], map: [100, 0] }, { world: [249, 364], map: [0, 100] }] },
+    "ground-zero": { dataKey: "groundzero", id: 9, tdevId: "653e6760052c01c1c805532f", tdevAliases: ["65b8d6f5cdde2479cb2a3125", "68236e8153654e8c1200798a"], svg: "GroundZero.svg", floors: ["Underground_Level", "Ground_Level", "Second_Floor", "Third_Floor"], defaultFloor: "Ground_Level", rotation: 180, bounds: [[249, -124], [-99, 364]], anchors: [{ world: [249, -124], map: [0, 0] }, { world: [-99, -124], map: [100, 0] }, { world: [249, 364], map: [0, 100] }] },
     terminal: { dataKey: "terminal", id: 10, tdevId: "65cc8f81a9aac3e77d0cfd3e", svg: "Terminal.svg", floors: ["Ground_Level"], defaultFloor: "Ground_Level", rotation: 180, bounds: [[463, -580], [-433, 475]], anchors: [{ world: [463, -580], map: [0, 0] }, { world: [-433, -580], map: [100, 0] }, { world: [463, 475], map: [0, 100] }] },
     labyrinth: { dataKey: "the-labyrinth", id: 11, tdevId: "6733700029c367a3d40b02af", tiles: "maps/tiles/labyrinth/main/{z}/{x}/{y}.png", tileZoom: 2, floors: ["Main"], defaultFloor: "Main", rotation: 270, bounds: [[-52, -37], [53, 76]], anchors: [{ world: [-52, -37], map: [0, 0] }, { world: [-52, 76], map: [100, 0] }, { world: [53, -37], map: [0, 100] }] },
     icebreaker: { dataKey: "icebreaker", id: 12, tdevId: "69af492a4819ea4ba10a69c5", tiles: "maps/tiles/icebreaker/{layer}/{z}/{x}/{y}.png", tileZoom: 2, tileLayers: { "Control_Room": "00_control_room", "Engine_Room": "01_engine_room", "Engine_Room_Upper": "02_engine_room_upper", "Fuel_Pumps_Lower": "03_fuel_pumps_lower", "Fuel_Pumps": "04_fuel_pumps", "Storage_Security": "05_storage_ecurity", "Infirmary": "06_infirmary", "Helipad": "07_helipad", "Gym_Canteen": "08_gym-canteen", "Accommodation_Lower": "09_accommodation_lower", "Accommodation_Mid": "10_accommodation_mid", "Accommodation_Upper": "11_accommodation_upper", "Officers_Deck": "12_officers_deck", "Stairs_Blocked": "13_stairs_blocked", "Bridge": "14_bridge", "Bridge_Roof": "15_bridge_roof" }, floors: ["Control_Room", "Engine_Room", "Engine_Room_Upper", "Fuel_Pumps_Lower", "Fuel_Pumps", "Storage_Security", "Infirmary", "Helipad", "Gym_Canteen", "Accommodation_Lower", "Accommodation_Mid", "Accommodation_Upper", "Officers_Deck", "Stairs_Blocked", "Bridge", "Bridge_Roof"], defaultFloor: "Infirmary", rotation: 180, bounds: [[77, -64.5], [-65.5, 67.4]], anchors: [{ world: [77, -64.5], map: [0, 0] }, { world: [-65.5, -64.5], map: [100, 0] }, { world: [77, 67.4], map: [0, 100] }] }
@@ -286,7 +286,7 @@
 
   function mapQuests() {
     if (!state.map) return [];
-    return state.quests.filter(quest => quest.objectives?.some(objective => objectiveLocationsOnMap(objective).length));
+    return state.quests.filter(quest => quest.objectives?.some(objective => objectiveBelongsToMap(objective)));
   }
 
   function compareRequirement(actual, method, wanted) {
@@ -317,9 +317,26 @@
     return true;
   }
 
+  function currentMapIds() {
+    return new Set(state.map ? [state.map.tdevId, ...(state.map.tdevAliases || [])] : []);
+  }
+
+  function objectiveBelongsToMap(objective) {
+    const mapIds = currentMapIds();
+    return (objective.maps || []).some(mapId => mapIds.has(mapId)) ||
+      (objective.locations || []).some(location => mapIds.has(location.map));
+  }
+
   function objectiveLocationsOnMap(objective) {
     if (!state.map) return [];
-    return (objective.locations || []).filter(location => location.map === state.map.tdevId);
+    const mapIds = currentMapIds();
+    const unique = new Map();
+    for (const location of objective.locations || []) {
+      if (!mapIds.has(location.map)) continue;
+      const key = [location.x, location.y, location.z, location.top, location.bottom].map(value => value ?? "").join("|");
+      if (!unique.has(key)) unique.set(key, location);
+    }
+    return [...unique.values()];
   }
 
   function questDisplayName(quest) {
@@ -353,8 +370,9 @@
       checkbox.addEventListener("change", () => toggleQuest(quest, checkbox.checked));
       const text = document.createElement("span");
       text.className = "quest-copy";
-      const locations = quest.objectives.reduce((count, objective) => count + objectiveLocationsOnMap(objective).length, 0);
-      text.innerHTML = `<strong>${escapeHtml(questDisplayName(quest))}</strong><small>${state.language === "ko" ? `지도 위치 ${locations}개` : `${locations} map location${locations === 1 ? "" : "s"}`}</small>`;
+      const mapObjectives = quest.objectives.filter(objective => objectiveBelongsToMap(objective));
+      const locations = mapObjectives.reduce((count, objective) => count + objectiveLocationsOnMap(objective).length, 0);
+      text.innerHTML = `<strong>${escapeHtml(questDisplayName(quest))}</strong><small>${state.language === "ko" ? `목표 ${mapObjectives.length}개 · 위치 마커 ${locations}개` : `${mapObjectives.length} objective${mapObjectives.length === 1 ? "" : "s"} · ${locations} location marker${locations === 1 ? "" : "s"}`}</small>`;
       const complete = document.createElement("button");
       complete.type = "button";
       complete.className = `quest-complete${completed ? " done" : ""}`;
@@ -420,11 +438,11 @@
         requirements.push(`${trader?.name || requirement.trader} ${requirementType} ${requirement.compareMethod || ">="} ${requirement.value}`);
       }
       for (const keyGroup of quest.neededKeys || []) {
-        if (keyGroup.map !== state.map?.tdevId) continue;
+        if (!currentMapIds().has(keyGroup.map)) continue;
         for (const key of keyGroup.keys || []) requirements.push(`${state.language === "ko" ? "열쇠" : "Key"}: ${key.name}`);
       }
       const objectives = (quest.objectives || []).filter(objective =>
-        objectiveLocationsOnMap(objective).length || !(objective.maps || []).length || objective.maps.includes(state.map?.tdevId));
+        objectiveBelongsToMap(objective) || !(objective.maps || []).length);
       card.innerHTML = `<h3>${escapeHtml(questDisplayName(quest))}</h3>` +
         (requirements.length ? `<ul>${requirements.map(v => `<li>${escapeHtml(v)}</li>`).join("")}</ul>` : `<p class="empty-state">${state.language === "ko" ? "기록된 선행 조건이 없습니다." : "No prerequisite recorded."}</p>`) +
         (objectives.length ? `<ul>${objectives.map(o => `<li class="objective">${escapeHtml(describeObjective(o))}</li>`).join("")}</ul>` : "");

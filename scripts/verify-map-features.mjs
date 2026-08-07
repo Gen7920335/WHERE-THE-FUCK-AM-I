@@ -193,6 +193,17 @@ for (const task of quests.tasks) {
   }
 }
 if (questLocationCount < 900) throw new Error(`Only ${questLocationCount} quest locations were found`);
+const questMapRows = new Set();
+for (const [mapKey, map] of Object.entries(maps)) {
+  const mapIds = new Set([map.tdevId, ...(map.tdevAliases || [])]);
+  for (const task of quests.tasks) {
+    const belongs = (task.objectives || []).some(objective =>
+      (objective.maps || []).some(mapId => mapIds.has(mapId)) ||
+      (objective.locations || []).some(location => mapIds.has(location.map)));
+    if (belongs) questMapRows.add(`${mapKey}:${task.id}`);
+  }
+}
+if (questMapRows.size < 500) throw new Error(`Only ${questMapRows.size} map-specific quest rows can be displayed`);
 const traderIds = new Set((quests.traders || []).map(trader => String(trader.id)));
 if (traderIds.size < 8) throw new Error("Trader progress metadata is incomplete");
 for (const task of quests.tasks) {
@@ -203,7 +214,7 @@ for (const task of quests.tasks) {
     if (!traderIds.has(String(requirement.trader))) throw new Error(`${task.name}: unknown trader requirement`);
 }
 
-for (const token of ["questAvailable", "questMatchesFilter", "progress-settings-changed", "completedQuests", "selectFloorByHotkey", "setFloorEditor", "save-floor-zones", "setIconScale", "--map-inverse-scale", "questDisplayName", "descriptionKo", "renderMapLabels"]) {
+for (const token of ["questAvailable", "questMatchesFilter", "objectiveBelongsToMap", "currentMapIds", "tdevAliases", "progress-settings-changed", "completedQuests", "selectFloorByHotkey", "setFloorEditor", "save-floor-zones", "setIconScale", "--map-inverse-scale", "questDisplayName", "descriptionKo", "renderMapLabels"]) {
   if (!mapJs.includes(token)) throw new Error(`Local parity feature is missing: ${token}`);
 }
 if (!/function questDisplayName\(quest\)\s*\{\s*return quest\.name;\s*\}/.test(mapJs)) {
@@ -314,4 +325,4 @@ for (const requiredBridgeToken of ["SendScreenshotPositionToMapAsync", "Invarian
   if (!whereAmICs.includes(requiredBridgeToken)) throw new Error(`Screenshot-to-map bridge is missing ${requiredBridgeToken}`);
 }
 
-console.log(`Verified ${layers.length} layers, ${markerCount} public markers (${hazardCount} hazards, ${keySpawnCount} key spawns, ${edgeCount} edge-pinned), ${mapLabelCount} place-name labels, ${battlePassCount} Battle Pass locations, ${questLocationCount} Korean quest locations, extraction labels, resizable panels, squad pose bridging, progress/floor parity, and screenshot direction bridging`);
+console.log(`Verified ${layers.length} layers, ${markerCount} public markers (${hazardCount} hazards, ${keySpawnCount} key spawns, ${edgeCount} edge-pinned), ${mapLabelCount} place-name labels, ${battlePassCount} Battle Pass locations, ${questLocationCount} quest coordinates and ${questMapRows.size} map-specific quest rows, extraction labels, resizable panels, squad pose bridging, progress/floor parity, and screenshot direction bridging`);
