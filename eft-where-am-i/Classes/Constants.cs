@@ -611,9 +611,6 @@ namespace eft_where_am_i.Classes
     // 1. 원치 않는 요소 제거
     // 1-1. 제거할 요소 selector 목록 (개발자 도구에서 selector 복사해서 추가)
     var selectors = [
-        '.content.maps > .p-relative',
-        '.content.maps .head-pilot',
-        '.content.maps .alert-box',
         '.panel_right > div.user-layers-panel',
         '.panel_right > div.squad-panel',
         '#__nuxt > div > div > div.cookie-consent',

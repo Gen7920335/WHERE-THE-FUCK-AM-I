@@ -1144,7 +1144,6 @@
     };
 
     document.querySelectorAll([
-      '.content.maps > .p-relative',
       '.content.maps .head-pilot',
       '.content.maps .alert-box',
       '.panel_right > .user-layers-panel',
@@ -1162,7 +1161,7 @@
       }
     });
 
-    document.querySelectorAll('a, button, [role="button"], label, span, div').forEach((element) => {
+    document.querySelectorAll('a, button, [role="button"], label, span, .sub').forEach((element) => {
       if (element.closest('[data-wtf-commercial-hidden="true"]')) return;
       const text = String(element.textContent || '').replace(/\s+/g, ' ').trim();
       if (!text || text.length > 220) return;
