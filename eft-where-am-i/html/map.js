@@ -322,7 +322,7 @@
   }
 
   function questDisplayName(quest) {
-    return state.language === "ko" ? (quest.nameKo || quest.name) : quest.name;
+    return quest.name;
   }
 
   function objectiveDisplayText(objective) {

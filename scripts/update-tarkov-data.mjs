@@ -74,7 +74,7 @@ function objectiveLocations(objective) {
 const tasks = Object.values(rawTasks.data?.tasks || {}).map(task => ({
   id: task.id,
   name: taskText[task.name] || task.normalizedName || task.id,
-  nameKo: taskKoText[task.name] || taskText[task.name] || task.normalizedName || task.id,
+  nameKo: taskText[task.name] || task.normalizedName || task.id,
   normalizedName: task.normalizedName || "",
   trader: task.trader,
   factionName: task.factionName || "Any",

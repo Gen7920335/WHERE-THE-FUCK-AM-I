@@ -178,10 +178,6 @@ function verifyQuestTranslation(taskName, kind, source, translated) {
   }
 }
 for (const task of quests.tasks) {
-  if (!task.nameKo || (!/[가-힣]/.test(task.nameKo) && !(task.nameKo === task.name && protectedQuestTerms.has(task.name)))) {
-    throw new Error(`${task.name}: Korean quest title is missing`);
-  }
-  verifyQuestTranslation(task.name, "title", task.name, task.nameKo);
   for (const requirement of task.taskRequirements || []) {
     if (!taskIds.has(String(requirement.task))) throw new Error(`${task.name}: missing prerequisite task`);
   }
@@ -209,6 +205,9 @@ for (const task of quests.tasks) {
 
 for (const token of ["questAvailable", "questMatchesFilter", "progress-settings-changed", "completedQuests", "selectFloorByHotkey", "setFloorEditor", "save-floor-zones", "setIconScale", "--map-inverse-scale", "questDisplayName", "descriptionKo", "renderMapLabels"]) {
   if (!mapJs.includes(token)) throw new Error(`Local parity feature is missing: ${token}`);
+}
+if (!/function questDisplayName\(quest\)\s*\{\s*return quest\.name;\s*\}/.test(mapJs)) {
+  throw new Error("Quest names must remain in English in every language mode");
 }
 for (const token of ["icon-scale-preview", "icon-scale-changed", "setIconScaleControl"]) {
   if (!panelHtml.includes(token)) throw new Error(`Top-panel icon scaling is missing: ${token}`);

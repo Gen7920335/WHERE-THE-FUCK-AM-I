@@ -99,8 +99,7 @@ async function translateBatch(batch) {
 const missing = [];
 for (const task of quests.tasks || []) {
   if (requestedTask && task.name !== requestedTask) continue;
-  if (manualTranslations.has(task.name)) task.nameKo = manualTranslations.get(task.name);
-  else missing.push({ target: task, field: "nameKo", source: task.name, kind: "task" });
+  task.nameKo = task.name;
   for (const objective of task.objectives || []) {
     if (manualTranslations.has(objective.description)) objective.descriptionKo = manualTranslations.get(objective.description);
     else missing.push({ target: objective, field: "descriptionKo", source: objective.description, kind: "objective" });
@@ -119,17 +118,18 @@ for (let start = 0; start < missing.length; start += 16) {
 }
 
 for (const task of quests.tasks || []) {
-  const entries = [
-    { source: task.name, translated: task.nameKo, kind: "title" },
-    ...(task.objectives || []).map(objective => ({ source: objective.description, translated: objective.descriptionKo, kind: "objective" }))
-  ];
+  const entries = (task.objectives || []).map(objective => ({
+    source: objective.description,
+    translated: objective.descriptionKo,
+    kind: "objective"
+  }));
   for (const entry of entries) {
     if (!entry.translated || /__Q\d+_TERM\d+__/.test(entry.translated)) throw new Error(`${task.name}: invalid Korean ${entry.kind}`);
     const lost = lostProtectedTerm(entry.source, entry.translated);
     if (lost) {
       throw new Error(`${task.name}: protected item/location name changed in ${entry.kind}: ${lost}\n${entry.source}\n${entry.translated}`);
     }
-    if (!/[가-힣]/.test(entry.translated) && !(entry.kind === "title" && protectedTerms.has(entry.source))) {
+    if (!/[가-힣]/.test(entry.translated)) {
       throw new Error(`${task.name}: Korean ${entry.kind} contains no translated text`);
     }
   }
