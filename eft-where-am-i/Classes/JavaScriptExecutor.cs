@@ -880,6 +880,7 @@ namespace eft_where_am_i.Classes
 
                 const findQuestItem = (target) => {
                     if (!target || target === container) return null;
+                    if (target.closest?.('.wtf-quest-pin')) return null;
                     let current = target;
                     while (current && current !== container) {
                         if (current.matches('div.no-wrap.d-flex, div.no-wrap, .quest, .quest-item, [data-quest-name]')) {

@@ -18,6 +18,7 @@ namespace eft_where_am_i
         private AppSettings appSettings; // AppSettings 참조
         private JavaScriptExecutor jsExecutor;
         private QuestRepository questRepository;
+        private QuestOverlayDataService questOverlayDataService;
         private FloorManager floorManager;
         private readonly Dictionary<string, string> mapDisplayNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -95,6 +96,7 @@ namespace eft_where_am_i
                 // 3. 모든 WebView가 초기화된 후에 jsExecutor 생성
                 jsExecutor = new JavaScriptExecutor(webView2);
                 questRepository = new QuestRepository();
+                questOverlayDataService = new QuestOverlayDataService();
                 floorManager = new FloorManager();
 
                 // 4. 앱 시작 시 패널을 강제로 열어둠
@@ -586,6 +588,7 @@ namespace eft_where_am_i
                 await jsExecutor.InjectQuestClickListenerAsync();
                 // 퀘스트 복원
                 await RestoreQuestsAsync(appSettings.latest_map);
+                await InjectQuestOverlayAsync();
             }
 
             // 새로고침의 경우 Where Am I 패널과 방향 표시를 다시 적용
@@ -620,6 +623,33 @@ namespace eft_where_am_i
                 iconScale = appSettings.icon_scale
             });
             await webView2.ExecuteScriptAsync($"window.__wtfSetEnhancementSettings?.({settingsJson});");
+        }
+
+        private async Task InjectQuestOverlayAsync()
+        {
+            if (webView2.CoreWebView2 == null || questOverlayDataService == null || appSettings == null)
+            {
+                return;
+            }
+
+            try
+            {
+                QuestOverlaySnapshot snapshot = await questOverlayDataService.GetMapSnapshotAsync(appSettings.latest_map);
+                appSettings.pinned_quests_per_map ??= new Dictionary<string, List<string>>();
+                if (!appSettings.pinned_quests_per_map.TryGetValue(appSettings.latest_map, out List<string> pinnedQuestIds))
+                {
+                    pinnedQuestIds = new List<string>();
+                }
+
+                string snapshotJson = Newtonsoft.Json.JsonConvert.SerializeObject(snapshot);
+                string pinnedJson = Newtonsoft.Json.JsonConvert.SerializeObject(pinnedQuestIds);
+                await webView2.ExecuteScriptAsync($"window.__wtfQuestOverlay?.configure({snapshotJson}, {pinnedJson});");
+                AppLogger.Info("QuestOverlay", $"Configured {snapshot.quests.Count} quests for {appSettings.latest_map}.");
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("QuestOverlay", $"Unable to configure quest pins: {ex.Message}");
+            }
         }
 
         private async void CoreWebView2_SourceChanged(object sender, CoreWebView2SourceChangedEventArgs e)
@@ -660,6 +690,7 @@ namespace eft_where_am_i
                     await jsExecutor.ExecuteScriptAsync(Constants.ADD_DIRECTION_INDICATORS_SCRIPT);
                     await jsExecutor.InjectQuestClickListenerAsync();
                     await RestoreQuestsAsync(appSettings.latest_map);
+                    await InjectQuestOverlayAsync();
                 }
             }
         }
@@ -1019,6 +1050,31 @@ namespace eft_where_am_i
                                 questRepository.AddQuest(appSettings.latest_map, questName);
                             else
                                 questRepository.RemoveQuest(appSettings.latest_map, questName);
+                        }
+                        break;
+
+                    case "quest-pin-changed":
+                        string pinnedQuestId = message["questId"]?.ToString() ?? string.Empty;
+                        bool isPinned = message["checked"]?.Value<bool>() ?? false;
+                        if (!string.IsNullOrWhiteSpace(pinnedQuestId))
+                        {
+                            appSettings.pinned_quests_per_map ??= new Dictionary<string, List<string>>();
+                            if (!appSettings.pinned_quests_per_map.TryGetValue(appSettings.latest_map, out List<string> pinnedQuestIds))
+                            {
+                                pinnedQuestIds = new List<string>();
+                                appSettings.pinned_quests_per_map[appSettings.latest_map] = pinnedQuestIds;
+                            }
+
+                            if (isPinned && !pinnedQuestIds.Contains(pinnedQuestId, StringComparer.OrdinalIgnoreCase))
+                            {
+                                pinnedQuestIds.Add(pinnedQuestId);
+                            }
+                            else if (!isPinned)
+                            {
+                                pinnedQuestIds.RemoveAll(id => string.Equals(id, pinnedQuestId, StringComparison.OrdinalIgnoreCase));
+                            }
+
+                            SaveSettings();
                         }
                         break;
 
