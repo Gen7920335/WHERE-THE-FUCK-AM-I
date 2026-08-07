@@ -15,7 +15,6 @@ namespace eft_where_am_i_chasrp
         // UserControl을 캐싱해서 상태 유지
         private WhereAmI whereAmIControl;
         private SettingPage settingPageControl;
-        private ServerLocation serverLocationControl;
 
         public Form1()
         {
@@ -35,21 +34,17 @@ namespace eft_where_am_i_chasrp
             // 화면 3개 생성 (딱 1번만)
             whereAmIControl = new WhereAmI();
             settingPageControl = new SettingPage();
-            serverLocationControl = new ServerLocation();
 
             // Panel에 미리 추가
             panel1.Controls.Add(whereAmIControl);
             panel1.Controls.Add(settingPageControl);
-            panel1.Controls.Add(serverLocationControl);
 
             whereAmIControl.Dock = DockStyle.Fill;
             settingPageControl.Dock = DockStyle.Fill;
-            serverLocationControl.Dock = DockStyle.Fill;
 
             // 시작 화면 설정
             whereAmIControl.Visible = true;
             settingPageControl.Visible = false;
-            serverLocationControl.Visible = false;
         }
 
         const int MAX_SLIDING_WIDTH = 200;
@@ -63,9 +58,7 @@ namespace eft_where_am_i_chasrp
             {
                 btnSetting.Text = "Setting Page";
                 btnSetting.Image = null;
-                btnServerLocation.Text = "Server Location";
-                btnServerLocation.Image = null;
-                btnWhereAmI.Text = "Where Am I";
+                btnWhereAmI.Text = "WHERE THE FUCK AM I";
                 btnWhereAmI.Image = null;
                 checkBoxHide.Text = "<";
             }
@@ -73,8 +66,6 @@ namespace eft_where_am_i_chasrp
             {
                 btnSetting.Text = "";
                 btnSetting.Image = Image.FromFile(@"assets\images\settings_icon2_resize.png");
-                btnServerLocation.Text = "";
-                btnServerLocation.Image = Image.FromFile(@"assets\images\server.png");
                 btnWhereAmI.Text = "";
                 btnWhereAmI.Image = Image.FromFile(@"assets\images\eft-where-am-i_icon_resize.png");
                 checkBoxHide.Text = ">";
@@ -110,7 +101,7 @@ namespace eft_where_am_i_chasrp
             var version = Assembly.GetExecutingAssembly()
                 .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
                 ?? Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "?";
-            this.Text = $"EFT Where am I? (v{version})";
+            this.Text = $"WHERE THE FUCK AM I (v{version})";
 
             await CheckForUpdatesAsync();
         }
@@ -119,7 +110,7 @@ namespace eft_where_am_i_chasrp
         {
             try
             {
-                var mgr = new UpdateManager(new GithubSource("https://github.com/karpitony/eft-where-am-i", null, false));
+                var mgr = new UpdateManager(new GithubSource("https://github.com/Gen7920335/WHERE-THE-FUCK-AM-I", null, false));
                 
                 // 개발 환경(디버거 모드)일 경우에만 건너뛰고, 무설치(Portable) 형태로 압축을 풀어 쓰는 유저도 업데이트를 받을 수 있게 합니다.
                 if (System.Diagnostics.Debugger.IsAttached)
@@ -169,21 +160,11 @@ namespace eft_where_am_i_chasrp
             }
         }
 
-        private void btnServerLocation_Click(object sender, EventArgs e)
-        {
-            if (currentScreen != "ServerLocation")
-            {
-                SwitchUserControl(serverLocationControl);
-                currentScreen = "ServerLocation";
-            }
-        }
-
         private void SwitchUserControl(UserControl control)
         {
             // 모든 화면 숨기기
             whereAmIControl.Visible = false;
             settingPageControl.Visible = false;
-            serverLocationControl.Visible = false;
 
             // 새 화면만 보이기
             control.Visible = true;

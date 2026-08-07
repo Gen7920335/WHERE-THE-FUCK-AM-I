@@ -140,6 +140,9 @@ namespace eft_where_am_i
                     string mapListJson = Newtonsoft.Json.JsonConvert.SerializeObject(GetMapListForLanguage(language));
                     await webView2_panel_ui.ExecuteScriptAsync($"populateMapList('{mapListJson}', '{appSettings.latest_map}')");
                     await webView2_panel_ui.ExecuteScriptAsync($"setTheme('{appSettings.theme_mode}')");
+                    await webView2_panel_ui.ExecuteScriptAsync(
+                        $"setScaleControls({appSettings.font_scale.ToString(System.Globalization.CultureInfo.InvariantCulture)}, " +
+                        $"{appSettings.icon_scale.ToString(System.Globalization.CultureInfo.InvariantCulture)})");
                 }
                 catch (Exception ex)
                 {
@@ -147,6 +150,7 @@ namespace eft_where_am_i
                     MessageBox.Show($"설정 변경 중 스크립트 실행 오류: {ex.Message}", "경고", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
             }
+            await ApplyEnhancementSettingsAsync();
             // 만약 null이라면 (아직 초기화 전),
             // 어차피 InitializeWebViewUI()의 NavigationCompleted 이벤트 핸들러가
             // 나중에 최신 appSettings 값을 읽어 언어를 설정할 것이므로
@@ -263,6 +267,13 @@ namespace eft_where_am_i
             // 영구 주입 스크립트 (새로고침 시에도 유지되도록 웹 콘텐츠가 로딩되기 전에 주입)
             await webView2.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(Constants.DEAD_ZONE_AUTO_PAN_SCRIPT);
 
+            string enhancementScriptPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "html", "enhancements.js");
+            if (File.Exists(enhancementScriptPath))
+            {
+                string enhancementScript = await File.ReadAllTextAsync(enhancementScriptPath);
+                await webView2.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(enhancementScript);
+            }
+
             // WebView2 콘텐츠 메시지 수신 핸들러 등록
             webView2.CoreWebView2.WebMessageReceived += WebView2Content_WebMessageReceived;
 
@@ -354,6 +365,10 @@ namespace eft_where_am_i
                         // 스크린샷 자동 삭제 체크박스 상태 전송
                         await webView2_panel_ui.ExecuteScriptAsync(
                             $"setAutoScreenshotCleanupCheckboxState({appSettings.auto_screenshot_cleanup.ToString().ToLower()})");
+
+                        await webView2_panel_ui.ExecuteScriptAsync(
+                            $"setScaleControls({appSettings.font_scale.ToString(System.Globalization.CultureInfo.InvariantCulture)}, " +
+                            $"{appSettings.icon_scale.ToString(System.Globalization.CultureInfo.InvariantCulture)})");
 
                         // 디버그 모드 플래그 전송
 #if DEBUG
@@ -475,6 +490,28 @@ namespace eft_where_am_i
                         }
                         break;
 
+                    case "font-scale-preview":
+                        appSettings.font_scale = Math.Clamp(message["scale"]?.Value<double>() ?? 1.0, 0.5, 1.5);
+                        await ApplyEnhancementSettingsAsync();
+                        break;
+
+                    case "font-scale-changed":
+                        appSettings.font_scale = Math.Clamp(message["scale"]?.Value<double>() ?? 1.0, 0.5, 1.5);
+                        SaveSettings();
+                        await ApplyEnhancementSettingsAsync();
+                        break;
+
+                    case "icon-scale-preview":
+                        appSettings.icon_scale = Math.Clamp(message["scale"]?.Value<double>() ?? 1.0, 0.5, 6.5);
+                        await ApplyEnhancementSettingsAsync();
+                        break;
+
+                    case "icon-scale-changed":
+                        appSettings.icon_scale = Math.Clamp(message["scale"]?.Value<double>() ?? 1.0, 0.5, 6.5);
+                        SaveSettings();
+                        await ApplyEnhancementSettingsAsync();
+                        break;
+
                     case "theme-updated":
                         if (!string.IsNullOrEmpty(theme))
                         {
@@ -535,6 +572,7 @@ namespace eft_where_am_i
 
             // 데드존 auto-pan 스크립트 재주입 (새 페이지 로드 시)
             await jsExecutor.ExecuteScriptAsync(Constants.DEAD_ZONE_AUTO_PAN_SCRIPT);
+            await ApplyEnhancementSettingsAsync();
 
             // 퀘스트 컨테이너 로드 대기 (DOM 준비 완료까지 대기)
             bool containerReady = await jsExecutor.WaitForQuestContainerAsync(15000);
@@ -566,6 +604,22 @@ namespace eft_where_am_i
             {
                 AppLogger.Warn("WhereAmI", $"Post-navigation reapply failed: {ex.Message}");
             }
+        }
+
+        private async Task ApplyEnhancementSettingsAsync()
+        {
+            if (webView2.CoreWebView2 == null || appSettings == null)
+            {
+                return;
+            }
+
+            string settingsJson = Newtonsoft.Json.JsonConvert.SerializeObject(new
+            {
+                uiScale = appSettings.ui_scale,
+                fontScale = appSettings.font_scale,
+                iconScale = appSettings.icon_scale
+            });
+            await webView2.ExecuteScriptAsync($"window.__wtfSetEnhancementSettings?.({settingsJson});");
         }
 
         private async void CoreWebView2_SourceChanged(object sender, CoreWebView2SourceChangedEventArgs e)

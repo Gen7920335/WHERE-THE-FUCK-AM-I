@@ -142,6 +142,24 @@
     </div>
   </section>
 
+  <section class="mb-6">
+    <p id="mapInterfaceTitle" class="mb-2 text-xl">Map Interface</p>
+    <div class="flex items-center space-x-4">
+      <label id="uiScaleLabel" for="uiScaleSlider" class="text-base font-medium">UI Size</label>
+      <input
+        type="range"
+        id="uiScaleSlider"
+        min="65"
+        max="200"
+        step="5"
+        value="100"
+        oninput="onUiScaleChange()"
+        class="w-64"
+      />
+      <span id="uiScaleValue" class="text-base font-medium">100%</span>
+    </div>
+  </section>
+
   <!-- App Version Settings -->
   <section class="mb-6">
     <p id="appVersionText" class="mb-2 text-xl">
@@ -226,6 +244,8 @@
       document.getElementById('themeToggleButton').textContent = i18next.t('themeToggleButton');
       document.getElementById('appVersionText').textContent = i18next.t('appVersionText');
       document.getElementById('checkUpdateButton').textContent = i18next.t('checkUpdateButton');
+      document.getElementById('mapInterfaceTitle').textContent = i18next.t('mapInterfaceTitle');
+      document.getElementById('uiScaleLabel').textContent = i18next.t('uiScaleLabel');
     }
 
     function setTheme(theme) {
@@ -245,6 +265,18 @@
       const nextTheme = document.body.classList.contains('theme-dark') ? 'light' : 'dark';
       setTheme(nextTheme);
       window.chrome.webview.postMessage(JSON.stringify({ action: 'theme-updated', theme: nextTheme }));
+    }
+
+    function setUiScale(scale) {
+      const percent = Math.min(200, Math.max(65, Math.round((Number(scale) || 1) * 100)));
+      document.getElementById('uiScaleSlider').value = percent;
+      document.getElementById('uiScaleValue').textContent = percent + '%';
+    }
+
+    function onUiScaleChange() {
+      const percent = Number(document.getElementById('uiScaleSlider').value);
+      document.getElementById('uiScaleValue').textContent = percent + '%';
+      window.chrome.webview.postMessage(JSON.stringify({ action: 'ui-scale-changed', scale: percent / 100 }));
     }
 
     // 언어 선택 시 호출되는 함수

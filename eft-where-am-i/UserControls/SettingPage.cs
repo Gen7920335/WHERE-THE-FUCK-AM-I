@@ -55,6 +55,7 @@ namespace eft_where_am_i
             _ = webView2_Settings.ExecuteScriptAsync($"setLogPath('{escapedLogPath}')");
             _ = webView2_Settings.ExecuteScriptAsync($"setDeadZonePercent({appSettings.dead_zone_percent})");
             _ = webView2_Settings.ExecuteScriptAsync($"setTheme('{appSettings.theme_mode}')");
+            _ = webView2_Settings.ExecuteScriptAsync($"setUiScale({appSettings.ui_scale.ToString(System.Globalization.CultureInfo.InvariantCulture)})");
         }
 
         private async Task InitializeWebViewUI()
@@ -121,6 +122,7 @@ namespace eft_where_am_i
 
                         // 테마 설정 전송
                         await webView2_Settings.ExecuteScriptAsync($"setTheme('{appSettings.theme_mode}')");
+                        await webView2_Settings.ExecuteScriptAsync($"setUiScale({appSettings.ui_scale.ToString(System.Globalization.CultureInfo.InvariantCulture)})");
 
                         // 앱 버전 정보 전송
                         var version = Assembly.GetExecutingAssembly()
@@ -223,6 +225,11 @@ namespace eft_where_am_i
                         SaveSettings();
                         break;
 
+                    case "ui-scale-changed":
+                        appSettings.ui_scale = Math.Clamp(message["scale"]?.Value<double>() ?? 1.0, 0.65, 2.0);
+                        SaveSettings();
+                        break;
+
                     case "auto-detect-log-path":
                         try
                         {
@@ -257,7 +264,7 @@ namespace eft_where_am_i
         {
             try
             {
-                var mgr = new UpdateManager(new GithubSource("https://github.com/karpitony/eft-where-am-i", null, false));
+                var mgr = new UpdateManager(new GithubSource("https://github.com/Gen7920335/WHERE-THE-FUCK-AM-I", null, false));
                 
                 if (System.Diagnostics.Debugger.IsAttached)
                 {
