@@ -18,7 +18,7 @@ namespace eft_where_am_i
         private AppSettings appSettings; // AppSettings 참조
         private JavaScriptExecutor jsExecutor;
         private QuestRepository questRepository;
-        private QuestOverlayDataService questOverlayDataService;
+        private BattlePassOverlayDataService battlePassOverlayDataService;
         private FloorManager floorManager;
         private readonly Dictionary<string, string> mapDisplayNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -96,7 +96,7 @@ namespace eft_where_am_i
                 // 3. 모든 WebView가 초기화된 후에 jsExecutor 생성
                 jsExecutor = new JavaScriptExecutor(webView2);
                 questRepository = new QuestRepository();
-                questOverlayDataService = new QuestOverlayDataService();
+                battlePassOverlayDataService = new BattlePassOverlayDataService();
                 floorManager = new FloorManager();
 
                 // 4. 앱 시작 시 패널을 강제로 열어둠
@@ -588,8 +588,9 @@ namespace eft_where_am_i
                 await jsExecutor.InjectQuestClickListenerAsync();
                 // 퀘스트 복원
                 await RestoreQuestsAsync(appSettings.latest_map);
-                await InjectQuestOverlayAsync();
             }
+
+            await InjectBattlePassOverlayAsync();
 
             // 새로고침의 경우 Where Am I 패널과 방향 표시를 다시 적용
             try
@@ -625,30 +626,27 @@ namespace eft_where_am_i
             await webView2.ExecuteScriptAsync($"window.__wtfSetEnhancementSettings?.({settingsJson});");
         }
 
-        private async Task InjectQuestOverlayAsync()
+        private async Task InjectBattlePassOverlayAsync()
         {
-            if (webView2.CoreWebView2 == null || questOverlayDataService == null || appSettings == null)
+            if (webView2.CoreWebView2 == null || battlePassOverlayDataService == null || appSettings == null)
             {
                 return;
             }
 
             try
             {
-                QuestOverlaySnapshot snapshot = await questOverlayDataService.GetMapSnapshotAsync(appSettings.latest_map);
-                appSettings.pinned_quests_per_map ??= new Dictionary<string, List<string>>();
-                if (!appSettings.pinned_quests_per_map.TryGetValue(appSettings.latest_map, out List<string> pinnedQuestIds))
-                {
-                    pinnedQuestIds = new List<string>();
-                }
-
+                BattlePassOverlaySnapshot snapshot = battlePassOverlayDataService.GetMapSnapshot(appSettings.latest_map);
+                appSettings.battle_pass_visible_per_map ??= new Dictionary<string, bool>();
+                bool visible = appSettings.battle_pass_visible_per_map.TryGetValue(appSettings.latest_map, out bool savedVisible)
+                    && savedVisible;
                 string snapshotJson = Newtonsoft.Json.JsonConvert.SerializeObject(snapshot);
-                string pinnedJson = Newtonsoft.Json.JsonConvert.SerializeObject(pinnedQuestIds);
-                await webView2.ExecuteScriptAsync($"window.__wtfQuestOverlay?.configure({snapshotJson}, {pinnedJson});");
-                AppLogger.Info("QuestOverlay", $"Configured {snapshot.quests.Count} quests for {appSettings.latest_map}.");
+                await webView2.ExecuteScriptAsync(
+                    $"window.__wtfBattlePassOverlay?.configure({snapshotJson}, {visible.ToString().ToLowerInvariant()});");
+                AppLogger.Info("BattlePassOverlay", $"Configured {snapshot.markers.Count} markers for {appSettings.latest_map}.");
             }
             catch (Exception ex)
             {
-                AppLogger.Warn("QuestOverlay", $"Unable to configure quest pins: {ex.Message}");
+                AppLogger.Warn("BattlePassOverlay", $"Unable to configure Battle Pass markers: {ex.Message}");
             }
         }
 
@@ -690,8 +688,9 @@ namespace eft_where_am_i
                     await jsExecutor.ExecuteScriptAsync(Constants.ADD_DIRECTION_INDICATORS_SCRIPT);
                     await jsExecutor.InjectQuestClickListenerAsync();
                     await RestoreQuestsAsync(appSettings.latest_map);
-                    await InjectQuestOverlayAsync();
                 }
+
+                await InjectBattlePassOverlayAsync();
             }
         }
 
@@ -1053,29 +1052,11 @@ namespace eft_where_am_i
                         }
                         break;
 
-                    case "quest-pin-changed":
-                        string pinnedQuestId = message["questId"]?.ToString() ?? string.Empty;
-                        bool isPinned = message["checked"]?.Value<bool>() ?? false;
-                        if (!string.IsNullOrWhiteSpace(pinnedQuestId))
-                        {
-                            appSettings.pinned_quests_per_map ??= new Dictionary<string, List<string>>();
-                            if (!appSettings.pinned_quests_per_map.TryGetValue(appSettings.latest_map, out List<string> pinnedQuestIds))
-                            {
-                                pinnedQuestIds = new List<string>();
-                                appSettings.pinned_quests_per_map[appSettings.latest_map] = pinnedQuestIds;
-                            }
-
-                            if (isPinned && !pinnedQuestIds.Contains(pinnedQuestId, StringComparer.OrdinalIgnoreCase))
-                            {
-                                pinnedQuestIds.Add(pinnedQuestId);
-                            }
-                            else if (!isPinned)
-                            {
-                                pinnedQuestIds.RemoveAll(id => string.Equals(id, pinnedQuestId, StringComparison.OrdinalIgnoreCase));
-                            }
-
-                            SaveSettings();
-                        }
+                    case "battle-pass-toggle":
+                        bool battlePassVisible = message["checked"]?.Value<bool>() ?? false;
+                        appSettings.battle_pass_visible_per_map ??= new Dictionary<string, bool>();
+                        appSettings.battle_pass_visible_per_map[appSettings.latest_map] = battlePassVisible;
+                        SaveSettings();
                         break;
 
                     case "save-floor-zones":

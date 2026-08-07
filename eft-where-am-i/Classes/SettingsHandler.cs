@@ -312,6 +312,6 @@ namespace eft_where_am_i.Classes
         public double ui_scale { get; set; } = 1.0;
         public double font_scale { get; set; } = 1.0;
         public double icon_scale { get; set; } = 1.0;
-        public Dictionary<string, List<string>> pinned_quests_per_map { get; set; } = new Dictionary<string, List<string>>();
+        public Dictionary<string, bool> battle_pass_visible_per_map { get; set; } = new Dictionary<string, bool>();
     }
 }

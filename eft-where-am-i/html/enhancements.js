@@ -136,12 +136,10 @@
     requestMarkerRedraw();
   };
 
-  const questOverlayState = {
-    snapshot: { map: '', quests: [] },
-    questsById: new Map(),
-    questByName: new Map(),
-    pinned: new Set(),
-    overlay: null,
+  const wtfOverlayState = {
+    battlePass: { map: '', markers: [] },
+    battlePassVisible: false,
+    battlePassLayer: null,
     mapWrap: null,
     domObserver: null,
     mapObserver: null,
@@ -150,17 +148,10 @@
     hydrateFrame: 0
   };
 
-  const normalizeQuestName = (value) => String(value || '')
-    .normalize('NFKC')
-    .replace(/[\u200B-\u200D\uFEFF]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLocaleLowerCase();
-
-  const installQuestOverlayStyles = () => {
-    if (document.getElementById('wtf-quest-overlay-styles')) return;
+  const installWtfOverlayStyles = () => {
+    if (document.getElementById('wtf-overlay-styles')) return;
     const style = document.createElement('style');
-    style.id = 'wtf-quest-overlay-styles';
+    style.id = 'wtf-overlay-styles';
     style.textContent = `
       .wtf-quest-pin {
         appearance: auto !important;
@@ -169,43 +160,98 @@
         width: 14px !important;
         min-width: 14px !important;
         height: 14px !important;
-        margin: 0 4px 0 7px !important;
+        margin: 0 6px 0 5px !important;
         padding: 0 !important;
         flex: 0 0 14px !important;
         cursor: pointer !important;
-        accent-color: #7ecb20;
+        accent-color: #70a800;
         vertical-align: middle;
       }
-      #wtf-quest-overlay {
+      .wtf-quest-pin:disabled {
+        cursor: default !important;
+        opacity: .45;
+      }
+      #wtf-battle-pass-control {
+        align-items: center;
+        border-top: 1px solid rgba(154, 136, 102, .45);
+        cursor: pointer;
+        display: flex;
+        gap: 8px;
+        margin-top: 8px;
+        padding: 8px 5px 4px;
+        user-select: none;
+      }
+      #wtf-battle-pass-control:hover {
+        color: var(--tm-text-bright, #fff);
+      }
+      .wtf-battle-pass-check {
+        appearance: auto !important;
+        -webkit-appearance: checkbox !important;
+        width: 14px !important;
+        min-width: 14px !important;
+        height: 14px !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        accent-color: #075fd1;
+      }
+      .wtf-battle-pass-count {
+        margin-left: auto;
+        opacity: .7;
+      }
+      .wtf-blue-cross {
+        display: inline-block;
+        flex: 0 0 auto;
+        height: 14px;
+        position: relative;
+        width: 14px;
+        filter:
+          drop-shadow(1px 0 0 #fff)
+          drop-shadow(-1px 0 0 #fff)
+          drop-shadow(0 1px 0 #fff)
+          drop-shadow(0 -1px 0 #fff);
+      }
+      .wtf-blue-cross::before,
+      .wtf-blue-cross::after {
+        background: #075fd1;
+        border-radius: 1px;
+        content: '';
         position: absolute;
+      }
+      .wtf-blue-cross::before {
+        height: 14px;
+        left: 5px;
+        top: 0;
+        width: 4px;
+      }
+      .wtf-blue-cross::after {
+        height: 4px;
+        left: 0;
+        top: 5px;
+        width: 14px;
+      }
+      #wtf-battle-pass-layer {
         inset: 0;
         overflow: hidden;
-        z-index: 6;
         pointer-events: none !important;
-      }
-      .wtf-quest-marker {
         position: absolute;
-        width: 18px;
-        height: 18px;
-        margin: 0;
-        padding: 0;
-        border: 2px solid #efffd7;
-        border-radius: 50%;
-        box-sizing: border-box;
-        background: #67ad16;
-        color: #fff;
-        font: 700 13px/14px Arial, sans-serif;
-        text-align: center;
-        transform: translate(-50%, -50%) scale(var(--wtf-icon-scale, 1));
-        transform-origin: center;
-        filter: drop-shadow(0 0 3px rgba(126, 203, 32, .95));
-        user-select: none;
-        pointer-events: none !important;
+        z-index: 6;
       }
-      .wtf-quest-marker[hidden] {
+      #wtf-battle-pass-layer[hidden],
+      .wtf-battle-pass-marker[hidden] {
         display: none !important;
         visibility: hidden !important;
         pointer-events: none !important;
+      }
+      .wtf-battle-pass-marker {
+        height: 14px;
+        left: 0;
+        pointer-events: none !important;
+        position: absolute;
+        top: 0;
+        transform: translate(-50%, -50%) scale(var(--wtf-icon-scale, 1));
+        transform-origin: center;
+        user-select: none;
+        width: 14px;
       }
     `;
     (document.head || document.documentElement).appendChild(style);
@@ -218,70 +264,105 @@
     return row?.querySelector?.('span:not(.alt)') || null;
   };
 
-  const setQuestPinned = (questId, checked, notifyHost) => {
-    const quest = questOverlayState.questsById.get(questId);
-    if (!quest) return;
-
-    if (checked) questOverlayState.pinned.add(questId);
-    else questOverlayState.pinned.delete(questId);
-
-    for (const marker of questOverlayState.overlay?.querySelectorAll('.wtf-quest-marker') || []) {
-      if (marker.dataset.questId === questId) {
-        marker.hidden = !checked;
-        marker.setAttribute('aria-hidden', checked ? 'false' : 'true');
-      }
-    }
-
-    for (const checkbox of document.querySelectorAll('.wtf-quest-pin')) {
-      if (checkbox.dataset.questId === questId && checkbox.checked !== checked) {
-        checkbox.checked = checked;
-      }
-    }
-
-    if (notifyHost) {
-      window.chrome?.webview?.postMessage(JSON.stringify({
-        action: 'quest-pin-changed',
-        questId,
-        checked
-      }));
-    }
+  const syncNativeQuestCheckbox = (row, checkbox) => {
+    const selected = row.classList.contains('selected');
+    checkbox.checked = selected;
+    checkbox.disabled = row.classList.contains('disabled');
+    checkbox.setAttribute('aria-checked', selected ? 'true' : 'false');
   };
 
-  const addQuestCheckboxes = () => {
+  const toggleNativeQuestSelection = (row, checkbox) => {
+    const desired = checkbox.checked;
+    const selected = row.classList.contains('selected');
+    if (desired === selected) return;
+
+    row.dispatchEvent(new MouseEvent('contextmenu', {
+      bubbles: true,
+      cancelable: true,
+      button: 2,
+      view: window
+    }));
+
+    setTimeout(() => syncNativeQuestCheckbox(row, checkbox), 120);
+  };
+
+  const addNativeQuestCheckboxes = () => {
     const rows = document.querySelectorAll('div.items.scroll div.no-wrap.d-flex[data-quest-uid]');
     for (const row of rows) {
       const nameElement = getQuestNameElement(row);
-      const quest = questOverlayState.questByName.get(normalizeQuestName(nameElement?.textContent));
-      if (!nameElement || !quest) continue;
+      if (!nameElement) continue;
 
-      const existingCheckbox = row.querySelector('.wtf-quest-pin');
-      if (row.dataset.wtfPinInstalled === 'true' && existingCheckbox?.dataset.questId === quest.id) continue;
-      existingCheckbox?.remove();
-      delete row.dataset.wtfPinInstalled;
+      let checkbox = row.querySelector(':scope > .wtf-quest-pin');
+      if (!checkbox) {
+        checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.className = 'wtf-quest-pin';
+        checkbox.dataset.questId = row.dataset.questUid || '';
+        checkbox.title = 'Select quest markers';
+        checkbox.setAttribute('aria-label', 'Select ' + nameElement.textContent.trim() + ' markers');
+
+        const stopRowInteraction = (event) => event.stopPropagation();
+        checkbox.addEventListener('pointerdown', stopRowInteraction);
+        checkbox.addEventListener('mousedown', stopRowInteraction);
+        checkbox.addEventListener('mouseup', stopRowInteraction);
+        checkbox.addEventListener('click', stopRowInteraction);
+        checkbox.addEventListener('dblclick', stopRowInteraction);
+        checkbox.addEventListener('contextmenu', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+        });
+        checkbox.addEventListener('keydown', stopRowInteraction);
+        checkbox.addEventListener('change', (event) => {
+          event.stopPropagation();
+          toggleNativeQuestSelection(row, checkbox);
+        });
+
+        nameElement.insertAdjacentElement('beforebegin', checkbox);
+      }
+
+      syncNativeQuestCheckbox(row, checkbox);
+    }
+  };
+
+  const ensureBattlePassControl = () => {
+    const leftPanel = document.querySelector('.panel_left');
+    if (!leftPanel) return;
+
+    let control = document.getElementById('wtf-battle-pass-control');
+    if (!control || control.parentElement !== leftPanel) {
+      control?.remove();
+      control = document.createElement('label');
+      control.id = 'wtf-battle-pass-control';
 
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
-      checkbox.className = 'wtf-quest-pin';
-      checkbox.dataset.questId = quest.id;
-      checkbox.checked = questOverlayState.pinned.has(quest.id);
-      checkbox.title = 'Pin quest markers';
-      checkbox.setAttribute('aria-label', `Pin ${quest.name || 'quest'} markers`);
-
-      const stopRowInteraction = (event) => event.stopPropagation();
-      checkbox.addEventListener('pointerdown', stopRowInteraction);
-      checkbox.addEventListener('mousedown', stopRowInteraction);
-      checkbox.addEventListener('mouseup', stopRowInteraction);
-      checkbox.addEventListener('click', stopRowInteraction);
-      checkbox.addEventListener('dblclick', stopRowInteraction);
-      checkbox.addEventListener('contextmenu', stopRowInteraction);
-      checkbox.addEventListener('keydown', stopRowInteraction);
+      checkbox.className = 'wtf-battle-pass-check';
+      checkbox.checked = wtfOverlayState.battlePassVisible;
+      checkbox.setAttribute('aria-label', 'Toggle Battle Pass document spawns');
       checkbox.addEventListener('change', (event) => {
         event.stopPropagation();
-        setQuestPinned(quest.id, checkbox.checked, true);
+        setBattlePassVisible(checkbox.checked, true);
       });
 
-      nameElement.insertAdjacentElement('afterend', checkbox);
-      row.dataset.wtfPinInstalled = 'true';
+      const icon = document.createElement('span');
+      icon.className = 'wtf-blue-cross';
+      icon.setAttribute('aria-hidden', 'true');
+
+      const label = document.createElement('span');
+      label.textContent = 'Battle Pass';
+
+      const count = document.createElement('span');
+      count.className = 'wtf-battle-pass-count';
+      count.textContent = String(wtfOverlayState.battlePass.markers?.length || 0);
+
+      control.append(checkbox, icon, label, count);
+      leftPanel.appendChild(control);
+    } else {
+      const checkbox = control.querySelector('.wtf-battle-pass-check');
+      const count = control.querySelector('.wtf-battle-pass-count');
+      if (checkbox) checkbox.checked = wtfOverlayState.battlePassVisible;
+      if (count) count.textContent = String(wtfOverlayState.battlePass.markers?.length || 0);
+      if (control !== leftPanel.lastElementChild) leftPanel.appendChild(control);
     }
   };
 
@@ -297,10 +378,10 @@
     return { left, top };
   };
 
-  const updateQuestMarkerPositions = () => {
-    questOverlayState.updateFrame = 0;
-    const overlay = questOverlayState.overlay;
-    const mapWrap = questOverlayState.mapWrap;
+  const updateBattlePassPositions = () => {
+    wtfOverlayState.updateFrame = 0;
+    const overlay = wtfOverlayState.battlePassLayer;
+    const mapWrap = wtfOverlayState.mapWrap;
     const mapContainer = overlay?.parentElement;
     if (!overlay?.isConnected || !mapWrap?.isConnected || !mapContainer) return;
 
@@ -320,154 +401,149 @@
     const width = mapWrap.offsetWidth || Number.parseFloat(computed.width) || 0;
     const height = mapWrap.offsetHeight || Number.parseFloat(computed.height) || 0;
 
-    for (const marker of overlay.querySelectorAll('.wtf-quest-marker')) {
+    for (const marker of overlay.querySelectorAll('.wtf-battle-pass-marker')) {
       const localX = (Number(marker.dataset.left) / 100) * width;
       const localY = (Number(marker.dataset.top) / 100) * height;
       const relativeX = localX - originX;
       const relativeY = localY - originY;
-      marker.style.left = `${layout.left + originX + (matrix.a * relativeX) + (matrix.c * relativeY) + matrix.e}px`;
-      marker.style.top = `${layout.top + originY + (matrix.b * relativeX) + (matrix.d * relativeY) + matrix.f}px`;
+      marker.style.left = (layout.left + originX + (matrix.a * relativeX) + (matrix.c * relativeY) + matrix.e) + 'px';
+      marker.style.top = (layout.top + originY + (matrix.b * relativeX) + (matrix.d * relativeY) + matrix.f) + 'px';
     }
   };
 
-  const scheduleQuestMarkerUpdate = () => {
-    if (questOverlayState.updateFrame) return;
-    questOverlayState.updateFrame = requestAnimationFrame(updateQuestMarkerPositions);
+  const scheduleBattlePassPositionUpdate = () => {
+    if (wtfOverlayState.updateFrame) return;
+    wtfOverlayState.updateFrame = requestAnimationFrame(updateBattlePassPositions);
   };
 
   const observeMapTransform = (mapContainer, mapWrap) => {
-    if (questOverlayState.mapWrap === mapWrap && questOverlayState.mapObserver) return;
-    questOverlayState.mapObserver?.disconnect();
-    questOverlayState.resizeObserver?.disconnect();
-    questOverlayState.mapWrap = mapWrap;
-    questOverlayState.mapObserver = new MutationObserver(scheduleQuestMarkerUpdate);
-    questOverlayState.mapObserver.observe(mapWrap, {
+    if (wtfOverlayState.mapWrap === mapWrap && wtfOverlayState.mapObserver) return;
+    wtfOverlayState.mapObserver?.disconnect();
+    wtfOverlayState.resizeObserver?.disconnect();
+    wtfOverlayState.mapWrap = mapWrap;
+    wtfOverlayState.mapObserver = new MutationObserver(scheduleBattlePassPositionUpdate);
+    wtfOverlayState.mapObserver.observe(mapWrap, {
       attributes: true,
       attributeFilter: ['style', 'class']
     });
     if (window.ResizeObserver) {
-      questOverlayState.resizeObserver = new ResizeObserver(scheduleQuestMarkerUpdate);
-      questOverlayState.resizeObserver.observe(mapContainer);
-      questOverlayState.resizeObserver.observe(mapWrap);
+      wtfOverlayState.resizeObserver = new ResizeObserver(scheduleBattlePassPositionUpdate);
+      wtfOverlayState.resizeObserver.observe(mapContainer);
+      wtfOverlayState.resizeObserver.observe(mapWrap);
     }
-    scheduleQuestMarkerUpdate();
+    scheduleBattlePassPositionUpdate();
   };
 
-  const renderQuestMarkers = () => {
-    const overlay = questOverlayState.overlay;
+  const renderBattlePassMarkers = () => {
+    const overlay = wtfOverlayState.battlePassLayer;
     if (!overlay) return;
     overlay.replaceChildren();
+    overlay.hidden = !wtfOverlayState.battlePassVisible;
 
-    for (const quest of questOverlayState.snapshot.quests || []) {
-      for (const markerData of quest.markers || []) {
-        const marker = document.createElement('div');
-        marker.className = 'wtf-quest-marker';
-        marker.dataset.questId = quest.id;
-        marker.dataset.objectiveId = markerData.objectiveId || '';
-        marker.dataset.left = String(markerData.left);
-        marker.dataset.top = String(markerData.top);
-        marker.dataset.floor = markerData.floor || '';
-        marker.hidden = !questOverlayState.pinned.has(quest.id);
-        marker.tabIndex = -1;
-        marker.setAttribute('aria-hidden', marker.hidden ? 'true' : 'false');
-        marker.textContent = '!';
-        overlay.appendChild(marker);
-      }
+    for (const markerData of wtfOverlayState.battlePass.markers || []) {
+      const marker = document.createElement('div');
+      marker.className = 'wtf-battle-pass-marker';
+      marker.dataset.left = String(markerData.left);
+      marker.dataset.top = String(markerData.top);
+      marker.dataset.elevation = String(markerData.elevation ?? '');
+      marker.title = [markerData.title, markerData.details].filter(Boolean).join(' · ');
+      marker.setAttribute('aria-hidden', 'true');
+      marker.tabIndex = -1;
+
+      const cross = document.createElement('span');
+      cross.className = 'wtf-blue-cross';
+      cross.setAttribute('aria-hidden', 'true');
+      marker.appendChild(cross);
+      overlay.appendChild(marker);
     }
-    scheduleQuestMarkerUpdate();
+    scheduleBattlePassPositionUpdate();
   };
 
-  const ensureQuestOverlay = () => {
-    installQuestOverlayStyles();
+  const ensureBattlePassLayer = () => {
     const mapContainer = document.querySelector('.map-cont');
     const mapWrap = mapContainer?.querySelector('.map-wrap');
     if (!mapContainer || !mapWrap) return false;
 
     let created = false;
-    if (!questOverlayState.overlay?.isConnected || questOverlayState.overlay.parentElement !== mapContainer) {
-      questOverlayState.overlay?.remove();
+    if (!wtfOverlayState.battlePassLayer?.isConnected || wtfOverlayState.battlePassLayer.parentElement !== mapContainer) {
+      wtfOverlayState.battlePassLayer?.remove();
       const overlay = document.createElement('div');
-      overlay.id = 'wtf-quest-overlay';
+      overlay.id = 'wtf-battle-pass-layer';
       overlay.setAttribute('aria-hidden', 'true');
       mapContainer.appendChild(overlay);
-      questOverlayState.overlay = overlay;
+      wtfOverlayState.battlePassLayer = overlay;
       created = true;
     }
 
     observeMapTransform(mapContainer, mapWrap);
-    if (created) renderQuestMarkers();
+    if (created) renderBattlePassMarkers();
     return true;
   };
 
-  const hydrateQuestOverlayDom = () => {
-    questOverlayState.hydrateFrame = 0;
-    ensureQuestOverlay();
-    addQuestCheckboxes();
+  const setBattlePassVisible = (visible, notifyHost) => {
+    wtfOverlayState.battlePassVisible = Boolean(visible);
+    if (wtfOverlayState.battlePassLayer) {
+      wtfOverlayState.battlePassLayer.hidden = !wtfOverlayState.battlePassVisible;
+    }
+    const checkbox = document.querySelector('.wtf-battle-pass-check');
+    if (checkbox) checkbox.checked = wtfOverlayState.battlePassVisible;
+    if (notifyHost) {
+      window.chrome?.webview?.postMessage(JSON.stringify({
+        action: 'battle-pass-toggle',
+        checked: wtfOverlayState.battlePassVisible
+      }));
+    }
   };
 
-  const scheduleQuestOverlayHydration = () => {
-    if (questOverlayState.hydrateFrame) return;
-    questOverlayState.hydrateFrame = requestAnimationFrame(hydrateQuestOverlayDom);
+  const hydrateWtfEnhancementDom = () => {
+    wtfOverlayState.hydrateFrame = 0;
+    installWtfOverlayStyles();
+    addNativeQuestCheckboxes();
+    ensureBattlePassControl();
+    ensureBattlePassLayer();
   };
 
-  const startQuestOverlayObserver = () => {
-    if (questOverlayState.domObserver || !document.documentElement) return;
-    questOverlayState.domObserver = new MutationObserver(scheduleQuestOverlayHydration);
-    questOverlayState.domObserver.observe(document.documentElement, {
+  const scheduleWtfEnhancementHydration = () => {
+    if (wtfOverlayState.hydrateFrame) return;
+    wtfOverlayState.hydrateFrame = requestAnimationFrame(hydrateWtfEnhancementDom);
+  };
+
+  const startWtfEnhancementObserver = () => {
+    if (wtfOverlayState.domObserver || !document.documentElement) return;
+    wtfOverlayState.domObserver = new MutationObserver(scheduleWtfEnhancementHydration);
+    wtfOverlayState.domObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
       childList: true,
-      characterData: true,
       subtree: true
     });
-    window.addEventListener('resize', scheduleQuestMarkerUpdate, { passive: true });
+    window.addEventListener('resize', scheduleBattlePassPositionUpdate, { passive: true });
+    scheduleWtfEnhancementHydration();
   };
 
-  window.__wtfQuestOverlay = {
-    configure(snapshot = {}, pinnedQuestIds = []) {
-      questOverlayState.snapshot = {
+  window.__wtfBattlePassOverlay = {
+    configure(snapshot = {}, visible = false) {
+      wtfOverlayState.battlePass = {
         map: String(snapshot.map || ''),
-        quests: Array.isArray(snapshot.quests) ? snapshot.quests : []
+        markers: Array.isArray(snapshot.markers) ? snapshot.markers : []
       };
-      questOverlayState.questsById.clear();
-      questOverlayState.questByName.clear();
-
-      for (const quest of questOverlayState.snapshot.quests) {
-        if (!quest?.id) continue;
-        questOverlayState.questsById.set(quest.id, quest);
-        const aliases = new Set([quest.name, quest.nameKo, ...(quest.aliases || [])]);
-        for (const alias of aliases) {
-          const normalized = normalizeQuestName(alias);
-          if (!normalized) continue;
-          const existing = questOverlayState.questByName.get(normalized);
-          if (!existing || (existing.markers?.length || 0) < (quest.markers?.length || 0)) {
-            questOverlayState.questByName.set(normalized, quest);
-          }
-        }
-      }
-
-      questOverlayState.pinned = new Set(
-        (Array.isArray(pinnedQuestIds) ? pinnedQuestIds : [])
-          .filter(id => questOverlayState.questsById.has(id))
-      );
-
-      for (const row of document.querySelectorAll('[data-wtf-pin-installed="true"]')) {
-        row.querySelector('.wtf-quest-pin')?.remove();
-        delete row.dataset.wtfPinInstalled;
-      }
-
-      ensureQuestOverlay();
-      renderQuestMarkers();
-      addQuestCheckboxes();
-      startQuestOverlayObserver();
+      wtfOverlayState.battlePassVisible = Boolean(visible);
+      installWtfOverlayStyles();
+      ensureBattlePassControl();
+      ensureBattlePassLayer();
+      renderBattlePassMarkers();
+      setBattlePassVisible(visible, false);
+      startWtfEnhancementObserver();
     }
   };
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
       applyDomScale();
-      startQuestOverlayObserver();
+      startWtfEnhancementObserver();
     }, { once: true });
   } else {
     applyDomScale();
-    startQuestOverlayObserver();
+    startWtfEnhancementObserver();
   }
 })();
