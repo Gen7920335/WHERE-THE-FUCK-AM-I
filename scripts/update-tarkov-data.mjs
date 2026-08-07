@@ -7,6 +7,7 @@ const markerOutputPath = resolve(repoRoot, "eft-where-am-i/html/map-markers.json
 const endpoints = {
   tasks: "https://json.tarkov.dev/regular/tasks",
   taskTranslations: "https://json.tarkov.dev/regular/tasks_en",
+  taskTranslationsKo: "https://json.tarkov.dev/regular/tasks_ko",
   traders: "https://json.tarkov.dev/regular/traders",
   traderTranslations: "https://json.tarkov.dev/regular/traders_en",
   itemTranslations: "https://json.tarkov.dev/regular/items_en",
@@ -32,9 +33,10 @@ async function getJson(url, cacheName) {
   }
 }
 
-const [rawTasks, taskEnglish, rawTraders, traderEnglish, itemEnglish, rawMaps, rawMapMetadata] = await Promise.all([
+const [rawTasks, taskEnglish, taskKorean, rawTraders, traderEnglish, itemEnglish, rawMaps, rawMapMetadata] = await Promise.all([
   getJson(endpoints.tasks, "regular-tasks.json"),
   getJson(endpoints.taskTranslations, "regular-tasks-en.json"),
+  getJson(endpoints.taskTranslationsKo, "regular-tasks-ko.json"),
   getJson(endpoints.traders, "regular-traders.json"),
   getJson(endpoints.traderTranslations, "regular-traders-en.json"),
   getJson(endpoints.itemTranslations, "regular-items-en.json"),
@@ -43,6 +45,7 @@ const [rawTasks, taskEnglish, rawTraders, traderEnglish, itemEnglish, rawMaps, r
 ]);
 
 const taskText = taskEnglish.data || {};
+const taskKoText = taskKorean.data || {};
 const traderText = traderEnglish.data || {};
 const itemText = itemEnglish.data || {};
 
@@ -71,6 +74,7 @@ function objectiveLocations(objective) {
 const tasks = Object.values(rawTasks.data?.tasks || {}).map(task => ({
   id: task.id,
   name: taskText[task.name] || task.normalizedName || task.id,
+  nameKo: taskKoText[task.name] || taskText[task.name] || task.normalizedName || task.id,
   normalizedName: task.normalizedName || "",
   trader: task.trader,
   factionName: task.factionName || "Any",
@@ -99,6 +103,7 @@ const tasks = Object.values(rawTasks.data?.tasks || {}).map(task => ({
   objectives: (task.objectives || []).map(objective => ({
     id: objective.id,
     description: taskText[objective.description] || objective.type || objective.id,
+    descriptionKo: taskKoText[objective.description] || taskText[objective.description] || objective.type || objective.id,
     type: objective.type,
     count: objective.count || 1,
     optional: Boolean(objective.optional),
@@ -181,6 +186,14 @@ const markerMaps = Object.values(mapData.maps || {})
     id: map.id,
     name: mapName(map),
     floorRules,
+    labels: (metadata?.labels || []).map(label => ({
+      position: [rounded(label.position?.[0]), rounded(label.position?.[1])],
+      text: label.text || "",
+      bottom: Number.isFinite(label.bottom) ? label.bottom : -1000,
+      top: Number.isFinite(label.top) ? label.top : 1000,
+      size: Number.isFinite(label.size) ? label.size : 100,
+      rotation: Number.isFinite(label.rotation) ? label.rotation : 0
+    })).filter(label => label.text && label.position.every(Number.isFinite)),
     spawns: (map.spawns || []).map(spawn => ({
       position: point(spawn.position), categories: spawn.categories || [], sides: spawn.sides || [], name: spawn.zoneName || "Spawn"
     })),

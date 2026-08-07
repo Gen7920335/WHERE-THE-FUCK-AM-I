@@ -95,11 +95,11 @@
     focusedItemId: null,
     rulerActive: false,
     measurePoints: [],
-    squadMembers: [],
     pinned: new Set(),
     currentFloor: "",
     markerMode: "arrows",
     panelPosition: "right",
+    panelWidths: { left: 256, right: 286 },
     panelOffset: { x: -1, y: -1 },
     wallColors: false,
     uiScale: 1,
@@ -110,22 +110,18 @@
     player: null,
     language: "en",
     progress: { useProgress: false, filter: "all", edition: "standard", faction: "Any", playerLevel: 1, traderLevels: {}, completedQuests: new Set() },
-    squad: { enabled: false, mode: "off", name: "Player", room: "eft-local", host: "", password: "", port: 38473 },
-    squadStatus: { mode: "off", state: "off", message: "Squad sharing is off." },
     floorEditor: { enabled: false, zones: [], floors: [], vertices: [] }
   };
 
   const el = Object.fromEntries([
     "content", "leftPanel", "layerDrawer", "layerList", "layersToggle", "mapSearch", "mapSearchResults", "markerDataStatus",
     "selectedItem", "questDrawer", "questList", "questSearch", "questStatus", "floorButtons", "mapViewport",
-    "mapWorld", "svgHost", "markerLayer", "mapStatus", "requirementsPanel", "requirementsHandle",
+    "mapWorld", "svgHost", "mapLabelLayer", "markerLayer", "mapStatus", "requirementsPanel", "requirementsHandle", "requirementsTitle", "leftPanelResize", "rightPanelResize",
     "requirementsList", "pinCount", "wallToggle", "markerMode", "panelPosition", "questToggle", "pinnedToggle", "pinnedDrawer", "questCount",
     "rulerToggle", "measurementLayer", "rulerReadout", "markerPopup", "hidePanels", "fullScreen", "whereAmI", "coordinatesReadout", "mapHelp",
     "zoomIn", "zoomOut", "zoomReset", "progressToggle", "floorEditToggle", "progressDialog", "progressForm", "useProgress",
     "questFilterButtons", "gameEdition", "playerFaction", "playerLevel", "traderLevels", "resetProgress",
-    "saveProgress", "questFilterSummary", "squadToggle", "squadCount", "squadDialog", "squadForm",
-    "squadMode", "squadName", "squadRoom", "squadHost", "squadPassword", "squadPort", "squadMembers", "saveSquad",
-    "squadRoomLabel", "squadHostLabel", "squadPasswordLabel", "generateSquadPassword", "squadHelp", "squadStatus",
+    "saveProgress", "questFilterSummary",
     "floorEditorPanel", "floorEditorExit", "floorZoneName", "floorZoneFloor", "floorZoneMin", "floorZoneMax",
     "floorUndo", "floorComplete", "floorDelete", "floorEditorStatus", "floorSave"
   ].map(id => [id, document.getElementById(id)]));
@@ -178,7 +174,6 @@
     state.focusedItemId = null;
     state.measurePoints = [];
     state.currentFloor = state.map.defaultFloor;
-    setSquadMembers(state.squadMembers);
     if (state.floorEditor.enabled) setFloorEditor(false);
     el.mapStatus.textContent = `Loading ${state.mapKey}…`;
     renderFloorButtons();
@@ -248,7 +243,7 @@
       renderMarkers();
     } catch (error) {
       el.questStatus.hidden = false;
-      el.questStatus.textContent = `Quest data load failed: ${error.message}`;
+      el.questStatus.textContent = state.language === "ko" ? `퀘스트 데이터를 불러오지 못했습니다: ${error.message}` : `Quest data load failed: ${error.message}`;
     }
   }
 
@@ -319,13 +314,26 @@
     return (objective.locations || []).filter(location => location.map === state.map.tdevId);
   }
 
+  function questDisplayName(quest) {
+    return state.language === "ko" ? (quest.nameKo || quest.name) : quest.name;
+  }
+
+  function objectiveDisplayText(objective) {
+    return state.language === "ko" ? (objective.descriptionKo || objective.description || objective.type || "목표") :
+      (objective.description || objective.type || "Objective");
+  }
+
   function renderQuests() {
     const query = el.questSearch.value.trim().toLowerCase();
     const fragment = document.createDocumentFragment();
     const visible = mapQuests().filter(quest => questMatchesFilter(quest) && questAvailable(quest) &&
-      (!query || quest.name.toLowerCase().includes(query)));
+      (!query || quest.name.toLowerCase().includes(query) || questDisplayName(quest).toLowerCase().includes(query)));
     if (el.questCount) el.questCount.textContent = `(${visible.length})`;
-    el.questFilterSummary.textContent = `${state.progress.filter[0].toUpperCase()}${state.progress.filter.slice(1)} · ${visible.length} quests${state.progress.useProgress ? " · available now" : ""}`;
+    const filterName = state.language === "ko" ? ({ all: "전체", kappa: "카파", story: "스토리" }[state.progress.filter] || state.progress.filter) :
+      `${state.progress.filter[0].toUpperCase()}${state.progress.filter.slice(1)}`;
+    el.questFilterSummary.textContent = state.language === "ko" ?
+      `${filterName} · 퀘스트 ${visible.length}개${state.progress.useProgress ? " · 현재 수행 가능" : ""}` :
+      `${filterName} · ${visible.length} quests${state.progress.useProgress ? " · available now" : ""}`;
     for (const quest of visible) {
       const completed = state.progress.completedQuests.has(String(quest.id));
       const label = document.createElement("label");
@@ -338,11 +346,11 @@
       const text = document.createElement("span");
       text.className = "quest-copy";
       const locations = quest.objectives.reduce((count, objective) => count + objectiveLocationsOnMap(objective).length, 0);
-      text.innerHTML = `<strong>${escapeHtml(quest.name)}</strong><small>${locations} map location${locations === 1 ? "" : "s"}</small>`;
+      text.innerHTML = `<strong>${escapeHtml(questDisplayName(quest))}</strong><small>${state.language === "ko" ? `지도 위치 ${locations}개` : `${locations} map location${locations === 1 ? "" : "s"}`}</small>`;
       const complete = document.createElement("button");
       complete.type = "button";
       complete.className = `quest-complete${completed ? " done" : ""}`;
-      complete.textContent = completed ? "Done" : "Mark done";
+      complete.textContent = state.language === "ko" ? (completed ? "완료됨" : "완료 표시") : (completed ? "Done" : "Mark done");
       complete.addEventListener("click", event => { event.preventDefault(); toggleQuestCompletion(quest); });
       label.append(checkbox, text, complete);
       fragment.append(label);
@@ -373,15 +381,15 @@
 
   function describeObjective(objective) {
     const count = objective.count && objective.count !== 1 ? `${objective.count}× ` : "";
-    const optional = objective.optional ? " (optional)" : "";
-    return `${count}${objective.description || objective.type || "Objective"}${optional}`;
+    const optional = objective.optional ? (state.language === "ko" ? " (선택)" : " (optional)") : "";
+    return `${count}${objectiveDisplayText(objective)}${optional}`;
   }
 
   function renderRequirements() {
     const quests = pinnedQuests();
     el.pinCount.textContent = String(quests.length);
     if (!quests.length) {
-      el.requirementsList.innerHTML = '<p class="empty-state">Pin a quest to show only its requirements here.</p>';
+      el.requirementsList.innerHTML = `<p class="empty-state">${state.language === "ko" ? "퀘스트를 고정하면 필요한 조건만 여기에 표시됩니다." : "Pin a quest to show only its requirements here."}</p>`;
       return;
     }
     const byId = new Map(state.quests.map(q => [String(q.id), q]));
@@ -391,23 +399,26 @@
       card.className = "requirement-card";
       card.dataset.questId = String(quest.id);
       const requirements = [];
-      if (quest.minPlayerLevel) requirements.push(`Player level ${quest.minPlayerLevel}+`);
+      if (quest.minPlayerLevel) requirements.push(state.language === "ko" ? `플레이어 레벨 ${quest.minPlayerLevel}+` : `Player level ${quest.minPlayerLevel}+`);
       for (const requirement of quest.taskRequirements || []) {
         const required = byId.get(String(requirement.task));
-        if (required) requirements.push(`${state.progress.completedQuests.has(String(requirement.task)) ? "✓" : "○"} Complete: ${required.name}`);
+        if (required) requirements.push(`${state.progress.completedQuests.has(String(requirement.task)) ? "✓" : "○"} ${state.language === "ko" ? "완료" : "Complete"}: ${questDisplayName(required)}`);
       }
       for (const requirement of quest.traderRequirements || []) {
         const trader = state.traders.find(value => String(value.id) === String(requirement.trader));
-        requirements.push(`${trader?.name || requirement.trader} ${requirement.requirementType || "level"} ${requirement.compareMethod || ">="} ${requirement.value}`);
+        const requirementType = state.language === "ko" ?
+          ({ level: "우호도 레벨", reputation: "평판" }[requirement.requirementType] || "레벨") :
+          (requirement.requirementType || "level");
+        requirements.push(`${trader?.name || requirement.trader} ${requirementType} ${requirement.compareMethod || ">="} ${requirement.value}`);
       }
       for (const keyGroup of quest.neededKeys || []) {
         if (keyGroup.map !== state.map?.tdevId) continue;
-        for (const key of keyGroup.keys || []) requirements.push(`Key: ${key.name}`);
+        for (const key of keyGroup.keys || []) requirements.push(`${state.language === "ko" ? "열쇠" : "Key"}: ${key.name}`);
       }
       const objectives = (quest.objectives || []).filter(objective =>
         objectiveLocationsOnMap(objective).length || !(objective.maps || []).length || objective.maps.includes(state.map?.tdevId));
-      card.innerHTML = `<h3>${escapeHtml(quest.name)}</h3>` +
-        (requirements.length ? `<ul>${requirements.map(v => `<li>${escapeHtml(v)}</li>`).join("")}</ul>` : '<p class="empty-state">No prerequisite recorded.</p>') +
+      card.innerHTML = `<h3>${escapeHtml(questDisplayName(quest))}</h3>` +
+        (requirements.length ? `<ul>${requirements.map(v => `<li>${escapeHtml(v)}</li>`).join("")}</ul>` : `<p class="empty-state">${state.language === "ko" ? "기록된 선행 조건이 없습니다." : "No prerequisite recorded."}</p>`) +
         (objectives.length ? `<ul>${objectives.map(o => `<li class="objective">${escapeHtml(describeObjective(o))}</li>`).join("")}</ul>` : "");
       fragment.append(card);
     }
@@ -777,7 +788,7 @@
     el.markerPopup.querySelector("button").addEventListener("click", () => { el.markerPopup.hidden = true; });
   }
 
-  function addMapMarker(fragment, layerIds, rawPosition, title, body = "", itemId = null) {
+  function addMapMarker(fragment, layerIds, rawPosition, title, body = "", itemId = null, showLabel = false) {
     const memberships = Array.isArray(layerIds) ? layerIds : [layerIds];
     const layerId = memberships.find(id => state.visibleLayers.has(id));
     if (!layerId) return;
@@ -811,6 +822,14 @@
       showMarkerPopup({ title, body: `${body}${outside ? `${body ? " · " : ""}source point is outside the SVG boundary and is pinned to the nearest edge` : ""}`, itemId, coordinates: `X ${position.x.toFixed(1)} · Y ${position.y.toFixed(1)} · Z ${position.z.toFixed(1)}` });
     });
     marker.append(button);
+    if (showLabel && title) {
+      const label = document.createElement("span");
+      label.className = "map-marker-label";
+      label.textContent = title;
+      label.title = title;
+      if (projected.left > 55) marker.classList.add("label-left");
+      marker.append(label);
+    }
     fragment.append(marker);
   }
 
@@ -823,9 +842,9 @@
       if (extract.transferItem) conditions.push(`${extract.transferItem.count}× ${markerItemName(extract.transferItem.item)}`);
       addMapMarker(fragment, extractLayerIds(extract), extract.position, extract.name,
         `${extract.faction.toUpperCase()} extraction${conditions.length ? ` · ${conditions.join(" · ")}` : ""}`,
-        extract.transferItem?.item || null);
+        extract.transferItem?.item || null, true);
     }
-    for (const transit of map.transits || []) addMapMarker(fragment, "transit", transit.position, transit.name, "Transit extraction");
+    for (const transit of map.transits || []) addMapMarker(fragment, "transit", transit.position, transit.name, "Transit extraction", null, true);
     for (const spawn of representativeSpawns()) {
       const layerIds = spawn._layerIds;
       if (layerIds.length) addMapMarker(fragment, layerIds, spawn.position, layerIds.map(id => LAYER_BY_ID.get(id).label).join(" / "), (spawn.sides || []).join(", "));
@@ -873,6 +892,7 @@
 
   function renderMarkers() {
     el.markerLayer.replaceChildren();
+    renderMapLabels();
     if (!state.map) return;
     const fragment = document.createDocumentFragment();
     renderMapDataMarkers(fragment);
@@ -886,7 +906,7 @@
           marker.className = "quest-marker";
           marker.style.left = `${pos.left}%`;
           marker.style.top = `${pos.top}%`;
-          marker.title = `${quest.name}: ${describeObjective(objective)}`;
+          marker.title = `${questDisplayName(quest)}: ${describeObjective(objective)}`;
           const targetRank = objectiveFloorRank(location);
           const delta = currentRank == null || targetRank == null ? 0 : targetRank - currentRank;
           if (delta !== 0) marker.classList.add("off-level");
@@ -909,20 +929,34 @@
         }
       }
     }
-    for (const member of state.squadMembers) {
-      if (normalizeMapKey(member.map) !== state.mapKey) continue;
-      const position = readPosition(member);
-      const pos = worldToPercent(position.x, position.z);
-      const marker = document.createElement("div");
-      marker.className = "squad-marker";
-      marker.style.left = `${pos.left}%`;
-      marker.style.top = `${pos.top}%`;
-      marker.textContent = String(member.name || "S").slice(0, 2).toUpperCase();
-      marker.title = member.name || "Squad member";
-      fragment.append(marker);
-    }
     el.markerLayer.append(fragment);
     if (state.player) renderPlayerMarker();
+  }
+
+  function renderMapLabels() {
+    el.mapLabelLayer.replaceChildren();
+    if (!state.map || !state.mapMarkers?.labels?.length) return;
+    const currentRank = mapFloorRank(state.currentFloor);
+    const fragment = document.createDocumentFragment();
+    for (const label of state.mapMarkers.labels) {
+      if (!Array.isArray(label.position) || label.position.length < 2 || !label.text) continue;
+      const targetRank = objectiveFloorRank({
+        x: Number(label.position[0]),
+        y: (Number(label.bottom) + Number(label.top)) / 2,
+        z: Number(label.position[1])
+      });
+      if (currentRank != null && targetRank != null && targetRank !== currentRank) continue;
+      const position = worldToPercent(label.position[0], label.position[1]);
+      const node = document.createElement("div");
+      node.className = "map-place-label";
+      node.textContent = label.text;
+      node.style.left = `${position.left}%`;
+      node.style.top = `${position.top}%`;
+      node.style.setProperty("--label-size", String(Math.max(.35, Math.min(2.5, Number(label.size || 100) / 100))));
+      node.style.rotate = `${Number(label.rotation || 0)}deg`;
+      fragment.append(node);
+    }
+    el.mapLabelLayer.append(fragment);
   }
 
   function focusRequirement(quest) {
@@ -1123,14 +1157,6 @@
     applyTransform();
   }
 
-  function setSquadMembers(members) {
-    state.squadMembers = Array.isArray(members) ? members.filter(member =>
-      [member?.x, member?.z].every(value => Number.isFinite(Number(value)))) : [];
-    el.squadCount.textContent = String(state.squadMembers.filter(member => normalizeMapKey(member.map) === state.mapKey).length);
-    renderSquadMembers();
-    renderMarkers();
-  }
-
   function progressPayload() {
     return {
       useProgress: state.progress.useProgress,
@@ -1203,52 +1229,6 @@
     persistProgress();
     renderQuests();
     renderRequirements();
-  }
-
-  function setSquadSettings(value = {}) {
-    const mode = ["lan", "host", "client"].includes(value.mode) ? value.mode : (value.enabled ? "lan" : "off");
-    state.squad = {
-      enabled: mode !== "off", mode, name: value.name || "Player", room: value.room || "eft-local",
-      host: value.host || "", password: value.password || "",
-      port: Math.min(65535, Math.max(1024, Number(value.port) || 38473))
-    };
-    el.squadMode.value = state.squad.mode;
-    el.squadName.value = state.squad.name;
-    el.squadRoom.value = state.squad.room;
-    el.squadHost.value = state.squad.host;
-    el.squadPassword.value = state.squad.password;
-    el.squadPort.value = String(state.squad.port);
-    updateSquadFields();
-  }
-
-  function updateSquadFields() {
-    const mode = el.squadMode.value;
-    el.squadRoomLabel.hidden = mode !== "lan";
-    el.squadHostLabel.hidden = mode !== "client";
-    el.squadPasswordLabel.hidden = mode !== "host" && mode !== "client";
-    el.squadHelp.textContent = mode === "host"
-      ? "Forward this UDP port on the host router and share the public IP, port, and password. The password stays in memory only."
-      : mode === "client"
-        ? "Enter the host's public IP or DNS name. The host must forward the selected UDP port."
-        : mode === "lan"
-          ? "Local multicast only. The room code separates groups and is not encryption."
-          : "Choose Host to open a room or Client to connect to one.";
-  }
-
-  function setSquadStatus(value = {}) {
-    state.squadStatus = { mode: value.mode || "off", state: value.state || "off", message: value.message || "" };
-    el.squadStatus.dataset.state = state.squadStatus.state;
-    el.squadStatus.textContent = state.squadStatus.message || "Squad sharing is off.";
-  }
-
-  function createSquadPassword() {
-    const bytes = crypto.getRandomValues(new Uint8Array(18));
-    return btoa(String.fromCharCode(...bytes)).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
-  }
-
-  function renderSquadMembers() {
-    const members = state.squadMembers.filter(member => normalizeMapKey(member.map) === state.mapKey);
-    el.squadMembers.textContent = members.length ? members.map(member => `${member.name} · ${Number(member.x).toFixed(1)}, ${Number(member.y).toFixed(1)}, ${Number(member.z).toFixed(1)}`).join("\n") : "No squad members online.";
   }
 
   function selectFloorByHotkey(keyIndex) {
@@ -1325,6 +1305,21 @@
     document.documentElement.style.setProperty("--marker-scale", state.uiScale * state.iconScale);
   }
 
+  function applyPanelWidths() {
+    document.documentElement.style.setProperty("--left-panel-width", `calc(${state.panelWidths.left}px * var(--ui-scale))`);
+    document.documentElement.style.setProperty("--right-panel-width", `calc(${state.panelWidths.right}px * var(--ui-scale))`);
+  }
+
+  function setPanelWidth(side, width, persist = true) {
+    const otherSide = side === "left" ? "right" : "left";
+    const available = Math.max(1, el.content.clientWidth / Math.max(state.uiScale, .01));
+    const maximum = Math.max(180, Math.min(520, available - state.panelWidths[otherSide] - 300));
+    state.panelWidths[side] = Math.round(Math.min(maximum, Math.max(180, Number(width) || state.panelWidths[side])));
+    applyPanelWidths();
+    if (persist) localStorage.setItem(`eft-${side}-panel-width`, String(state.panelWidths[side]));
+    return state.panelWidths[side];
+  }
+
   function setScale(scale) {
     state.uiScale = Math.min(2, Math.max(.65, Number(scale) || 1));
     applyScaleVariables();
@@ -1338,7 +1333,7 @@
   }
 
   const KOREAN = {
-    Overlays: "오버레이", Quests: "퀘스트", Progress: "진행도", Squad: "분대", "Floor editor": "층 편집", Ruler: "거리 측정",
+    Overlays: "오버레이", Quests: "퀘스트", Progress: "진행도", "Floor editor": "층 편집", Ruler: "거리 측정",
     "Hide panels": "패널 숨기기", "Show panels": "패널 보이기", "Full screen": "전체 화면", Fit: "맞춤",
     "Wall colors": "벽 색상", "Floor markers": "층 마커", "Icon scale": "아이콘 크기", Panel: "패널", right: "오른쪽", bottom: "아래", floating: "이동식",
     arrows: "화살표", opacity: "반투명", both: "둘 다"
@@ -1349,11 +1344,17 @@
   function applyLanguage() {
     el.layersToggle.textContent = t("Overlays"); el.questToggle.textContent = t("Quests"); el.progressToggle.textContent = t("Progress");
     el.floorEditToggle.textContent = t("Floor editor");
-    el.squadToggle.firstChild.textContent = `${t("Squad")} `; el.rulerToggle.textContent = t("Ruler");
+    el.rulerToggle.textContent = t("Ruler");
     el.fullScreen.textContent = t("Full screen"); el.zoomReset.textContent = t("Fit");
     const hidden = el.content.classList.contains("panels-hidden"); el.hidePanels.textContent = state.language === "ko" ? t(hidden ? "Show panels" : "Hide panels") : (hidden ? "Show pannels" : "Hide pannels");
+    el.questSearch.placeholder = state.language === "ko" ? "퀘스트 검색" : "Search quests";
+    el.requirementsTitle.textContent = state.language === "ko" ? "고정한 퀘스트 필요 조건" : "Pinned quest requirements";
+    if (!state.quests.length) el.questStatus.textContent = state.language === "ko" ? "퀘스트 데이터 불러오는 중…" : "Loading quest data…";
     setPanelPosition(state.panelPosition); setMarkerMode(state.markerMode); setWallColors(state.wallColors);
     renderLayerList();
+    renderQuests();
+    renderRequirements();
+    renderMarkers();
   }
 
   function setPanelsHidden(hidden) {
@@ -1418,7 +1419,6 @@
     window.__eftAutoPan = options.autoPanning !== false;
     applyLanguage();
     if (options.progress) setProgress(options.progress);
-    if (options.squad) setSquadSettings(options.squad);
     if (Array.isArray(options.visibleLayers)) {
       state.visibleLayers = new Set(options.visibleLayers.filter(id => LAYER_BY_ID.has(id)));
       renderLayerList(); renderMarkers();
@@ -1547,6 +1547,43 @@
     panelDrag = null;
   });
 
+  let panelResize = null;
+  function beginPanelResize(side, handle, event) {
+    if (state.panelPosition !== "right" || el.content.classList.contains("panels-hidden")) return;
+    panelResize = { side, pointerId: event.pointerId };
+    handle.setPointerCapture(event.pointerId);
+    document.body.classList.add("resizing-panels");
+    event.preventDefault();
+  }
+  function movePanelResize(event) {
+    if (!panelResize || panelResize.pointerId !== event.pointerId) return;
+    const rect = el.content.getBoundingClientRect();
+    const width = panelResize.side === "left" ? event.clientX - rect.left : rect.right - event.clientX;
+    setPanelWidth(panelResize.side, width / Math.max(state.uiScale, .01), false);
+  }
+  function endPanelResize(event) {
+    if (!panelResize || panelResize.pointerId !== event.pointerId) return;
+    const side = panelResize.side;
+    panelResize = null;
+    document.body.classList.remove("resizing-panels");
+    localStorage.setItem(`eft-${side}-panel-width`, String(state.panelWidths[side]));
+  }
+  function wirePanelResizeHandle(handle, side, defaultWidth) {
+    handle.addEventListener("pointerdown", event => beginPanelResize(side, handle, event));
+    handle.addEventListener("pointermove", movePanelResize);
+    handle.addEventListener("pointerup", endPanelResize);
+    handle.addEventListener("pointercancel", endPanelResize);
+    handle.addEventListener("dblclick", () => setPanelWidth(side, defaultWidth));
+    handle.addEventListener("keydown", event => {
+      const direction = side === "left" ? 1 : -1;
+      if (event.key === "Home") { setPanelWidth(side, defaultWidth); event.preventDefault(); }
+      else if (event.key === "ArrowLeft") { setPanelWidth(side, state.panelWidths[side] - 10 * direction); event.preventDefault(); }
+      else if (event.key === "ArrowRight") { setPanelWidth(side, state.panelWidths[side] + 10 * direction); event.preventDefault(); }
+    });
+  }
+  wirePanelResizeHandle(el.leftPanelResize, "left", 256);
+  wirePanelResizeHandle(el.rightPanelResize, "right", 286);
+
   el.layersToggle.addEventListener("click", () => el.layerDrawer.scrollTo({ top: 0, behavior: "smooth" }));
   el.questToggle.addEventListener("click", () => showRightPanelPage("quests"));
   el.pinnedToggle.addEventListener("click", () => showRightPanelPage("pinned"));
@@ -1575,19 +1612,6 @@
   });
   el.progressForm.addEventListener("submit", event => { event.preventDefault(); readProgressForm(); el.progressDialog.close(); });
   el.resetProgress.addEventListener("click", () => { state.progress.completedQuests.clear(); persistProgress(); renderQuests(); renderRequirements(); });
-  el.squadToggle.addEventListener("click", () => { setSquadSettings(state.squad); renderSquadMembers(); el.squadDialog.showModal(); });
-  el.squadMode.addEventListener("change", updateSquadFields);
-  el.generateSquadPassword.addEventListener("click", () => { el.squadPassword.value = createSquadPassword(); el.squadPassword.type = "text"; });
-  el.squadForm.addEventListener("submit", event => {
-    event.preventDefault();
-    const mode = el.squadMode.value;
-    const requiresPassword = mode === "host" || mode === "client";
-    el.squadPassword.setCustomValidity(requiresPassword && el.squadPassword.value.length < 8 ? "Use at least 8 characters." : "");
-    if (!el.squadForm.reportValidity()) return;
-    setSquadSettings({ mode, enabled: mode !== "off", name: el.squadName.value.trim(), room: el.squadRoom.value.trim(), host: el.squadHost.value.trim(), password: el.squadPassword.value, port: Number(el.squadPort.value) });
-    post("squad-settings-changed", state.squad);
-    el.squadDialog.close();
-  });
   el.floorEditorExit.addEventListener("click", () => { setFloorEditor(false); post("exit-floor-edit-mode"); });
   el.floorUndo.addEventListener("click", () => { state.floorEditor.vertices.pop(); renderFloorEditor(); });
   el.floorComplete.addEventListener("click", completeFloorZone);
@@ -1604,8 +1628,6 @@
     setMap: loadMap,
     setPinnedQuests,
     setPlayerPosition,
-    setSquadMembers,
-    setSquadStatus,
     focusItem,
     toggleLayer,
     selectFloor,
@@ -1618,7 +1640,7 @@
     toggleRequirements: togglePanels,
     resetView,
     getCalibrationReport: calibrationReport,
-    getState: () => ({ map: state.mapKey, floor: state.currentFloor, pinned: [...state.pinned], markerMode: state.markerMode, panelPosition: state.panelPosition, wallColors: state.wallColors, iconScale: state.iconScale, visibleLayers: [...state.visibleLayers], focusedItemId: state.focusedItemId, progress: progressPayload(), floorEditor: { enabled: state.floorEditor.enabled, zones: state.floorEditor.zones.length } })
+    getState: () => ({ map: state.mapKey, floor: state.currentFloor, pinned: [...state.pinned], markerMode: state.markerMode, panelPosition: state.panelPosition, panelWidths: { ...state.panelWidths }, wallColors: state.wallColors, iconScale: state.iconScale, visibleLayers: [...state.visibleLayers], focusedItemId: state.focusedItemId, progress: progressPayload(), floorEditor: { enabled: state.floorEditor.enabled, zones: state.floorEditor.zones.length } })
   };
 
   try {
@@ -1626,6 +1648,10 @@
     if (Array.isArray(savedLayers)) state.visibleLayers = new Set(savedLayers.filter(id => LAYER_BY_ID.has(id)));
   } catch { }
   state.panelPosition = localStorage.getItem("eft-panel-position") || "right";
+  state.panelWidths.left = Number(localStorage.getItem("eft-left-panel-width")) || 256;
+  state.panelWidths.right = Number(localStorage.getItem("eft-right-panel-width")) || 286;
+  setPanelWidth("left", state.panelWidths.left, false);
+  setPanelWidth("right", state.panelWidths.right, false);
   setPanelPosition(state.panelPosition);
   setIconScale(Number(localStorage.getItem("eft-icon-scale")) || 1);
   loadMap(state.mapKey);

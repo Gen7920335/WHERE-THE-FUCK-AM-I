@@ -17,8 +17,10 @@
           <div id="mapSearchResults" class="map-search-results"></div>
           <div id="layerList" class="layer-list"></div>
         </section>
-        <footer class="panel-actions"><button id="progressToggle" type="button">Filters</button><button id="squadToggle" type="button">Auth Squad <span id="squadCount">0</span></button></footer>
+        <footer class="panel-actions"><button id="progressToggle" type="button">Filters</button></footer>
       </aside>
+
+      <div id="leftPanelResize" class="panel-resize-handle left-resize-handle" role="separator" aria-label="Resize left panel" aria-orientation="vertical" tabindex="0" title="Drag to resize · Double-click to reset"></div>
 
       <section id="mapViewport" class="map-viewport" aria-label="Tarkov map">
         <nav class="map-hud" aria-label="Map view controls">
@@ -30,15 +32,17 @@
           <button id="zoomOut" class="square-command" type="button" aria-label="Zoom out">−</button><button id="zoomReset" type="button">Fit</button><button id="zoomIn" class="square-command" type="button" aria-label="Zoom in">+</button>
           <button id="mapHelp" class="help-command" type="button" title="Mouse wheel: zoom · Alt + wheel: switch level">?</button>
         </nav>
-        <div id="mapWorld" class="map-world"><div id="svgHost" class="svg-host"></div><svg id="measurementLayer" class="measurement-layer" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg><div id="markerLayer" class="marker-layer"></div></div>
+        <div id="mapWorld" class="map-world"><div id="svgHost" class="svg-host"></div><div id="mapLabelLayer" class="map-label-layer" aria-hidden="true"></div><svg id="measurementLayer" class="measurement-layer" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg><div id="markerLayer" class="marker-layer"></div></div>
         <div id="markerPopup" class="marker-popup" hidden></div><div id="rulerReadout" class="ruler-readout" hidden></div><div id="mapStatus" class="map-status">Loading map…</div>
       </section>
+
+      <div id="rightPanelResize" class="panel-resize-handle right-resize-handle" role="separator" aria-label="Resize right panel" aria-orientation="vertical" tabindex="0" title="Drag to resize · Double-click to reset"></div>
 
       <aside id="requirementsPanel" class="requirements-panel" aria-label="Quests and pinned requirements">
         <section class="level-section" aria-label="Map levels"><div class="level-picker"><div class="section-caption"><strong>Levels</strong><span class="level-settings-icon" title="Nearby levels" aria-hidden="true">⚙</span></div><div id="floorButtons" class="floor-buttons" aria-label="Levels"></div></div><div class="level-shortcut" title="Alt + mouse wheel"><strong>Alt + ↕</strong><span>Switch<br>Level</span></div></section>
         <nav class="right-panel-tabs"><button id="questToggle" class="active" type="button">Quests <span id="questCount"></span></button><button id="pinnedToggle" type="button">Pinned <span id="pinCount" class="pin-count">0</span></button></nav>
         <section id="questDrawer" class="right-panel-page open quest-drawer"><div class="drawer-header"><input id="questSearch" type="search" placeholder="Search quests"><div id="questFilterSummary" class="filter-summary">All quests</div></div><div id="questStatus" class="status">Loading quest data…</div><div id="questList" class="quest-list"></div></section>
-        <section id="pinnedDrawer" class="right-panel-page"><div id="requirementsHandle" class="requirements-header"><strong>Pinned quest requirements</strong></div><div id="requirementsList" class="requirements-list"><p class="empty-state">Pin a quest to show only its requirements here.</p></div></section>
+        <section id="pinnedDrawer" class="right-panel-page"><div id="requirementsHandle" class="requirements-header"><strong id="requirementsTitle">Pinned quest requirements</strong></div><div id="requirementsList" class="requirements-list"><p class="empty-state">Pin a quest to show only its requirements here.</p></div></section>
         <section class="view-controls" aria-label="Map display options"><strong>Pro Settings</strong><button id="wallToggle" type="button" aria-pressed="false">Wall colors: off</button><button id="markerMode" type="button">Floor markers: arrows</button><button id="panelPosition" type="button">Panel: right</button><button id="floorEditToggle" type="button">Floor editor</button></section>
       </aside>
     </section>
@@ -87,26 +91,6 @@
       <section><strong>Trader loyalty levels</strong><div id="traderLevels" class="trader-grid"></div></section>
       <p class="dialog-help">Mark quests complete from the quest list. Progress is stored locally in this app.</p>
       <footer><button id="resetProgress" type="button">Reset completed</button><button id="saveProgress" value="default">Save</button></footer>
-    </form>
-  </dialog>
-
-  <dialog id="squadDialog" class="settings-dialog">
-    <form method="dialog" class="dialog-card" id="squadForm">
-      <header><strong>Squad connection</strong><button value="cancel" aria-label="Close">×</button></header>
-      <div class="form-grid">
-        <label>Mode<select id="squadMode"><option value="off">Off</option><option value="lan">LAN</option><option value="host">Host</option><option value="client">Client</option></select></label>
-        <label>Name<input id="squadName" maxlength="32" value="Player"></label>
-        <label>UDP port<input id="squadPort" type="number" min="1024" max="65535" value="38473"></label>
-      </div>
-      <div class="form-grid">
-        <label id="squadRoomLabel">LAN room<input id="squadRoom" maxlength="64" value="eft-local"></label>
-        <label id="squadHostLabel">Host IP or DNS<input id="squadHost" maxlength="255" placeholder="203.0.113.10"></label>
-        <label id="squadPasswordLabel">Password<span class="password-row"><input id="squadPassword" type="password" minlength="8" maxlength="128" autocomplete="new-password"><button id="generateSquadPassword" type="button">Generate</button></span></label>
-      </div>
-      <p id="squadHelp" class="dialog-help"></p>
-      <p id="squadStatus" class="squad-status" data-state="off">Squad sharing is off.</p>
-      <div id="squadMembers" class="member-list">No squad members online.</div>
-      <footer><button id="saveSquad" value="default">Save</button></footer>
     </form>
   </dialog>
 

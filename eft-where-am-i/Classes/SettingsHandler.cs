@@ -324,12 +324,6 @@ namespace eft_where_am_i.Classes
         public int player_level { get; set; } = 1;
         public Dictionary<string, int> trader_levels { get; set; } = new Dictionary<string, int>();
         public List<string> completed_quests { get; set; } = new List<string>();
-        public bool squad_enabled { get; set; } = false;
-        public string squad_mode { get; set; } = "off";
-        public string squad_name { get; set; } = "Player";
-        public string squad_room { get; set; } = "eft-local";
-        public string squad_host { get; set; } = string.Empty;
-        public int squad_port { get; set; } = 38473;
         public string update_feed_url { get; set; } = string.Empty;
     }
 }

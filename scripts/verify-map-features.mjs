@@ -77,6 +77,7 @@ let markerCount = 0;
 let hazardCount = 0;
 let keySpawnCount = 0;
 let edgeCount = 0;
+let mapLabelCount = 0;
 
 function project(map, x, z) {
   const [a, b, c] = map.anchors;
@@ -105,6 +106,13 @@ for (const markerMap of markers.maps) {
       if (position.left < 0 || position.left > 100 || position.top < 0 || position.top > 100) edgeCount++;
     }
   }
+  for (const label of markerMap.labels || []) {
+    mapLabelCount++;
+    if (!label.text || !Array.isArray(label.position) || label.position.length !== 2 || label.position.some(value => !Number.isFinite(value)) ||
+        ![label.bottom, label.top, label.size, label.rotation].every(Number.isFinite)) {
+      throw new Error(`${markerMap.name}: invalid place-name label metadata`);
+    }
+  }
   hazardCount += markerMap.hazards?.length || 0;
   keySpawnCount += (markerMap.looseLoot || []).filter(loot => (loot.items || []).some(id => knownKeys.has(id))).length;
   for (const lock of markerMap.locks || []) {
@@ -118,6 +126,7 @@ for (const markerMap of markers.maps) {
 }
 
 if (markerCount < 15000) throw new Error(`Only ${markerCount} marker positions were found`);
+if (mapLabelCount < 250) throw new Error(`Only ${mapLabelCount} map place-name labels were found`);
 if (!hazardCount) throw new Error("Minefield/sniper hazard data is missing");
 if (!keySpawnCount) throw new Error("Key-spawn locations are missing");
 if (Object.values(markers.containerNames || {}).some(name => /^[a-f0-9]{24} Name$/i.test(name))) {
@@ -128,11 +137,55 @@ if (edgeCount && !mapJs.includes("edge-clamped")) throw new Error(`${edgeCount} 
 const taskIds = new Set((quests.tasks || []).map(task => String(task.id)));
 if (taskIds.size !== quests.tasks?.length || taskIds.size < 500) throw new Error("Quest snapshot is incomplete or contains duplicate IDs");
 let questLocationCount = 0;
+const protectedQuestTerms = new Set([
+  "Old Gas Station", "New Gas Station",
+  ...Object.values(markers.itemNames || {}),
+  ...Object.values(markers.containerNames || {}),
+  ...markers.maps.flatMap(map => [
+    map.name,
+    ...(map.extracts || []).map(value => value.name),
+    ...(map.transits || []).map(value => value.name),
+    ...(map.bosses || []).map(value => value.name),
+    ...(map.labels || []).map(value => value.text)
+  ]),
+  ...(quests.traders || []).map(value => value.name),
+  ...(quests.tasks || []).flatMap(task => (task.neededKeys || []).flatMap(group => (group.keys || []).map(key => key.name)))
+].filter(value => typeof value === "string" && value.trim().length >= 3));
+const orderedProtectedQuestTerms = [...protectedQuestTerms].sort((a, b) => b.length - a.length);
+function questTermPattern(term) {
+  const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const left = /^[A-Za-z0-9]/.test(term) ? "(?<![A-Za-z0-9])" : "";
+  const right = /[A-Za-z0-9]$/.test(term) ? "(?![A-Za-z0-9])" : "";
+  return new RegExp(`${left}${escaped}${right}`, "i");
+}
+function verifyQuestTranslation(taskName, kind, source, translated) {
+  if (/__Q\d+_TERM\d+__/.test(translated || "")) throw new Error(`${taskName}/${kind}: unresolved translation placeholder`);
+  let remaining = source;
+  const selected = [];
+  for (const term of orderedProtectedQuestTerms) {
+    if (!questTermPattern(term).test(remaining)) continue;
+    remaining = remaining.replace(new RegExp(questTermPattern(term).source, "gi"), match => {
+      selected.push(match);
+      return `__SELECTED${selected.length - 1}__`;
+    });
+  }
+  for (const term of selected) {
+    if (!questTermPattern(term).test(translated)) throw new Error(`${taskName}/${kind}: protected item/location name changed: ${term}`);
+  }
+}
 for (const task of quests.tasks) {
+  if (!task.nameKo || (!/[가-힣]/.test(task.nameKo) && !(task.nameKo === task.name && protectedQuestTerms.has(task.name)))) {
+    throw new Error(`${task.name}: Korean quest title is missing`);
+  }
+  verifyQuestTranslation(task.name, "title", task.name, task.nameKo);
   for (const requirement of task.taskRequirements || []) {
     if (!taskIds.has(String(requirement.task))) throw new Error(`${task.name}: missing prerequisite task`);
   }
   for (const objective of task.objectives || []) {
+    if (!objective.descriptionKo || !/[가-힣]/.test(objective.descriptionKo)) {
+      throw new Error(`${task.name}/${objective.description}: Korean objective translation is missing`);
+    }
+    verifyQuestTranslation(task.name, "objective", objective.description, objective.descriptionKo);
     for (const location of objective.locations || []) {
       questLocationCount++;
       if (![location.x, location.y, location.z].every(Number.isFinite)) throw new Error(`${task.name}: invalid quest position`);
@@ -150,17 +203,20 @@ for (const task of quests.tasks) {
     if (!traderIds.has(String(requirement.trader))) throw new Error(`${task.name}: unknown trader requirement`);
 }
 
-for (const token of ["questAvailable", "questMatchesFilter", "progress-settings-changed", "completedQuests", "selectFloorByHotkey", "setFloorEditor", "save-floor-zones", "setIconScale", "--map-inverse-scale"]) {
+for (const token of ["questAvailable", "questMatchesFilter", "progress-settings-changed", "completedQuests", "selectFloorByHotkey", "setFloorEditor", "save-floor-zones", "setIconScale", "--map-inverse-scale", "questDisplayName", "descriptionKo", "renderMapLabels"]) {
   if (!mapJs.includes(token)) throw new Error(`Local parity feature is missing: ${token}`);
 }
 for (const token of ["icon-scale-preview", "icon-scale-changed", "setIconScaleControl"]) {
   if (!panelHtml.includes(token)) throw new Error(`Top-panel icon scaling is missing: ${token}`);
 }
-for (const token of ["map_use_progress", "map_quest_filter", "trader_levels", "completed_quests", "squad_enabled", "squad_mode", "squad_room", "squad_host", "map_visible_layers", "quest_panel_offset_x", "icon_scale"]) {
+for (const token of ["map_use_progress", "map_quest_filter", "trader_levels", "completed_quests", "map_visible_layers", "quest_panel_offset_x", "icon_scale"]) {
   if (!settingsCs.includes(token)) throw new Error(`Persistent setting is missing: ${token}`);
 }
 if (!mapCss.includes("--marker-scale") || !mapCss.includes("scale: var(--map-inverse-scale)")) {
   throw new Error("Map icons must support independent sizing and zoom-invariant screen dimensions");
+}
+if (!mapHtml.includes('id="mapLabelLayer"') || !mapCss.includes(".map-place-label") || !mapCss.includes("-webkit-text-stroke: .5px #000")) {
+  throw new Error("Original-style map place-name rendering is missing");
 }
 if (!panelHtml.includes('id="iconScaleSlider"') || !panelHtml.includes('min="50" max="250"') || mapHtml.includes('id="iconScaleSlider"')) {
   throw new Error("The 50%-250% icon-scale control must live in the top control panel");
@@ -183,8 +239,19 @@ for (const token of ["239.255.38.73", "MulticastLoopback", "room", "PruneMembers
 for (const token of ["host", "client", "ResolveServerEndpoint", "Rfc2898DeriveBytes.Pbkdf2", "AesGcm", "WTF2", "sequence", "CryptographicException"]) {
   if (!squadSyncCs.includes(token)) throw new Error(`Direct squad sync is missing: ${token}`);
 }
-for (const token of ["squadMode", "squadHost", "squadPassword", "setSquadStatus", "generateSquadPassword"]) {
-  if (!mapJs.includes(token)) throw new Error(`Direct squad UI is missing: ${token}`);
+for (const token of ['id="leftPanelResize"', 'id="rightPanelResize"']) {
+  if (!mapHtml.includes(token)) throw new Error(`Resizable side-panel handle is missing: ${token}`);
+}
+for (const token of ["beginPanelResize", "setPanelWidth", "eft-left-panel-width", "eft-right-panel-width"]) {
+  if (!mapJs.includes(token)) throw new Error(`Resizable side-panel behavior is missing: ${token}`);
+}
+if (!mapCss.includes(".map-marker-label") || !/extract\.transferItem\?\.item \|\| null, true\)/.test(mapJs)) {
+  throw new Error("Extraction names must be rendered beside extraction markers");
+}
+for (const removedServerUi of ["squadToggle", "squadDialog", "squad-settings-changed", "ConfigureSquadSync"]) {
+  if (mapHtml.includes(removedServerUi) || mapJs.includes(removedServerUi) || whereAmICs.includes(removedServerUi)) {
+    throw new Error(`Removed server setting is still reachable: ${removedServerUi}`);
+  }
 }
 
 const forwardSource = mapJs.match(/function quaternionForward\([^)]*\) \{[\s\S]*?\n  \}/)?.[0];
@@ -203,4 +270,4 @@ for (const requiredBridgeToken of ["SendScreenshotPositionToMapAsync", "Invarian
   if (!whereAmICs.includes(requiredBridgeToken)) throw new Error(`Screenshot-to-map bridge is missing ${requiredBridgeToken}`);
 }
 
-console.log(`Verified ${layers.length} layers, ${markerCount} public markers (${hazardCount} hazards, ${keySpawnCount} key spawns, ${edgeCount} edge-pinned), ${battlePassCount} Battle Pass locations, ${questLocationCount} quest locations, progress/floor/squad parity, and screenshot direction bridging`);
+console.log(`Verified ${layers.length} layers, ${markerCount} public markers (${hazardCount} hazards, ${keySpawnCount} key spawns, ${edgeCount} edge-pinned), ${mapLabelCount} place-name labels, ${battlePassCount} Battle Pass locations, ${questLocationCount} Korean quest locations, extraction labels, resizable panels, progress/floor parity, and screenshot direction bridging`);
