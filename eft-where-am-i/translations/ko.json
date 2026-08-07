@@ -53,5 +53,6 @@
     "serverLocation_StatusFail": "상태 : 실패 (API 오류)",
     "serverLocation_Reason": "사유 : ",
     "serverLocation_Error": "오류 발생",
-    "serverLocation_OfflineCol": "오프라인 / 매칭안됨"
+    "serverLocation_OfflineCol": "오프라인 / 매칭안됨",
+    "squadButton": "스쿼드"
 }

@@ -140,6 +140,8 @@
     battlePass: { map: '', markers: [] },
     battlePassVisible: false,
     battlePassLayer: null,
+    squad: { map: '', members: [] },
+    squadLayer: null,
     mapWrap: null,
     domObserver: null,
     mapObserver: null,
@@ -252,6 +254,73 @@
         transform-origin: center;
         user-select: none;
         width: 14px;
+      }
+      #wtf-squad-layer {
+        inset: 0;
+        overflow: hidden;
+        pointer-events: none !important;
+        position: absolute;
+        z-index: 8;
+      }
+      .wtf-squad-marker {
+        height: 24px;
+        left: 0;
+        pointer-events: none !important;
+        position: absolute;
+        top: 0;
+        transform: translate(-50%, -50%) scale(var(--wtf-icon-scale, 1));
+        transform-origin: center;
+        user-select: none;
+        width: 24px;
+      }
+      .wtf-squad-direction {
+        height: 24px;
+        left: 0;
+        position: absolute;
+        top: 0;
+        transform: rotate(var(--wtf-squad-direction, 0deg));
+        transform-origin: 12px 12px;
+        width: 24px;
+      }
+      .wtf-squad-circle {
+        background: #1672e8;
+        border: 2px solid #fff;
+        border-radius: 50%;
+        box-shadow: 0 0 6px rgba(22, 114, 232, .95);
+        height: 16px;
+        left: 4px;
+        position: absolute;
+        top: 6px;
+        width: 16px;
+      }
+      .wtf-squad-arrow {
+        border-bottom: 9px solid #1672e8;
+        border-left: 5px solid transparent;
+        border-right: 5px solid transparent;
+        filter:
+          drop-shadow(1px 0 0 #fff)
+          drop-shadow(-1px 0 0 #fff)
+          drop-shadow(0 -1px 0 #fff);
+        height: 0;
+        left: 7px;
+        position: absolute;
+        top: -1px;
+        width: 0;
+      }
+      .wtf-squad-name {
+        background: rgba(0, 0, 0, .72);
+        border-radius: 2px;
+        color: #fff;
+        font-size: 10px;
+        left: 50%;
+        max-width: 120px;
+        overflow: hidden;
+        padding: 1px 3px;
+        position: absolute;
+        text-overflow: ellipsis;
+        top: 25px;
+        transform: translateX(-50%);
+        white-space: nowrap;
       }
     `;
     (document.head || document.documentElement).appendChild(style);
@@ -401,7 +470,8 @@
     const width = mapWrap.offsetWidth || Number.parseFloat(computed.width) || 0;
     const height = mapWrap.offsetHeight || Number.parseFloat(computed.height) || 0;
 
-    for (const marker of overlay.querySelectorAll('.wtf-battle-pass-marker')) {
+    for (const marker of document.querySelectorAll('.wtf-battle-pass-marker, .wtf-squad-marker')) {
+      if (marker.parentElement !== overlay && marker.parentElement !== wtfOverlayState.squadLayer) continue;
       const localX = (Number(marker.dataset.left) / 100) * width;
       const localY = (Number(marker.dataset.top) / 100) * height;
       const relativeX = localX - originX;
@@ -480,6 +550,55 @@
     return true;
   };
 
+  const renderSquadMarkers = () => {
+    const overlay = wtfOverlayState.squadLayer;
+    if (!overlay) return;
+    overlay.replaceChildren();
+
+    for (const member of wtfOverlayState.squad.members || []) {
+      const marker = document.createElement('div');
+      marker.className = 'wtf-squad-marker';
+      marker.dataset.left = String(member.left);
+      marker.dataset.top = String(member.top);
+      marker.dataset.elevation = String(member.elevation ?? '');
+      marker.title = member.name || 'Squad member';
+      marker.setAttribute('aria-hidden', 'true');
+      marker.style.setProperty('--wtf-squad-direction', `${Number(member.direction) || 0}deg`);
+
+      const direction = document.createElement('span');
+      direction.className = 'wtf-squad-direction';
+      const circle = document.createElement('span');
+      circle.className = 'wtf-squad-circle';
+      const arrow = document.createElement('span');
+      arrow.className = 'wtf-squad-arrow';
+      direction.append(circle, arrow);
+
+      const label = document.createElement('span');
+      label.className = 'wtf-squad-name';
+      label.textContent = String(member.name || 'Squad');
+      marker.append(direction, label);
+      overlay.appendChild(marker);
+    }
+    scheduleBattlePassPositionUpdate();
+  };
+
+  const ensureSquadLayer = () => {
+    const mapContainer = document.querySelector('.map-cont');
+    const mapWrap = mapContainer?.querySelector('.map-wrap');
+    if (!mapContainer || !mapWrap) return false;
+    if (!wtfOverlayState.squadLayer?.isConnected || wtfOverlayState.squadLayer.parentElement !== mapContainer) {
+      wtfOverlayState.squadLayer?.remove();
+      const overlay = document.createElement('div');
+      overlay.id = 'wtf-squad-layer';
+      overlay.setAttribute('aria-hidden', 'true');
+      mapContainer.appendChild(overlay);
+      wtfOverlayState.squadLayer = overlay;
+      renderSquadMarkers();
+    }
+    observeMapTransform(mapContainer, mapWrap);
+    return true;
+  };
+
   const setBattlePassVisible = (visible, notifyHost) => {
     wtfOverlayState.battlePassVisible = Boolean(visible);
     if (wtfOverlayState.battlePassLayer) {
@@ -501,6 +620,7 @@
     addNativeQuestCheckboxes();
     ensureBattlePassControl();
     ensureBattlePassLayer();
+    ensureSquadLayer();
   };
 
   const scheduleWtfEnhancementHydration = () => {
@@ -533,6 +653,19 @@
       ensureBattlePassLayer();
       renderBattlePassMarkers();
       setBattlePassVisible(visible, false);
+      startWtfEnhancementObserver();
+    }
+  };
+
+  window.__wtfSquadOverlay = {
+    configure(snapshot = {}) {
+      wtfOverlayState.squad = {
+        map: String(snapshot.map || ''),
+        members: Array.isArray(snapshot.members) ? snapshot.members : []
+      };
+      installWtfOverlayStyles();
+      ensureSquadLayer();
+      renderSquadMarkers();
       startWtfEnhancementObserver();
     }
   };

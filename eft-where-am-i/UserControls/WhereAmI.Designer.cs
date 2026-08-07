@@ -16,6 +16,8 @@
             if (disposing)
             {
                 hotkeyManager?.Dispose();
+                squadForm?.Dispose();
+                squadNetworkService?.Dispose();
                 components?.Dispose();
             }
             base.Dispose(disposing);

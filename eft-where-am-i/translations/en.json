@@ -53,5 +53,6 @@
     "serverLocation_StatusFail": "Status : Failed (API Error)",
     "serverLocation_Reason": "Reason : ",
     "serverLocation_Error": "Error Occurred",
-    "serverLocation_OfflineCol": "Offline / Unmatched"
+    "serverLocation_OfflineCol": "Offline / Unmatched",
+    "squadButton": "Squad"
 }

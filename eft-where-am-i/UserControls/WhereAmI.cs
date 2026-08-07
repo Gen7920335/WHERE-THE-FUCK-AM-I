@@ -67,10 +67,15 @@ namespace eft_where_am_i
         private bool chkAutoScreenshot;
         private bool isFloorEditMode = false;
         private GlobalHotkeyManager hotkeyManager;
+        private readonly SquadNetworkService squadNetworkService;
+        private SquadForm? squadForm;
 
         public WhereAmI()
         {
             InitializeComponent();
+            squadNetworkService = new SquadNetworkService();
+            squadNetworkService.PositionsChanged += OnSquadPositionsChanged;
+            squadNetworkService.StatusChanged += OnSquadStatusChanged;
             settingsHandler = SettingsHandler.Instance;             // 싱글톤 인스턴스 사용
             settingsHandler.SettingsChanged += OnSettingsChanged;   // 세팅 변경될 때마다 호출됨
             LoadSettings();                                         // 동기작업
@@ -526,6 +531,10 @@ namespace eft_where_am_i
                         await ToggleFloorEditModeAsync();
                         break;
 
+                    case "open-squad":
+                        OpenSquadWindow();
+                        break;
+
                     case "floor-db-updated":
                         floorManager?.Reload();
                         break;
@@ -591,6 +600,7 @@ namespace eft_where_am_i
             }
 
             await InjectBattlePassOverlayAsync();
+            await InjectSquadOverlayAsync();
 
             // 새로고침의 경우 Where Am I 패널과 방향 표시를 다시 적용
             try
@@ -650,6 +660,73 @@ namespace eft_where_am_i
             }
         }
 
+        private async Task InjectSquadOverlayAsync()
+        {
+            if (webView2.CoreWebView2 == null || appSettings == null)
+            {
+                return;
+            }
+
+            try
+            {
+                SquadOverlaySnapshot snapshot = SquadPositionParser.CreateOverlay(
+                    appSettings.latest_map,
+                    squadNetworkService.GetRemotePositions());
+                string snapshotJson = Newtonsoft.Json.JsonConvert.SerializeObject(snapshot);
+                await webView2.ExecuteScriptAsync($"window.__wtfSquadOverlay?.configure({snapshotJson});");
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("Squad", $"Unable to configure teammate markers: {ex.Message}");
+            }
+        }
+
+        private void OpenSquadWindow()
+        {
+            squadForm ??= new SquadForm(squadNetworkService);
+            IWin32Window owner = (IWin32Window?)FindForm() ?? this;
+            squadForm.ShowOrActivate(owner);
+        }
+
+        private void OnSquadPositionsChanged()
+        {
+            if (IsDisposed || !IsHandleCreated)
+            {
+                return;
+            }
+            BeginInvoke(new Action(async () => await InjectSquadOverlayAsync()));
+        }
+
+        private void OnSquadStatusChanged(string _)
+        {
+            if (IsDisposed || !IsHandleCreated)
+            {
+                return;
+            }
+            BeginInvoke(new Action(async () =>
+            {
+                if (squadNetworkService.IsConnected)
+                {
+                    PublishLatestSquadPosition();
+                }
+                await InjectSquadOverlayAsync();
+            }));
+        }
+
+        private void PublishLatestSquadPosition()
+        {
+            if (!squadNetworkService.IsConnected)
+            {
+                return;
+            }
+            string screenshot = GetLatestFile();
+            if (screenshot != null
+                && SquadPositionParser.TryParseScreenshotName(screenshot, appSettings.latest_map, out SquadPosition position))
+            {
+                squadNetworkService.UpdateLocalPosition(position);
+            }
+        }
+
         private async void CoreWebView2_SourceChanged(object sender, CoreWebView2SourceChangedEventArgs e)
         {
             // URL 변경 감지: 맵 slug(/maps/{slug})가 실제로 바뀐 경우에만 복원 로직 실행
@@ -691,6 +768,7 @@ namespace eft_where_am_i
                 }
 
                 await InjectBattlePassOverlayAsync();
+                await InjectSquadOverlayAsync();
             }
         }
 
@@ -828,6 +906,11 @@ namespace eft_where_am_i
 
             string filenameWithoutExt = screenshot.Replace(".png", "");
             await jsExecutor.SetInputValueAsync("input[type=\"text\"]", filenameWithoutExt);
+
+            if (SquadPositionParser.TryParseScreenshotName(screenshot, appSettings.latest_map, out SquadPosition squadPosition))
+            {
+                squadNetworkService.UpdateLocalPosition(squadPosition);
+            }
 
             // Z좌표 파싱 후 자동 층 전환
             await AutoSwitchFloorAsync(filenameWithoutExt);
