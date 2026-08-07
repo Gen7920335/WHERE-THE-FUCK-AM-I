@@ -1,12 +1,13 @@
 :root {
   color-scheme: dark;
   --ui-scale: 1;
+  --font-scale: 1;
   --marker-scale: 1;
   --map-inverse-scale: 1;
   --toolbar-height: calc(38px * var(--ui-scale));
   --left-panel-width: calc(256px * var(--ui-scale));
   --right-panel-width: calc(286px * var(--ui-scale));
-  --font-size: calc(14px * var(--ui-scale));
+  --font-size: calc(14px * var(--ui-scale) * var(--font-scale));
   --bg: #090a09;
   --panel: #101210;
   --panel-2: #171a17;
@@ -90,7 +91,7 @@ button:hover, button.active, button[aria-pressed="true"] { border-color: var(--a
   transform-origin: center;
   color: #b9a263;
   font-family: Bender, "Arial Narrow", Arial, sans-serif;
-  font-size: calc(20px * var(--ui-scale) * var(--label-size, 1));
+  font-size: calc(20px * var(--ui-scale) * var(--font-scale) * var(--label-size, 1));
   font-weight: 800;
   line-height: 1;
   text-align: center;
@@ -259,7 +260,7 @@ body.resizing-panels { cursor: col-resize; user-select: none; }
   max-width: calc(190px * var(--ui-scale));
   translate: 0 -50%;
   color: #ddd4b8;
-  font-size: calc(10px * var(--ui-scale));
+  font-size: calc(10px * var(--ui-scale) * var(--font-scale));
   font-weight: 700;
   line-height: 1.12;
   text-align: left;

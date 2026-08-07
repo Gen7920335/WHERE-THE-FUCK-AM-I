@@ -103,6 +103,7 @@
     panelOffset: { x: -1, y: -1 },
     wallColors: false,
     uiScale: 1,
+    fontScale: 1,
     iconScale: 1,
     transform: { x: 0, y: 0, scale: 1 },
     svgAspect: 1,
@@ -608,6 +609,23 @@
     return "boss";
   }
 
+  function mergedBossSpawns() {
+    const groups = new Map();
+    for (const boss of state.mapMarkers?.bosses || []) {
+      const position = readPosition(boss.position);
+      const key = [position.x, position.y, position.z].map(value => Number(value).toFixed(3)).join("|");
+      const group = groups.get(key) || { position: boss.position, bosses: [], layerIds: [] };
+      group.bosses.push(boss);
+      group.layerIds.push(bossLayerId(boss));
+      groups.set(key, group);
+    }
+    return [...groups.values()].map(group => ({
+      ...group,
+      layerIds: [...new Set(group.layerIds)],
+      names: [...new Set(group.bosses.map(boss => boss.name).filter(Boolean))]
+    }));
+  }
+
   function containerLayerId(containerId) {
     return CONTAINER_LAYER_BY_TYPE[state.markerData?.containerTypes?.[containerId]] || "container-other";
   }
@@ -856,9 +874,12 @@
       const layerIds = spawn._layerIds;
       if (layerIds.length) addMapMarker(fragment, layerIds, spawn.position, layerIds.map(id => LAYER_BY_ID.get(id).label).join(" / "), (spawn.sides || []).join(", "));
     }
-    for (const boss of map.bosses || []) {
-      const layerId = bossLayerId(boss);
-      addMapMarker(fragment, layerId, boss.position, boss.name, `${LAYER_BY_ID.get(layerId).label} · ${Math.round((boss.chance || 0) * 100)}% map spawn chance${boss.area ? ` · ${boss.area}` : ""}`);
+    for (const group of mergedBossSpawns()) {
+      const details = group.bosses.map(boss => {
+        const layerId = bossLayerId(boss);
+        return `${boss.name} · ${LAYER_BY_ID.get(layerId).label} · ${Math.round((boss.chance || 0) * 100)}% map spawn chance${boss.area ? ` · ${boss.area}` : ""}`;
+      });
+      addMapMarker(fragment, group.layerIds, group.position, group.names.join(" / "), [...new Set(details)].join("\n"));
     }
     for (const lock of map.locks || []) addMapMarker(fragment, lockLayerIds(lock), lock.position, markerItemName(lock.keyId), `${LAYER_BY_ID.get(lockLayerIds(lock)[1]).label}${lock.needsPower ? " · power required" : ""}`, lock.keyId);
     for (const sw of map.switches || []) addMapMarker(fragment, "switch", sw.position, sw.name || "Lever / switch", sw.type || "Usable switch");
@@ -1385,6 +1406,7 @@
 
   function applyScaleVariables() {
     document.documentElement.style.setProperty("--ui-scale", state.uiScale);
+    document.documentElement.style.setProperty("--font-scale", state.fontScale);
     document.documentElement.style.setProperty("--marker-scale", state.uiScale * state.iconScale);
   }
 
@@ -1413,6 +1435,13 @@
     applyScaleVariables();
     localStorage.setItem("eft-icon-scale", String(state.iconScale));
     return state.iconScale;
+  }
+
+  function setFontScale(scale) {
+    state.fontScale = Math.min(1.5, Math.max(.5, Number(scale) || 1));
+    applyScaleVariables();
+    localStorage.setItem("eft-font-scale", String(state.fontScale));
+    return state.fontScale;
   }
 
   const KOREAN = {
@@ -1496,6 +1525,7 @@
     if (options.panelOffset && Number.isFinite(Number(options.panelOffset.x)) && Number.isFinite(Number(options.panelOffset.y)))
       state.panelOffset = { x: Number(options.panelOffset.x), y: Number(options.panelOffset.y) };
     setScale(options.uiScale);
+    setFontScale(options.fontScale ?? state.fontScale);
     setIconScale(options.iconScale ?? state.iconScale);
     setPanelPosition(options.panelPosition || state.panelPosition);
     setMarkerMode(options.markerMode || state.markerMode);
@@ -1724,6 +1754,7 @@
   window.eftMap = {
     configure,
     setIconScale,
+    setFontScale,
     setMap: loadMap,
     setPinnedQuests,
     setPlayerPosition,
@@ -1741,7 +1772,7 @@
     toggleRequirements: togglePanels,
     resetView,
     getCalibrationReport: calibrationReport,
-    getState: () => ({ map: state.mapKey, floor: state.currentFloor, pinned: [...state.pinned], markerMode: state.markerMode, panelPosition: state.panelPosition, panelWidths: { ...state.panelWidths }, wallColors: state.wallColors, iconScale: state.iconScale, visibleLayers: [...state.visibleLayers], focusedItemId: state.focusedItemId, squadMembers: state.squadMembers.length, progress: progressPayload(), floorEditor: { enabled: state.floorEditor.enabled, zones: state.floorEditor.zones.length } })
+    getState: () => ({ map: state.mapKey, floor: state.currentFloor, pinned: [...state.pinned], markerMode: state.markerMode, panelPosition: state.panelPosition, panelWidths: { ...state.panelWidths }, wallColors: state.wallColors, fontScale: state.fontScale, iconScale: state.iconScale, visibleLayers: [...state.visibleLayers], focusedItemId: state.focusedItemId, squadMembers: state.squadMembers.length, progress: progressPayload(), floorEditor: { enabled: state.floorEditor.enabled, zones: state.floorEditor.zones.length } })
   };
 
   try {

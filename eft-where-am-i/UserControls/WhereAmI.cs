@@ -154,6 +154,8 @@ namespace eft_where_am_i
                     await webView2_panel_ui.ExecuteScriptAsync($"populateMapList('{mapListJson}', '{appSettings.latest_map}')");
                     await webView2_panel_ui.ExecuteScriptAsync($"setTheme('{appSettings.theme_mode}')");
                     await webView2_panel_ui.ExecuteScriptAsync(
+                        $"setFontScaleControl({appSettings.font_scale.ToString(System.Globalization.CultureInfo.InvariantCulture)})");
+                    await webView2_panel_ui.ExecuteScriptAsync(
                         $"setIconScaleControl({appSettings.icon_scale.ToString(System.Globalization.CultureInfo.InvariantCulture)})");
                 }
                 catch (Exception ex)
@@ -376,6 +378,8 @@ namespace eft_where_am_i
                             $"setAutoScreenshotCleanupCheckboxState({appSettings.auto_screenshot_cleanup.ToString().ToLower()})");
 
                         await webView2_panel_ui.ExecuteScriptAsync(
+                            $"setFontScaleControl({appSettings.font_scale.ToString(System.Globalization.CultureInfo.InvariantCulture)})");
+                        await webView2_panel_ui.ExecuteScriptAsync(
                             $"setIconScaleControl({appSettings.icon_scale.ToString(System.Globalization.CultureInfo.InvariantCulture)})");
 
                         // 디버그 모드 플래그 전송
@@ -495,6 +499,20 @@ namespace eft_where_am_i
                             else if (!isChecked && !appSettings.auto_map_detection)
                                 logWatcher.Stop();
                         }
+                        break;
+
+                    case "font-scale-preview":
+                        double previewFontScale = Math.Clamp(message["scale"]?.Value<double>() ?? 1.0, 0.5, 1.5);
+                        if (webView2.CoreWebView2 != null)
+                        {
+                            await webView2.ExecuteScriptAsync(
+                                $"window.eftMap?.setFontScale({previewFontScale.ToString(System.Globalization.CultureInfo.InvariantCulture)})");
+                        }
+                        break;
+
+                    case "font-scale-changed":
+                        appSettings.font_scale = Math.Clamp(message["scale"]?.Value<double>() ?? 1.0, 0.5, 1.5);
+                        SaveSettings();
                         break;
 
                     case "icon-scale-preview":
@@ -784,6 +802,7 @@ namespace eft_where_am_i
             {
                 map = appSettings.latest_map,
                 uiScale = appSettings.ui_scale,
+                fontScale = appSettings.font_scale,
                 iconScale = appSettings.icon_scale,
                 panelPosition = appSettings.quest_panel_position,
                 panelOffset = new { x = appSettings.quest_panel_offset_x, y = appSettings.quest_panel_offset_y },
@@ -1192,6 +1211,11 @@ namespace eft_where_am_i
 
                     case "wall-colors-changed":
                         appSettings.tarkov_wall_colors = message["enabled"]?.Value<bool>() ?? false;
+                        SaveSettings();
+                        break;
+
+                    case "font-scale-changed":
+                        appSettings.font_scale = Math.Clamp(message["scale"]?.Value<double>() ?? 1.0, 0.5, 1.5);
                         SaveSettings();
                         break;
 

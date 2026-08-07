@@ -209,10 +209,10 @@ for (const token of ["questAvailable", "questMatchesFilter", "progress-settings-
 if (!/function questDisplayName\(quest\)\s*\{\s*return quest\.name;\s*\}/.test(mapJs)) {
   throw new Error("Quest names must remain in English in every language mode");
 }
-for (const token of ["icon-scale-preview", "icon-scale-changed", "setIconScaleControl"]) {
+for (const token of ["icon-scale-preview", "icon-scale-changed", "setIconScaleControl", "font-scale-preview", "font-scale-changed", "setFontScaleControl"]) {
   if (!panelHtml.includes(token)) throw new Error(`Top-panel icon scaling is missing: ${token}`);
 }
-for (const token of ["map_use_progress", "map_quest_filter", "trader_levels", "completed_quests", "map_visible_layers", "quest_panel_offset_x", "icon_scale", "squad_mode", "squad_host", "squad_port"]) {
+for (const token of ["map_use_progress", "map_quest_filter", "trader_levels", "completed_quests", "map_visible_layers", "quest_panel_offset_x", "font_scale", "icon_scale", "squad_mode", "squad_host", "squad_port"]) {
   if (!settingsCs.includes(token)) throw new Error(`Persistent setting is missing: ${token}`);
 }
 if (!mapCss.includes("--marker-scale") || !mapCss.includes("scale: var(--map-inverse-scale)")) {
@@ -231,6 +231,15 @@ if (!mapHtml.includes('id="mapLabelLayer"') || !mapCss.includes(".map-place-labe
 }
 if (!panelHtml.includes('id="iconScaleSlider"') || !panelHtml.includes('min="50" max="650"') || mapHtml.includes('id="iconScaleSlider"')) {
   throw new Error("The 50%-650% icon-scale control must live in the top control panel");
+}
+const fontScaleIndex = panelHtml.indexOf('id="fontScaleSlider"');
+const iconScaleIndex = panelHtml.indexOf('id="iconScaleSlider"');
+if (fontScaleIndex < 0 || fontScaleIndex > iconScaleIndex || !panelHtml.includes('min="50" max="150"') ||
+    !mapJs.includes("Math.min(1.5") || !mapCss.includes("--font-scale")) {
+  throw new Error("The 50%-150% font-size control must appear above the icon-size control and affect map text");
+}
+for (const token of ["mergedBossSpawns", "group.names.join(\" / \")", "[...new Set(details)].join(\"\\n\")"]) {
+  if (!mapJs.includes(token)) throw new Error(`Overlapping boss markers are not merged correctly: ${token}`);
 }
 const requirementsPanelIndex = mapHtml.indexOf('id="requirementsPanel"');
 const floorButtonsIndex = mapHtml.indexOf('id="floorButtons"');
@@ -283,6 +292,10 @@ if (!settingPageCs.includes("html/settings.html") || !settingsHtml.includes('id=
 if (!settingsHtml.includes('min="50" max="650"') || !mapJs.includes("Math.min(6.5") ||
     !whereAmICs.includes(", 0.5, 6.5)") || !settingPageCs.includes(", 0.5, 6.5)")) {
   throw new Error("Icon scaling must be enforced from 50% through 650% in every settings path");
+}
+if (!settingsHtml.includes('id="fontScaleSlider"') || !settingsHtml.includes('min="50" max="150"') ||
+    !whereAmICs.includes(", 0.5, 1.5)") || !settingPageCs.includes(", 0.5, 1.5)")) {
+  throw new Error("Font scaling must be enforced from 50% through 150% in every settings path");
 }
 
 const forwardSource = mapJs.match(/function quaternionForward\([^)]*\) \{[\s\S]*?\n  \}/)?.[0];

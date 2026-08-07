@@ -310,6 +310,7 @@ namespace eft_where_am_i.Classes
         public int dead_zone_percent { get; set; } = 93;
         public Dictionary<string, bool> panel_hidden_per_map { get; set; } = new Dictionary<string, bool>();
         public double ui_scale { get; set; } = 1.0;
+        public double font_scale { get; set; } = 1.0;
         public double icon_scale { get; set; } = 1.0;
         public string quest_panel_position { get; set; } = "right";
         public double quest_panel_offset_x { get; set; } = -1;
