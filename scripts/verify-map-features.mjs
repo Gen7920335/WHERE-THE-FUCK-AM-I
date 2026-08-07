@@ -209,11 +209,19 @@ for (const token of ["questAvailable", "questMatchesFilter", "progress-settings-
 for (const token of ["icon-scale-preview", "icon-scale-changed", "setIconScaleControl"]) {
   if (!panelHtml.includes(token)) throw new Error(`Top-panel icon scaling is missing: ${token}`);
 }
-for (const token of ["map_use_progress", "map_quest_filter", "trader_levels", "completed_quests", "map_visible_layers", "quest_panel_offset_x", "icon_scale"]) {
+for (const token of ["map_use_progress", "map_quest_filter", "trader_levels", "completed_quests", "map_visible_layers", "quest_panel_offset_x", "icon_scale", "squad_mode", "squad_host", "squad_port"]) {
   if (!settingsCs.includes(token)) throw new Error(`Persistent setting is missing: ${token}`);
 }
 if (!mapCss.includes("--marker-scale") || !mapCss.includes("scale: var(--map-inverse-scale)")) {
   throw new Error("Map icons must support independent sizing and zoom-invariant screen dimensions");
+}
+for (const token of [".position-marker", "#8a2be2", "width: calc(20px * var(--marker-scale))", "border: calc(2px * var(--marker-scale)) solid #70a800", ".squad-marker", "#2b84e2", ".position-heading"]) {
+  if (!mapCss.includes(token)) throw new Error(`Player/squad marker styling is missing: ${token}`);
+}
+const upstreamDirectionSvg = "PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4IDEwIj48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg0LCA0KSBzY2FsZSgwLjcpIHRyYW5zbGF0ZSgtNCwgLTQpIj48cG9seWdvbiBwb2ludHM9IjQsMCA3LjUsOCAwLjUsOCIgZmlsbD0iIzhhMmJlMiIgc3Ryb2tlPSIjNzBhODAwIiBzdHJva2Utd2lkdGg9IjAuNSIvPjwvZz48L3N2Zz4=";
+if (!mapCss.includes(upstreamDirectionSvg)) throw new Error("The player direction marker must reuse the exact SVG embedded by the upstream source");
+for (const token of ["squadMembers: []", "renderPositionMarker", "playerHeadingOnMap(position)", "setSquadMembers"]) {
+  if (!mapJs.includes(token)) throw new Error(`Player/squad marker behavior is missing: ${token}`);
 }
 if (!mapHtml.includes('id="mapLabelLayer"') || !mapCss.includes(".map-place-label") || !mapCss.includes("-webkit-text-stroke: .5px #000")) {
   throw new Error("Original-style map place-name rendering is missing");
@@ -248,9 +256,15 @@ for (const token of ["beginPanelResize", "setPanelWidth", "eft-left-panel-width"
 if (!mapCss.includes(".map-marker-label") || !/extract\.transferItem\?\.item \|\| null, true\)/.test(mapJs)) {
   throw new Error("Extraction names must be rendered beside extraction markers");
 }
-for (const removedServerUi of ["squadToggle", "squadDialog", "squad-settings-changed", "ConfigureSquadSync"]) {
-  if (mapHtml.includes(removedServerUi) || mapJs.includes(removedServerUi) || whereAmICs.includes(removedServerUi)) {
-    throw new Error(`Removed server setting is still reachable: ${removedServerUi}`);
+for (const token of ["squadToggle", "squadDialog", "squad-settings-changed", "setSquadStatus"]) {
+  if (!mapHtml.includes(token) && !mapJs.includes(token)) throw new Error(`Squad connection UI is missing: ${token}`);
+}
+for (const token of ["ConfigureSquadSync", "UpdatePose", "OnSquadMembersChanged", "setSquadMembers"]) {
+  if (!whereAmICs.includes(token)) throw new Error(`Squad application bridge is missing: ${token}`);
+}
+for (const removedLegacyServerUi of ["serverLocation_Title", "serverLocation_HistoryTitle", "ServerLocation"]) {
+  if (mapHtml.includes(removedLegacyServerUi) || panelHtml.includes(removedLegacyServerUi) || whereAmICs.includes(removedLegacyServerUi)) {
+    throw new Error(`Removed legacy server-location screen is still reachable: ${removedLegacyServerUi}`);
   }
 }
 
@@ -270,4 +284,4 @@ for (const requiredBridgeToken of ["SendScreenshotPositionToMapAsync", "Invarian
   if (!whereAmICs.includes(requiredBridgeToken)) throw new Error(`Screenshot-to-map bridge is missing ${requiredBridgeToken}`);
 }
 
-console.log(`Verified ${layers.length} layers, ${markerCount} public markers (${hazardCount} hazards, ${keySpawnCount} key spawns, ${edgeCount} edge-pinned), ${mapLabelCount} place-name labels, ${battlePassCount} Battle Pass locations, ${questLocationCount} Korean quest locations, extraction labels, resizable panels, progress/floor parity, and screenshot direction bridging`);
+console.log(`Verified ${layers.length} layers, ${markerCount} public markers (${hazardCount} hazards, ${keySpawnCount} key spawns, ${edgeCount} edge-pinned), ${mapLabelCount} place-name labels, ${battlePassCount} Battle Pass locations, ${questLocationCount} Korean quest locations, extraction labels, resizable panels, squad pose bridging, progress/floor parity, and screenshot direction bridging`);

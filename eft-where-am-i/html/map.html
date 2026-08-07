@@ -17,7 +17,7 @@
           <div id="mapSearchResults" class="map-search-results"></div>
           <div id="layerList" class="layer-list"></div>
         </section>
-        <footer class="panel-actions"><button id="progressToggle" type="button">Filters</button></footer>
+        <footer class="panel-actions"><button id="progressToggle" type="button">Filters</button><button id="squadToggle" type="button">Squad <span id="squadCount">0</span></button></footer>
       </aside>
 
       <div id="leftPanelResize" class="panel-resize-handle left-resize-handle" role="separator" aria-label="Resize left panel" aria-orientation="vertical" tabindex="0" title="Drag to resize · Double-click to reset"></div>
@@ -91,6 +91,26 @@
       <section><strong>Trader loyalty levels</strong><div id="traderLevels" class="trader-grid"></div></section>
       <p class="dialog-help">Mark quests complete from the quest list. Progress is stored locally in this app.</p>
       <footer><button id="resetProgress" type="button">Reset completed</button><button id="saveProgress" value="default">Save</button></footer>
+    </form>
+  </dialog>
+
+  <dialog id="squadDialog" class="settings-dialog">
+    <form method="dialog" class="dialog-card" id="squadForm">
+      <header><strong>Squad connection</strong><button value="cancel" aria-label="Close">×</button></header>
+      <div class="form-grid">
+        <label>Mode<select id="squadMode"><option value="off">Off</option><option value="lan">LAN</option><option value="host">Host</option><option value="client">Client</option></select></label>
+        <label>Name<input id="squadName" maxlength="32" value="Player"></label>
+        <label>UDP port<input id="squadPort" type="number" min="1024" max="65535" value="38473"></label>
+      </div>
+      <div class="form-grid">
+        <label id="squadRoomLabel">LAN room<input id="squadRoom" maxlength="64" value="eft-local"></label>
+        <label id="squadHostLabel">Host IP or DNS<input id="squadHost" maxlength="255" placeholder="203.0.113.10"></label>
+        <label id="squadPasswordLabel">Password<span class="password-row"><input id="squadPassword" type="password" minlength="8" maxlength="128" autocomplete="new-password"><button id="generateSquadPassword" type="button">Generate</button></span></label>
+      </div>
+      <p id="squadHelp" class="dialog-help"></p>
+      <p id="squadStatus" class="squad-status" data-state="off">Squad sharing is off.</p>
+      <div id="squadMembers" class="member-list">No squad members online.</div>
+      <footer><button id="saveSquad" value="default">Save</button></footer>
     </form>
   </dialog>
 

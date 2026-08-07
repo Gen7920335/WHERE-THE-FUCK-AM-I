@@ -108,6 +108,9 @@
     svgAspect: 1,
     mapFrame: { left: 0, top: 0, width: 1, height: 1 },
     player: null,
+    squadMembers: [],
+    squad: { enabled: false, mode: "off", name: "Player", room: "eft-local", host: "", password: "", port: 38473 },
+    squadStatus: { mode: "off", state: "off", message: "Squad sharing is off." },
     language: "en",
     progress: { useProgress: false, filter: "all", edition: "standard", faction: "Any", playerLevel: 1, traderLevels: {}, completedQuests: new Set() },
     floorEditor: { enabled: false, zones: [], floors: [], vertices: [] }
@@ -121,7 +124,9 @@
     "rulerToggle", "measurementLayer", "rulerReadout", "markerPopup", "hidePanels", "fullScreen", "whereAmI", "coordinatesReadout", "mapHelp",
     "zoomIn", "zoomOut", "zoomReset", "progressToggle", "floorEditToggle", "progressDialog", "progressForm", "useProgress",
     "questFilterButtons", "gameEdition", "playerFaction", "playerLevel", "traderLevels", "resetProgress",
-    "saveProgress", "questFilterSummary",
+    "saveProgress", "questFilterSummary", "squadToggle", "squadCount", "squadDialog", "squadForm",
+    "squadMode", "squadName", "squadRoom", "squadHost", "squadPassword", "squadPort", "squadMembers", "saveSquad",
+    "squadRoomLabel", "squadHostLabel", "squadPasswordLabel", "generateSquadPassword", "squadHelp", "squadStatus",
     "floorEditorPanel", "floorEditorExit", "floorZoneName", "floorZoneFloor", "floorZoneMin", "floorZoneMax",
     "floorUndo", "floorComplete", "floorDelete", "floorEditorStatus", "floorSave"
   ].map(id => [id, document.getElementById(id)]));
@@ -201,6 +206,8 @@
       renderQuests();
       renderLayerList();
       renderSearchResults();
+      el.squadCount.textContent = String(state.squadMembers.filter(member => normalizeMapKey(member.map) === state.mapKey).length);
+      renderSquadMembers();
       renderMarkers();
       renderMeasurement();
       resetView();
@@ -929,6 +936,10 @@
         }
       }
     }
+    for (const member of state.squadMembers) {
+      if (normalizeMapKey(member.map) !== state.mapKey) continue;
+      fragment.append(renderPositionMarker(member, "squad"));
+    }
     el.markerLayer.append(fragment);
     if (state.player) renderPlayerMarker();
   }
@@ -1121,16 +1132,24 @@
     return Math.atan2(dx, -dy) * 180 / Math.PI;
   }
 
-  function renderPlayerMarker() {
-    const pos = worldToPercent(state.player.x, state.player.z);
+  function renderPositionMarker(position, kind) {
+    const pos = worldToPercent(position.x, position.z);
     const marker = document.createElement("div");
-    marker.className = "player-marker";
+    marker.className = `position-marker ${kind === "squad" ? "squad-marker" : "player-marker"}`;
     marker.style.left = `${pos.left}%`;
     marker.style.top = `${pos.top}%`;
-    const heading = playerHeadingOnMap(state.player);
+    const heading = playerHeadingOnMap(position);
     marker.style.setProperty("--heading", `${heading}deg`);
-    marker.title = `Player: ${state.player.x.toFixed(1)}, ${state.player.y.toFixed(1)}, ${state.player.z.toFixed(1)}`;
-    el.markerLayer.append(marker);
+    const headingNode = document.createElement("span");
+    headingNode.className = "position-heading";
+    marker.append(headingNode);
+    const label = kind === "squad" ? String(position.name || "Squad member") : "Player";
+    marker.title = `${label}: ${position.x.toFixed(1)}, ${position.y.toFixed(1)}, ${position.z.toFixed(1)}`;
+    return marker;
+  }
+
+  function renderPlayerMarker() {
+    el.markerLayer.append(renderPositionMarker(state.player, "player"));
   }
 
   function setPlayerPosition(position) {
@@ -1141,6 +1160,22 @@
     renderMarkers();
     if (state.player && state.map && window.__eftAutoPan !== false) panToPlayer();
     return true;
+  }
+
+  function setSquadMembers(members) {
+    state.squadMembers = Array.isArray(members) ? members.flatMap(member => {
+      const values = [member?.x, member?.y, member?.z, member?.qx, member?.qy, member?.qz, member?.qw].map(Number);
+      if (values.slice(0, 3).some(value => !Number.isFinite(value))) return [];
+      const orientation = values.slice(3).every(Number.isFinite) ? values.slice(3) : [0, 0, 0, 1];
+      return [{
+        id: String(member?.id || ""), name: String(member?.name || "Squad member"), map: String(member?.map || state.mapKey),
+        x: values[0], y: values[1], z: values[2], qx: orientation[0], qy: orientation[1], qz: orientation[2], qw: orientation[3]
+      }];
+    }) : [];
+    el.squadCount.textContent = String(state.squadMembers.filter(member => normalizeMapKey(member.map) === state.mapKey).length);
+    renderSquadMembers();
+    renderMarkers();
+    return state.squadMembers.length;
   }
 
   function panToPlayer() {
@@ -1229,6 +1264,54 @@
     persistProgress();
     renderQuests();
     renderRequirements();
+  }
+
+  function setSquadSettings(value = {}) {
+    const mode = ["lan", "host", "client"].includes(value.mode) ? value.mode : (value.enabled ? "lan" : "off");
+    state.squad = {
+      enabled: mode !== "off", mode, name: value.name || "Player", room: value.room || "eft-local",
+      host: value.host || "", password: value.password || "",
+      port: Math.min(65535, Math.max(1024, Number(value.port) || 38473))
+    };
+    el.squadMode.value = state.squad.mode;
+    el.squadName.value = state.squad.name;
+    el.squadRoom.value = state.squad.room;
+    el.squadHost.value = state.squad.host;
+    el.squadPassword.value = state.squad.password;
+    el.squadPort.value = String(state.squad.port);
+    updateSquadFields();
+  }
+
+  function updateSquadFields() {
+    const mode = el.squadMode.value;
+    el.squadRoomLabel.hidden = mode !== "lan";
+    el.squadHostLabel.hidden = mode !== "client";
+    el.squadPasswordLabel.hidden = mode !== "host" && mode !== "client";
+    el.squadHelp.textContent = mode === "host"
+      ? "Forward this UDP port on the host router and share the public IP, port, and password. The password stays in memory only."
+      : mode === "client"
+        ? "Enter the host's public IP or DNS name. The host must forward the selected UDP port."
+        : mode === "lan"
+          ? "Local multicast only. The room code separates groups and is not encryption."
+          : "Choose Host to open a room or Client to connect to one.";
+  }
+
+  function setSquadStatus(value = {}) {
+    state.squadStatus = { mode: value.mode || "off", state: value.state || "off", message: value.message || "" };
+    el.squadStatus.dataset.state = state.squadStatus.state;
+    el.squadStatus.textContent = state.squadStatus.message || "Squad sharing is off.";
+  }
+
+  function createSquadPassword() {
+    const bytes = crypto.getRandomValues(new Uint8Array(18));
+    return btoa(String.fromCharCode(...bytes)).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
+  }
+
+  function renderSquadMembers() {
+    const members = state.squadMembers.filter(member => normalizeMapKey(member.map) === state.mapKey);
+    el.squadMembers.textContent = members.length
+      ? members.map(member => `${member.name} · ${Number(member.x).toFixed(1)}, ${Number(member.y).toFixed(1)}, ${Number(member.z).toFixed(1)}`).join("\n")
+      : "No squad members online.";
   }
 
   function selectFloorByHotkey(keyIndex) {
@@ -1333,7 +1416,7 @@
   }
 
   const KOREAN = {
-    Overlays: "오버레이", Quests: "퀘스트", Progress: "진행도", "Floor editor": "층 편집", Ruler: "거리 측정",
+    Overlays: "오버레이", Quests: "퀘스트", Progress: "진행도", Squad: "분대", "Floor editor": "층 편집", Ruler: "거리 측정",
     "Hide panels": "패널 숨기기", "Show panels": "패널 보이기", "Full screen": "전체 화면", Fit: "맞춤",
     "Wall colors": "벽 색상", "Floor markers": "층 마커", "Icon scale": "아이콘 크기", Panel: "패널", right: "오른쪽", bottom: "아래", floating: "이동식",
     arrows: "화살표", opacity: "반투명", both: "둘 다"
@@ -1344,6 +1427,7 @@
   function applyLanguage() {
     el.layersToggle.textContent = t("Overlays"); el.questToggle.textContent = t("Quests"); el.progressToggle.textContent = t("Progress");
     el.floorEditToggle.textContent = t("Floor editor");
+    el.squadToggle.firstChild.textContent = `${t("Squad")} `;
     el.rulerToggle.textContent = t("Ruler");
     el.fullScreen.textContent = t("Full screen"); el.zoomReset.textContent = t("Fit");
     const hidden = el.content.classList.contains("panels-hidden"); el.hidePanels.textContent = state.language === "ko" ? t(hidden ? "Show panels" : "Hide panels") : (hidden ? "Show pannels" : "Hide pannels");
@@ -1419,6 +1503,8 @@
     window.__eftAutoPan = options.autoPanning !== false;
     applyLanguage();
     if (options.progress) setProgress(options.progress);
+    if (options.squad) setSquadSettings(options.squad);
+    if (options.squadStatus) setSquadStatus(options.squadStatus);
     if (Array.isArray(options.visibleLayers)) {
       state.visibleLayers = new Set(options.visibleLayers.filter(id => LAYER_BY_ID.has(id)));
       renderLayerList(); renderMarkers();
@@ -1612,6 +1698,19 @@
   });
   el.progressForm.addEventListener("submit", event => { event.preventDefault(); readProgressForm(); el.progressDialog.close(); });
   el.resetProgress.addEventListener("click", () => { state.progress.completedQuests.clear(); persistProgress(); renderQuests(); renderRequirements(); });
+  el.squadToggle.addEventListener("click", () => { setSquadSettings(state.squad); renderSquadMembers(); el.squadDialog.showModal(); });
+  el.squadMode.addEventListener("change", updateSquadFields);
+  el.generateSquadPassword.addEventListener("click", () => { el.squadPassword.value = createSquadPassword(); el.squadPassword.type = "text"; });
+  el.squadForm.addEventListener("submit", event => {
+    event.preventDefault();
+    const mode = el.squadMode.value;
+    const requiresPassword = mode === "host" || mode === "client";
+    el.squadPassword.setCustomValidity(requiresPassword && el.squadPassword.value.length < 8 ? "Use at least 8 characters." : "");
+    if (!el.squadForm.reportValidity()) return;
+    setSquadSettings({ mode, enabled: mode !== "off", name: el.squadName.value.trim(), room: el.squadRoom.value.trim(), host: el.squadHost.value.trim(), password: el.squadPassword.value, port: Number(el.squadPort.value) });
+    post("squad-settings-changed", state.squad);
+    el.squadDialog.close();
+  });
   el.floorEditorExit.addEventListener("click", () => { setFloorEditor(false); post("exit-floor-edit-mode"); });
   el.floorUndo.addEventListener("click", () => { state.floorEditor.vertices.pop(); renderFloorEditor(); });
   el.floorComplete.addEventListener("click", completeFloorZone);
@@ -1628,6 +1727,8 @@
     setMap: loadMap,
     setPinnedQuests,
     setPlayerPosition,
+    setSquadMembers,
+    setSquadStatus,
     focusItem,
     toggleLayer,
     selectFloor,
@@ -1640,7 +1741,7 @@
     toggleRequirements: togglePanels,
     resetView,
     getCalibrationReport: calibrationReport,
-    getState: () => ({ map: state.mapKey, floor: state.currentFloor, pinned: [...state.pinned], markerMode: state.markerMode, panelPosition: state.panelPosition, panelWidths: { ...state.panelWidths }, wallColors: state.wallColors, iconScale: state.iconScale, visibleLayers: [...state.visibleLayers], focusedItemId: state.focusedItemId, progress: progressPayload(), floorEditor: { enabled: state.floorEditor.enabled, zones: state.floorEditor.zones.length } })
+    getState: () => ({ map: state.mapKey, floor: state.currentFloor, pinned: [...state.pinned], markerMode: state.markerMode, panelPosition: state.panelPosition, panelWidths: { ...state.panelWidths }, wallColors: state.wallColors, iconScale: state.iconScale, visibleLayers: [...state.visibleLayers], focusedItemId: state.focusedItemId, squadMembers: state.squadMembers.length, progress: progressPayload(), floorEditor: { enabled: state.floorEditor.enabled, zones: state.floorEditor.zones.length } })
   };
 
   try {
