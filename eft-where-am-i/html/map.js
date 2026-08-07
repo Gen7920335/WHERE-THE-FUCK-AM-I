@@ -22,51 +22,51 @@
   };
   const FLOOR_ALIASES = {};
   const LAYERS = [
-    { id: "extract-pmc", group: "Extractions", label: "PMC extraction", symbol: "E", color: "#47d16c" },
-    { id: "extract-scav", group: "Extractions", label: "Scav extraction", symbol: "S", color: "#7fc85a" },
-    { id: "extract-coop", group: "Extractions", label: "Co-op extraction", symbol: "C", color: "#52d4bd" },
-    { id: "transit", group: "Extractions", label: "Transit", symbol: "T", color: "#52a7ff" },
-    { id: "spawn-pmc", group: "Spawns", label: "PMC spawn", symbol: "P", color: "#74b9ff" },
-    { id: "spawn-scav", group: "Spawns", label: "Scav spawn", symbol: "S", color: "#9acd63" },
-    { id: "spawn-aipmc", group: "Spawns", label: "AI PMC spawn", symbol: "A", color: "#82aaff" },
-    { id: "spawn-sniper", group: "Spawns", label: "Sniper Scav", symbol: "N", color: "#ffb65c" },
-    { id: "boss", group: "Spawns", label: "Boss spawn", symbol: "B", color: "#ef6262" },
-    { id: "cultist", group: "Spawns", label: "Cultist spawn", symbol: "C", color: "#9f78c9" },
-    { id: "rogue", group: "Spawns", label: "Rogue spawn", symbol: "R", color: "#df805c" },
-    { id: "raider", group: "Spawns", label: "Raider spawn", symbol: "R", color: "#da6d76" },
-    { id: "lock", group: "Usable", label: "All unlocks", symbol: "K", color: "#d7b96f" },
-    { id: "lock-door", group: "Usable", label: "Locked room / door", symbol: "D", color: "#d7b96f" },
-    { id: "lock-container", group: "Usable", label: "Locked container", symbol: "C", color: "#bf9c61" },
-    { id: "lock-trunk", group: "Usable", label: "Locked trunk", symbol: "T", color: "#a88f66" },
-    { id: "key-spawn", group: "Usable", label: "Key spawn", symbol: "K", color: "#f2d67c" },
-    { id: "switch", group: "Usable", label: "Lever / switch", symbol: "W", color: "#cfa7ff" },
-    { id: "stationary", group: "Usable", label: "Stationary weapon", symbol: "G", color: "#ff8e5c" },
-    { id: "btr", group: "Usable", label: "BTR stop", symbol: "R", color: "#ad9b7b" },
-    { id: "hazard-mine", group: "Hazards", label: "Minefield", symbol: "!", color: "#ff5a5a" },
-    { id: "hazard-sniper", group: "Hazards", label: "Sniper boundary", symbol: "!", color: "#ff925a" },
-    { id: "container-cache", group: "Loot", label: "Cache", symbol: "C", color: "#b59767" },
-    { id: "container-ammo", group: "Loot", label: "Ammo box", symbol: "A", color: "#9c9275" },
-    { id: "container-grenade", group: "Loot", label: "Grenade box", symbol: "G", color: "#8d9568" },
-    { id: "container-weapon", group: "Loot", label: "Weapon box", symbol: "W", color: "#9f805e" },
-    { id: "container-register", group: "Loot", label: "Cash register", symbol: "$", color: "#c3a864" },
-    { id: "container-body", group: "Loot", label: "Dead body", symbol: "D", color: "#96716b" },
-    { id: "container-jacket", group: "Loot", label: "Jacket", symbol: "J", color: "#8e735d" },
-    { id: "container-drawer", group: "Loot", label: "Drawer", symbol: "D", color: "#a98867" },
-    { id: "container-bag", group: "Loot", label: "Sports bag", symbol: "B", color: "#718c72" },
-    { id: "container-suitcase", group: "Loot", label: "Suitcase", symbol: "S", color: "#7f8b91" },
-    { id: "container-crate", group: "Loot", label: "Wooden crate", symbol: "C", color: "#9b744c" },
-    { id: "container-toolbox", group: "Loot", label: "Toolbox", symbol: "T", color: "#b47154" },
-    { id: "container-pc", group: "Loot", label: "PC block", symbol: "P", color: "#6e8895" },
-    { id: "container-medcase", group: "Loot", label: "Medcase", symbol: "+", color: "#c77777" },
-    { id: "container-medbag", group: "Loot", label: "Medbag", symbol: "+", color: "#db8585" },
-    { id: "container-safe", group: "Loot", label: "Safe", symbol: "S", color: "#8e9194" },
-    { id: "container-stash", group: "Loot", label: "Shturman's stash", symbol: "S", color: "#8b7253" },
-    { id: "container-technical", group: "Loot", label: "Technical supply crate", symbol: "T", color: "#8d8066" },
-    { id: "container-medical", group: "Loot", label: "Medical supply crate", symbol: "+", color: "#bd7676" },
-    { id: "container-ration", group: "Loot", label: "Ration supply crate", symbol: "R", color: "#9a9160" },
-    { id: "container-other", group: "Loot", label: "Other container", symbol: "L", color: "#c99d65" },
-    { id: "loose-item", group: "Loot", label: "Loose item", symbol: "I", color: "#ffd166" },
-    { id: "battle-pass", group: "Loot", label: "Battle Pass", symbol: "", color: "#ff2727" }
+    { id: "extract-pmc", group: "Extractions", label: "PMC extraction", icon: "extraction", color: "#70a800" },
+    { id: "extract-scav", group: "Extractions", label: "Scav extraction", icon: "extraction", color: "#aeaeb0" },
+    { id: "extract-coop", group: "Extractions", label: "Co-op extraction", icon: "extraction", color: "#9a8866" },
+    { id: "transit", group: "Extractions", label: "Transit", icon: "transit", color: "#aeaeb0" },
+    { id: "spawn-pmc", group: "Spawns", label: "PMC spawn", icon: "spawn", color: "#70a800" },
+    { id: "spawn-scav", group: "Spawns", label: "Scav spawn", icon: "spawn", color: "#aeaeb0" },
+    { id: "spawn-aipmc", group: "Spawns", label: "AI PMC spawn", icon: "spawn", color: "#879860" },
+    { id: "spawn-sniper", group: "Spawns", label: "Sniper Scav", icon: "sniper", color: "#aeaeb0" },
+    { id: "boss", group: "Spawns", label: "Boss spawn", icon: "skull", color: "#ff2020" },
+    { id: "cultist", group: "Spawns", label: "Cultist spawn", icon: "skull", color: "#b75bd6" },
+    { id: "rogue", group: "Spawns", label: "Rogue spawn", icon: "skull", color: "#dc774f" },
+    { id: "raider", group: "Spawns", label: "Raider spawn", icon: "skull", color: "#ca5d67" },
+    { id: "lock", group: "Keys", label: "All unlocks", icon: "lock", color: "#9a8866" },
+    { id: "lock-door", group: "Keys", label: "Locked room / door", icon: "lock", color: "#9a8866" },
+    { id: "lock-container", group: "Keys", label: "Locked container", icon: "lock", color: "#9a8866" },
+    { id: "lock-trunk", group: "Keys", label: "Locked trunk", icon: "lock", color: "#9a8866" },
+    { id: "key-spawn", group: "Keys", label: "Key spawn", icon: "key", color: "#9a8866" },
+    { id: "switch", group: "Map", label: "Lever / switch", icon: "switch", color: "#9a8866" },
+    { id: "stationary", group: "Map", label: "Stationary weapon", icon: "weapon", color: "#9a8866" },
+    { id: "btr", group: "Map", label: "BTR stop", icon: "btr", color: "#9a8866" },
+    { id: "hazard-mine", group: "Map", label: "Minefield", icon: "mine", color: "#ff2020" },
+    { id: "hazard-sniper", group: "Map", label: "Sniper boundary", icon: "sniper", color: "#ff2020" },
+    { id: "container-cache", group: "Loot", label: "Cache", icon: "box", color: "#9a8866" },
+    { id: "container-ammo", group: "Loot", label: "Ammo box", icon: "bullet", color: "#9a8866" },
+    { id: "container-grenade", group: "Loot", label: "Grenade box", icon: "grenade", color: "#9a8866" },
+    { id: "container-weapon", group: "Loot", label: "Weapon box", icon: "weapon", color: "#9a8866" },
+    { id: "container-register", group: "Loot", label: "Cash register", icon: "cash", color: "#9a8866" },
+    { id: "container-body", group: "Loot", label: "Dead body", icon: "body", color: "#9a8866" },
+    { id: "container-jacket", group: "Loot", label: "Jacket", icon: "jacket", color: "#9a8866" },
+    { id: "container-drawer", group: "Loot", label: "Drawer", icon: "drawer", color: "#9a8866" },
+    { id: "container-bag", group: "Loot", label: "Sports bag", icon: "bag", color: "#9a8866" },
+    { id: "container-suitcase", group: "Loot", label: "Suitcase", icon: "suitcase", color: "#9a8866" },
+    { id: "container-crate", group: "Loot", label: "Wooden crate", icon: "box", color: "#9a8866" },
+    { id: "container-toolbox", group: "Loot", label: "Toolbox", icon: "tools", color: "#9a8866" },
+    { id: "container-pc", group: "Loot", label: "PC block", icon: "pc", color: "#9a8866" },
+    { id: "container-medcase", group: "Loot", label: "Medcase", icon: "med", color: "#9a8866" },
+    { id: "container-medbag", group: "Loot", label: "Medbag", icon: "med", color: "#9a8866" },
+    { id: "container-safe", group: "Loot", label: "Safe", icon: "safe", color: "#9a8866" },
+    { id: "container-stash", group: "Loot", label: "Shturman's stash", icon: "box", color: "#9a8866" },
+    { id: "container-technical", group: "Loot", label: "Technical supply crate", icon: "tools", color: "#9a8866" },
+    { id: "container-medical", group: "Loot", label: "Medical supply crate", icon: "med", color: "#9a8866" },
+    { id: "container-ration", group: "Loot", label: "Ration supply crate", icon: "box", color: "#9a8866" },
+    { id: "container-other", group: "Loot", label: "Other container", icon: "box", color: "#9a8866" },
+    { id: "loose-item", group: "Loot", label: "Loose item", icon: "item", color: "#9a8866" },
+    { id: "battle-pass", group: "Loot", label: "Battle Pass", icon: "star", color: "#ff2727" }
   ];
   const LAYER_BY_ID = new Map(LAYERS.map(layer => [layer.id, layer]));
   const CONTAINER_LAYER_BY_TYPE = {
@@ -118,8 +118,8 @@
     "content", "leftPanel", "layerDrawer", "layerList", "layersToggle", "mapSearch", "mapSearchResults", "markerDataStatus",
     "selectedItem", "questDrawer", "questList", "questSearch", "questStatus", "floorButtons", "mapViewport",
     "mapWorld", "svgHost", "markerLayer", "mapStatus", "requirementsPanel", "requirementsHandle",
-    "requirementsList", "pinCount", "wallToggle", "markerMode", "panelPosition", "questToggle",
-    "rulerToggle", "measurementLayer", "rulerReadout", "markerPopup", "hidePanels", "fullScreen",
+    "requirementsList", "pinCount", "wallToggle", "markerMode", "panelPosition", "questToggle", "pinnedToggle", "pinnedDrawer", "questCount",
+    "rulerToggle", "measurementLayer", "rulerReadout", "markerPopup", "hidePanels", "fullScreen", "whereAmI", "coordinatesReadout", "mapHelp",
     "zoomIn", "zoomOut", "zoomReset", "progressToggle", "floorEditToggle", "progressDialog", "progressForm", "useProgress",
     "questFilterButtons", "gameEdition", "playerFaction", "playerLevel", "traderLevels", "resetProgress",
     "saveProgress", "questFilterSummary", "squadToggle", "squadCount", "squadDialog", "squadForm",
@@ -131,6 +131,10 @@
 
   function post(action, data = {}) {
     if (window.chrome?.webview) window.chrome.webview.postMessage(JSON.stringify({ action, ...data }));
+  }
+
+  function iconSvg(name, className = "marker-icon") {
+    return `<svg class="${className}" viewBox="0 0 32 32" aria-hidden="true"><use href="#icon-${escapeHtml(name)}"></use></svg>`;
   }
 
   function normalizeMapKey(key) {
@@ -196,6 +200,7 @@
       } else throw new Error("No public map artwork is configured");
       layoutMapWorld();
       applyFloor();
+      applyMonochromePalette();
       applyWallPalette();
       renderQuests();
       renderLayerList();
@@ -318,6 +323,7 @@
     const fragment = document.createDocumentFragment();
     const visible = mapQuests().filter(quest => questMatchesFilter(quest) && questAvailable(quest) &&
       (!query || quest.name.toLowerCase().includes(query)));
+    if (el.questCount) el.questCount.textContent = `(${visible.length})`;
     el.questFilterSummary.textContent = `${state.progress.filter[0].toUpperCase()}${state.progress.filter.slice(1)} · ${visible.length} quests${state.progress.useProgress ? " · available now" : ""}`;
     for (const quest of visible) {
       const completed = state.progress.completedQuests.has(String(quest.id));
@@ -449,6 +455,40 @@
     }
   }
 
+  function grayscaleColor(value) {
+    return String(value).replace(/((?:fill|stroke|color)\s*:\s*)(red|blue|green|yellow|orange|purple|brown|cyan|magenta|lime|navy|teal|maroon|olive)/gi, "$1#777777").replace(/#[0-9a-f]{6}(?:[0-9a-f]{2})?/gi, color => {
+      const r = parseInt(color.slice(1, 3), 16), g = parseInt(color.slice(3, 5), 16), b = parseInt(color.slice(5, 7), 16);
+      const y = Math.max(18, Math.min(220, Math.round(.2126 * r + .7152 * g + .0722 * b)));
+      const hex = y.toString(16).padStart(2, "0");
+      return `#${hex}${hex}${hex}${color.length === 9 ? color.slice(7) : ""}`;
+    }).replace(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)([^)]*)\)/gi, (_, r, g, b, rest) => {
+      const y = Math.max(18, Math.min(220, Math.round(.2126 * Number(r) + .7152 * Number(g) + .0722 * Number(b))));
+      return `rgb${rest ? "a" : ""}(${y},${y},${y}${rest})`;
+    });
+  }
+
+  function applyMonochromePalette() {
+    const svg = el.svgHost.querySelector("svg");
+    if (!svg || svg.dataset.monochrome === "true") return;
+    for (const style of svg.querySelectorAll("style")) style.textContent = grayscaleColor(style.textContent);
+    for (const node of svg.querySelectorAll("[fill],[stroke],[style]")) {
+      if (node.hasAttribute("fill")) node.setAttribute("fill", /^(red|blue|green|yellow|orange|purple|brown|cyan|magenta|lime|navy|teal|maroon|olive)$/i.test(node.getAttribute("fill").trim()) ? "#777777" : grayscaleColor(node.getAttribute("fill")));
+      if (node.hasAttribute("stroke")) node.setAttribute("stroke", /^(red|blue|green|yellow|orange|purple|brown|cyan|magenta|lime|navy|teal|maroon|olive)$/i.test(node.getAttribute("stroke").trim()) ? "#777777" : grayscaleColor(node.getAttribute("stroke")));
+      if (node.hasAttribute("style")) node.setAttribute("style", grayscaleColor(node.getAttribute("style")));
+    }
+    const danger = document.createElementNS("http://www.w3.org/2000/svg", "style");
+    danger.id = "eft-danger-palette";
+    danger.textContent = `
+      .danger,.danger_small,#Minefield,#Mines,#mines,[id*="mine" i] { color:#ff2020 !important; opacity:1 !important; }
+      .danger path,.danger polygon,.danger polyline,.danger circle,.danger rect,
+      .danger_small path,.danger_small polygon,.danger_small polyline,.danger_small circle,.danger_small rect,
+      #Minefield path,#Minefield polygon,#Mines path,#Mines polygon,#mines path,#mines polygon,
+      [id*="mine" i] path,[id*="mine" i] polygon { fill:#b71919 !important; stroke:#ff2727 !important; }
+    `;
+    svg.append(danger);
+    svg.dataset.monochrome = "true";
+  }
+
   function applyWallPalette() {
     const svg = el.svgHost.querySelector("svg");
     if (!svg) return;
@@ -495,13 +535,49 @@
   function spawnLayerIds(spawn) {
     const categories = new Set(spawn.categories || []);
     const sides = new Set(spawn.sides || []);
+    const isZone = /^zone/i.test(String(spawn.name || ""));
     const layers = [];
     if (categories.has("sniper")) layers.push("spawn-sniper");
     if (categories.has("botpmc")) layers.push("spawn-aipmc");
-    if (categories.has("player") || (!categories.size && sides.has("pmc"))) layers.push("spawn-pmc");
-    if (categories.has("bot") || sides.has("scav")) layers.push("spawn-scav");
+    if (!isZone && (categories.has("player") || sides.has("pmc") || sides.has("all"))) layers.push("spawn-pmc");
+    if (isZone && (categories.has("bot") || sides.has("scav"))) layers.push("spawn-scav");
     if (!layers.length && sides.has("pmc")) layers.push("spawn-pmc");
     return [...new Set(layers)];
+  }
+
+  function representativeSpawns() {
+    const source = state.mapMarkers?.spawns || [];
+    const named = new Map();
+    const clustered = [];
+    const spanX = Math.abs(Number(state.map?.bounds?.[0]?.[0]) - Number(state.map?.bounds?.[1]?.[0]));
+    const spanZ = Math.abs(Number(state.map?.bounds?.[0]?.[1]) - Number(state.map?.bounds?.[1]?.[1]));
+    const radius = Math.max(6, Math.max(spanX, spanZ) / 33);
+    for (const spawn of source) {
+      const layers = spawnLayerIds(spawn);
+      if (!layers.length) continue;
+      const position = readPosition(spawn.position);
+      const layerKey = layers.join("|");
+      if (/^zone/i.test(String(spawn.name || ""))) {
+        const key = String(spawn.name);
+        const group = named.get(key) || { ...spawn, layers: [], total: { x: 0, y: 0, z: 0 }, count: 0 };
+        group.layers = [...new Set([...group.layers, ...layers])];
+        group.total.x += position.x; group.total.y += position.y; group.total.z += position.z; group.count++;
+        named.set(key, group);
+        continue;
+      }
+      let group = clustered.find(candidate => candidate.layerKey === layerKey && Math.hypot(position.x - candidate.anchor.x, position.z - candidate.anchor.z) <= radius);
+      if (!group) {
+        group = { ...spawn, layers, layerKey, anchor: { ...position }, total: { ...position }, count: 1 };
+        clustered.push(group);
+      } else {
+        group.total.x += position.x; group.total.y += position.y; group.total.z += position.z; group.count++;
+      }
+    }
+    return [...named.values(), ...clustered].map(group => ({
+      ...group,
+      position: [group.total.x / group.count, group.total.y / group.count, group.total.z / group.count],
+      _layerIds: group.layers
+    }));
   }
 
   function bossLayerId(boss) {
@@ -531,8 +607,8 @@
     if (!map) return counts;
     for (const extract of map.extracts || []) for (const layerId of extractLayerIds(extract)) counts[layerId]++;
     counts.transit = map.transits?.length || 0;
-    for (const spawn of map.spawns || []) {
-      for (const layerId of spawnLayerIds(spawn)) counts[layerId]++;
+    for (const spawn of representativeSpawns()) {
+      for (const layerId of spawn._layerIds) counts[layerId]++;
     }
     for (const boss of map.bosses || []) counts[bossLayerId(boss)]++;
     for (const lock of map.locks || []) for (const layerId of lockLayerIds(lock)) counts[layerId]++;
@@ -557,7 +633,10 @@
       const section = document.createElement("section");
       section.className = "layer-group";
       const heading = document.createElement("h3");
-        heading.textContent = t(groupName);
+      heading.innerHTML = `<span class="collapse-glyph">−/+</span><span>${escapeHtml(t(groupName))}</span>`;
+      heading.tabIndex = 0;
+      heading.addEventListener("click", () => section.classList.toggle("collapsed"));
+      heading.addEventListener("keydown", event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); section.classList.toggle("collapsed"); } });
       section.append(heading);
       for (const layer of LAYERS.filter(candidate => candidate.group === groupName)) {
         const label = document.createElement("label");
@@ -568,9 +647,9 @@
         checkbox.disabled = counts[layer.id] === 0;
         checkbox.addEventListener("change", () => toggleLayer(layer.id, checkbox.checked));
         const swatch = document.createElement("span");
-        swatch.className = "layer-swatch";
-        swatch.classList.add(`layer-swatch-${layer.id}`);
+        swatch.className = "layer-icon-wrap";
         swatch.style.setProperty("--marker-color", layer.color);
+        swatch.innerHTML = iconSvg(layer.icon, "layer-icon");
         const name = document.createElement("span");
         name.textContent = t(layer.label);
         const count = document.createElement("small");
@@ -601,7 +680,7 @@
     }
     const id = state.focusedItemId;
     el.selectedItem.hidden = false;
-    el.selectedItem.innerHTML = `<div class="selected-item-row"><span class="item-icon-placeholder" aria-hidden="true">I</span><div><strong>${escapeHtml(markerItemName(id))}</strong><small>Loose item locations</small></div><button type="button" aria-label="Clear item overlay">×</button></div>`;
+    el.selectedItem.innerHTML = `<div class="selected-item-row"><span class="item-icon-placeholder" aria-hidden="true">${iconSvg("item")}</span><div><strong>${escapeHtml(markerItemName(id))}</strong><small>Loose item locations</small></div><button type="button" aria-label="Clear item overlay">×</button></div>`;
     el.selectedItem.querySelector("button").addEventListener("click", clearFocusedItem);
   }
 
@@ -690,7 +769,7 @@
   }
 
   function showMarkerPopup(details) {
-    const image = details.itemId ? `<span class="item-icon-placeholder" aria-hidden="true">I</span>` : "";
+    const image = details.itemId ? `<span class="item-icon-placeholder" aria-hidden="true">${iconSvg("item")}</span>` : "";
     el.markerPopup.innerHTML = `<div class="marker-popup-head"><strong>${escapeHtml(details.title)}</strong><button type="button" aria-label="Close">×</button></div>${image}${details.body ? `<p>${escapeHtml(details.body)}</p>` : ""}<small>${escapeHtml(details.coordinates || "")}</small>`;
     el.markerPopup.hidden = false;
     el.markerPopup.querySelector("button").addEventListener("click", () => { el.markerPopup.hidden = true; });
@@ -722,7 +801,7 @@
     const button = document.createElement("button");
     button.type = "button";
     button.className = "map-marker-button";
-    button.textContent = layer.symbol;
+    button.innerHTML = iconSvg(layer.icon);
     button.setAttribute("aria-label", `${layer.label}: ${title}`);
     button.title = `${title}${body ? ` — ${body}` : ""}`;
     button.addEventListener("click", event => {
@@ -745,8 +824,8 @@
         extract.transferItem?.item || null);
     }
     for (const transit of map.transits || []) addMapMarker(fragment, "transit", transit.position, transit.name, "Transit extraction");
-    for (const spawn of map.spawns || []) {
-      const layerIds = spawnLayerIds(spawn);
+    for (const spawn of representativeSpawns()) {
+      const layerIds = spawn._layerIds;
       if (layerIds.length) addMapMarker(fragment, layerIds, spawn.position, layerIds.map(id => LAYER_BY_ID.get(id).label).join(" / "), (spawn.sides || []).join(", "));
     }
     for (const boss of map.bosses || []) {
@@ -813,6 +892,7 @@
           const dot = document.createElement("button");
           dot.type = "button";
           dot.className = "quest-dot";
+          dot.innerHTML = iconSvg("quest");
           dot.setAttribute("aria-label", marker.title);
           dot.addEventListener("click", () => focusRequirement(quest));
           marker.append(dot);
@@ -844,6 +924,7 @@
   }
 
   function focusRequirement(quest) {
+    showRightPanelPage("pinned");
     const card = el.requirementsList.querySelector(`[data-quest-id="${CSS.escape(String(quest.id))}"]`);
     card?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     if (card) {
@@ -1020,6 +1101,7 @@
     const values = [position.x, position.y, position.z, position.qx, position.qy, position.qz, position.qw].map(Number);
     if (values.some(v => !Number.isFinite(v))) return false;
     state.player = { x: values[0], y: values[1], z: values[2], qx: values[3], qy: values[4], qz: values[5], qw: values[6] };
+    if (el.coordinatesReadout) el.coordinatesReadout.textContent = `X ${values[0].toFixed(1)} · Y ${values[1].toFixed(1)} · Z ${values[2].toFixed(1)}`;
     renderMarkers();
     if (state.player && state.map && window.__eftAutoPan !== false) panToPlayer();
     return true;
@@ -1255,14 +1337,14 @@
     el.floorEditToggle.textContent = t("Floor editor");
     el.squadToggle.firstChild.textContent = `${t("Squad")} `; el.rulerToggle.textContent = t("Ruler");
     el.fullScreen.textContent = t("Full screen"); el.zoomReset.textContent = t("Fit");
-    const hidden = el.content.classList.contains("panels-hidden"); el.hidePanels.textContent = t(hidden ? "Show panels" : "Hide panels");
+    const hidden = el.content.classList.contains("panels-hidden"); el.hidePanels.textContent = state.language === "ko" ? t(hidden ? "Show panels" : "Hide panels") : (hidden ? "Show pannels" : "Hide pannels");
     setPanelPosition(state.panelPosition); setMarkerMode(state.markerMode); setWallColors(state.wallColors);
     renderLayerList();
   }
 
   function setPanelsHidden(hidden) {
     el.content.classList.toggle("panels-hidden", Boolean(hidden));
-    el.hidePanels.textContent = t(hidden ? "Show panels" : "Hide panels");
+    el.hidePanels.textContent = state.language === "ko" ? t(hidden ? "Show panels" : "Hide panels") : (hidden ? "Show pannels" : "Hide pannels");
     requestAnimationFrame(() => { layoutMapWorld(); resetView(); });
     return Boolean(hidden);
   }
@@ -1271,12 +1353,12 @@
     return setPanelsHidden(!el.content.classList.contains("panels-hidden"));
   }
 
-  function showLeftPanelPage(page) {
-    const showQuests = page === "quests";
-    el.layerDrawer.classList.toggle("open", !showQuests);
-    el.questDrawer.classList.toggle("open", showQuests);
-    el.layersToggle.classList.toggle("active", !showQuests);
-    el.questToggle.classList.toggle("active", showQuests);
+  function showRightPanelPage(page) {
+    const showPinned = page === "pinned";
+    el.questDrawer.classList.toggle("open", !showPinned);
+    el.pinnedDrawer.classList.toggle("open", showPinned);
+    el.questToggle.classList.toggle("active", !showPinned);
+    el.pinnedToggle.classList.toggle("active", showPinned);
   }
 
   function setPanelPosition(position) {
@@ -1449,17 +1531,15 @@
     panelDrag = null;
   });
 
-  el.layersToggle.addEventListener("click", () => {
-    showLeftPanelPage("overlays");
-  });
-  el.questToggle.addEventListener("click", () => {
-    showLeftPanelPage("quests");
-  });
+  el.layersToggle.addEventListener("click", () => el.layerDrawer.scrollTo({ top: 0, behavior: "smooth" }));
+  el.questToggle.addEventListener("click", () => showRightPanelPage("quests"));
+  el.pinnedToggle.addEventListener("click", () => showRightPanelPage("pinned"));
   el.mapSearch.addEventListener("input", renderSearchResults);
   el.questSearch.addEventListener("input", renderQuests);
   el.rulerToggle.addEventListener("click", () => setRuler(!state.rulerActive));
   el.hidePanels.addEventListener("click", togglePanels);
   el.fullScreen.addEventListener("click", () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen());
+  el.whereAmI.addEventListener("click", () => post("force-run"));
   el.wallToggle.addEventListener("click", () => { setWallColors(!state.wallColors); post("wall-colors-changed", { enabled: state.wallColors }); });
   el.markerMode.addEventListener("click", () => { const modes = ["arrows", "opacity", "both"]; setMarkerMode(modes[(modes.indexOf(state.markerMode) + 1) % modes.length]); post("marker-mode-changed", { mode: state.markerMode }); });
   el.panelPosition.addEventListener("click", () => { const positions = ["right", "bottom", "floating"]; setPanelPosition(positions[(positions.indexOf(state.panelPosition) + 1) % positions.length]); post("panel-position-changed", { position: state.panelPosition }); });

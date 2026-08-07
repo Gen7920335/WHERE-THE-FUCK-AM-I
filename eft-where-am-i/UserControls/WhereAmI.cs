@@ -1149,6 +1149,10 @@ namespace eft_where_am_i
                         await ToggleFloorEditModeAsync();
                         break;
 
+                    case "force-run":
+                        await CheckLocationAsync();
+                        break;
+
                     case "panel-position-changed":
                         appSettings.quest_panel_position = message["position"]?.ToString() ?? "right";
                         SaveSettings();
