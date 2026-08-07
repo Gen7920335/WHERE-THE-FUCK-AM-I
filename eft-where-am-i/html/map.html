@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -11,6 +11,9 @@
     <header class="map-toolbar" aria-label="Map controls">
       <button id="layersToggle" type="button" title="Map layers and item search">Layers</button>
       <button id="questToggle" type="button" title="Quest pins">Quests</button>
+      <button id="progressToggle" type="button">Progress</button>
+      <button id="squadToggle" type="button">Squad <span id="squadCount">0</span></button>
+      <button id="floorEditToggle" type="button">Floor editor</button>
       <button id="rulerToggle" type="button" aria-pressed="false">Ruler</button>
       <div id="floorButtons" class="floor-buttons" aria-label="Floors"></div>
       <span class="toolbar-spacer"></span>
@@ -26,10 +29,7 @@
 
     <section id="content" class="content panel-right">
       <aside id="layerDrawer" class="side-drawer layer-drawer" aria-label="Map layers">
-        <div class="drawer-header">
-          <strong>Map layers</strong>
-          <input id="mapSearch" type="search" placeholder="Search item, key, extract, boss…">
-        </div>
+        <div class="drawer-header"><strong>Map layers</strong><input id="mapSearch" type="search" placeholder="Search item, key, extract, boss…"></div>
         <div id="markerDataStatus" class="status">Loading map marker data…</div>
         <div id="selectedItem" class="selected-item" hidden></div>
         <div id="mapSearchResults" class="map-search-results"></div>
@@ -40,6 +40,7 @@
         <div class="drawer-header">
           <strong>Map quests</strong>
           <input id="questSearch" type="search" placeholder="Search quests">
+          <div id="questFilterSummary" class="filter-summary">All quests</div>
         </div>
         <div id="questStatus" class="status">Loading quest data…</div>
         <div id="questList" class="quest-list"></div>
@@ -57,16 +58,58 @@
       </section>
 
       <aside id="requirementsPanel" class="requirements-panel" aria-label="Pinned quest requirements">
-        <div id="requirementsHandle" class="requirements-header">
-          <strong>Pinned quest requirements</strong>
-          <span id="pinCount" class="pin-count">0</span>
-        </div>
-        <div id="requirementsList" class="requirements-list">
-          <p class="empty-state">Pin a quest to show only its requirements here.</p>
-        </div>
+        <div id="requirementsHandle" class="requirements-header"><strong>Pinned quest requirements</strong><span id="pinCount" class="pin-count">0</span></div>
+        <div id="requirementsList" class="requirements-list"><p class="empty-state">Pin a quest to show only its requirements here.</p></div>
       </aside>
     </section>
   </main>
+
+  <dialog id="progressDialog" class="settings-dialog">
+    <form method="dialog" class="dialog-card" id="progressForm">
+      <header><strong>Quest progress</strong><button value="cancel" aria-label="Close">×</button></header>
+      <label class="toggle-row"><input id="useProgress" type="checkbox"> Use my progress to show available quests</label>
+      <div class="segmented" id="questFilterButtons"><button type="button" data-filter="story">Story</button><button type="button" data-filter="kappa">Kappa</button><button type="button" data-filter="all">All</button></div>
+      <div class="form-grid">
+        <label>Game edition<select id="gameEdition"><option value="standard">Standard</option><option value="left-behind">Left Behind</option><option value="prepare-for-escape">Prepare for Escape</option><option value="edge-of-darkness">Edge of Darkness</option><option value="the-unheard">The Unheard</option><option value="eod-unheard">EOD + The Unheard</option></select></label>
+        <label>Faction<select id="playerFaction"><option value="Any">Any</option><option value="USEC">USEC</option><option value="BEAR">BEAR</option></select></label>
+        <label>Player level<input id="playerLevel" type="number" min="1" max="100" value="1"></label>
+      </div>
+      <section><strong>Trader loyalty levels</strong><div id="traderLevels" class="trader-grid"></div></section>
+      <p class="dialog-help">Mark quests complete from the quest list. Progress is stored locally in this app.</p>
+      <footer><button id="resetProgress" type="button">Reset completed</button><button id="saveProgress" value="default">Save</button></footer>
+    </form>
+  </dialog>
+
+  <dialog id="squadDialog" class="settings-dialog">
+    <form method="dialog" class="dialog-card" id="squadForm">
+      <header><strong>Squad connection</strong><button value="cancel" aria-label="Close">×</button></header>
+      <div class="form-grid">
+        <label>Mode<select id="squadMode"><option value="off">Off</option><option value="lan">LAN</option><option value="host">Host</option><option value="client">Client</option></select></label>
+        <label>Name<input id="squadName" maxlength="32" value="Player"></label>
+        <label>UDP port<input id="squadPort" type="number" min="1024" max="65535" value="38473"></label>
+      </div>
+      <div class="form-grid">
+        <label id="squadRoomLabel">LAN room<input id="squadRoom" maxlength="64" value="eft-local"></label>
+        <label id="squadHostLabel">Host IP or DNS<input id="squadHost" maxlength="255" placeholder="203.0.113.10"></label>
+        <label id="squadPasswordLabel">Password<span class="password-row"><input id="squadPassword" type="password" minlength="8" maxlength="128" autocomplete="new-password"><button id="generateSquadPassword" type="button">Generate</button></span></label>
+      </div>
+      <p id="squadHelp" class="dialog-help"></p>
+      <p id="squadStatus" class="squad-status" data-state="off">Squad sharing is off.</p>
+      <div id="squadMembers" class="member-list">No squad members online.</div>
+      <footer><button id="saveSquad" value="default">Save</button></footer>
+    </form>
+  </dialog>
+
+  <aside id="floorEditorPanel" class="floor-editor" hidden>
+    <header><strong>Floor zone editor</strong><button id="floorEditorExit" type="button">×</button></header>
+    <p>Click the map to draw a zone in EFT world X/Z coordinates.</p>
+    <label>Name<input id="floorZoneName" value="Zone"></label>
+    <label>Floor<select id="floorZoneFloor"></select></label>
+    <div class="form-grid"><label>Height min<input id="floorZoneMin" type="number" step="0.1" value="-100"></label><label>Height max<input id="floorZoneMax" type="number" step="0.1" value="100"></label></div>
+    <div class="editor-actions"><button id="floorUndo" type="button">Undo point</button><button id="floorComplete" type="button">Complete zone</button><button id="floorDelete" type="button">Delete last</button></div>
+    <div id="floorEditorStatus" class="dialog-help">0 zones · 0 points</div>
+    <button id="floorSave" type="button">Save zones</button>
+  </aside>
   <script src="map.js"></script>
 </body>
 </html>

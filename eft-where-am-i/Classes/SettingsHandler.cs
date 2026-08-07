@@ -311,8 +311,24 @@ namespace eft_where_am_i.Classes
         public Dictionary<string, bool> panel_hidden_per_map { get; set; } = new Dictionary<string, bool>();
         public double ui_scale { get; set; } = 1.0;
         public string quest_panel_position { get; set; } = "right";
+        public double quest_panel_offset_x { get; set; } = -1;
+        public double quest_panel_offset_y { get; set; } = -1;
         public string quest_floor_marker_mode { get; set; } = "arrows";
         public bool tarkov_wall_colors { get; set; } = false;
+        public List<string> map_visible_layers { get; set; } = new List<string> { "extract-pmc", "extract-scav", "extract-coop", "transit" };
+        public bool map_use_progress { get; set; } = false;
+        public string map_quest_filter { get; set; } = "all";
+        public string game_edition { get; set; } = "standard";
+        public string player_faction { get; set; } = "Any";
+        public int player_level { get; set; } = 1;
+        public Dictionary<string, int> trader_levels { get; set; } = new Dictionary<string, int>();
+        public List<string> completed_quests { get; set; } = new List<string>();
+        public bool squad_enabled { get; set; } = false;
+        public string squad_mode { get; set; } = "off";
+        public string squad_name { get; set; } = "Player";
+        public string squad_room { get; set; } = "eft-local";
+        public string squad_host { get; set; } = string.Empty;
+        public int squad_port { get; set; } = 38473;
         public string update_feed_url { get; set; } = string.Empty;
     }
 }

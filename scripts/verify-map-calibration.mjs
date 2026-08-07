@@ -32,7 +32,7 @@ try {
 } catch {
   // The reference checkout is intentionally ignored and is not present in clean CI jobs.
 }
-const sourceNames = { streets: "streets-of-tarkov", "ground-zero": "ground-zero", lab: "the-lab" };
+const sourceNames = { streets: "streets-of-tarkov", "ground-zero": "ground-zero", lab: "the-lab", labyrinth: "the-labyrinth" };
 let maxError = 0;
 
 for (const [key, map] of Object.entries(maps)) {

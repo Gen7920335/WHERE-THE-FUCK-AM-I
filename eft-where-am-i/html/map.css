@@ -18,7 +18,8 @@
 * { box-sizing: border-box; }
 html, body, #app { width: 100%; height: 100%; margin: 0; overflow: hidden; }
 body { background: var(--bg); color: var(--text); font: var(--font-size)/1.35 "Segoe UI", sans-serif; }
-button, input { font: inherit; }
+button, input, select { font: inherit; }
+input, select { border: 1px solid var(--line); border-radius: 5px; padding: 7px 9px; color: var(--text); background: #0f1518; }
 button {
   border: 1px solid var(--line);
   border-radius: calc(5px * var(--ui-scale));
@@ -56,6 +57,8 @@ button:hover, button.active, button[aria-pressed="true"] { border-color: var(--a
 .map-world { position: absolute; inset: 0; transform-origin: 0 0; will-change: transform; }
 .svg-host, .marker-layer, .measurement-layer { position: absolute; inset: 0; width: 100%; height: 100%; }
 .svg-host svg { display: block; width: 100%; height: 100%; }
+.tile-grid { display: grid; grid-template-columns: repeat(var(--tile-count), 1fr); width: 100%; height: 100%; background: #0a0f11; }
+.tile-grid img { display: block; width: 100%; height: 100%; object-fit: fill; image-rendering: auto; }
 .marker-layer { pointer-events: none; }
 .measurement-layer { z-index: 9; pointer-events: none; overflow: visible; }
 .measurement-line { stroke: #ffd166; stroke-width: .35; stroke-dasharray: 1.2 .8; vector-effect: non-scaling-stroke; }
@@ -96,6 +99,12 @@ button:hover, button.active, button[aria-pressed="true"] { border-color: var(--a
 .layer-row { display: grid; grid-template-columns: auto 18px 1fr auto; gap: 7px; align-items: center; padding: 7px 9px; border-top: 1px solid #253137; cursor: pointer; }
 .layer-row:hover, .search-result:hover { background: rgba(255,255,255,.04); }
 .layer-swatch { width: 13px; height: 13px; border-radius: 50%; background: var(--marker-color); box-shadow: 0 0 0 1px rgba(255,255,255,.65); }
+.layer-swatch-battle-pass {
+  border-radius: 0;
+  background: #ff2727;
+  clip-path: polygon(50% 0, 61% 37%, 100% 50%, 61% 63%, 50% 100%, 39% 63%, 0 50%, 39% 37%);
+  box-shadow: 0 0 5px rgba(255,39,39,.95);
+}
 .layer-count { color: var(--muted); font-variant-numeric: tabular-nums; }
 .selected-item { margin: 9px; padding: 9px; border: 1px solid var(--accent); border-radius: 6px; background: #151c1f; }
 .selected-item-row { display: grid; grid-template-columns: 42px 1fr auto; gap: 8px; align-items: center; }
@@ -108,6 +117,12 @@ button:hover, button.active, button[aria-pressed="true"] { border-color: var(--a
 .quest-row { display: flex; gap: 8px; align-items: flex-start; padding: 8px 4px; border-bottom: 1px solid #27343a; cursor: pointer; }
 .quest-row:hover { background: rgba(255,255,255,.035); }
 .quest-row small { display: block; color: var(--muted); }
+.quest-row.completed strong { text-decoration: line-through; color: var(--muted); }
+.quest-row.unavailable { opacity: .58; }
+.quest-row .quest-copy { min-width: 0; flex: 1; }
+.quest-complete { flex: 0 0 auto; padding: 2px 6px; font-size: .78em; }
+.quest-complete.done { color: var(--success); border-color: var(--success); }
+.filter-summary { color: var(--muted); font-size: .84em; }
 
 .requirements-panel { min-width: 0; min-height: 0; background: var(--panel); border-left: 1px solid var(--line); overflow: auto; z-index: 30; }
 .panel-bottom .requirements-panel { border-left: 0; border-top: 1px solid var(--line); }
@@ -143,6 +158,10 @@ button:hover, button.active, button[aria-pressed="true"] { border-color: var(--a
 
 .map-marker { z-index: 10; }
 .map-marker.off-level { opacity: .28; }
+.map-marker.edge-clamped .map-marker-button {
+  border-style: dashed;
+  box-shadow: 0 0 0 2px rgba(255,90,90,.5), 0 1px 6px #000;
+}
 .map-marker-button {
   display: grid;
   place-items: center;
@@ -159,6 +178,18 @@ button:hover, button.active, button[aria-pressed="true"] { border-color: var(--a
   font-weight: 900;
 }
 .map-marker.item-focused .map-marker-button { width: calc(27px * var(--ui-scale)); height: calc(27px * var(--ui-scale)); animation: marker-pulse 1.4s infinite; }
+.map-marker.layer-battle-pass { z-index: 11; }
+.map-marker.layer-battle-pass .map-marker-button {
+  width: calc(10.5px * var(--ui-scale));
+  height: calc(10.5px * var(--ui-scale));
+  border: 0;
+  border-radius: 0;
+  color: transparent;
+  background: #ff2727;
+  clip-path: polygon(50% 0, 61% 37%, 100% 50%, 61% 63%, 50% 100%, 39% 63%, 0 50%, 39% 37%);
+  box-shadow: 0 0 calc(5px * var(--ui-scale)) rgba(255,39,39,.95);
+}
+.map-marker.layer-battle-pass.off-level { opacity: .38; }
 @keyframes marker-pulse { 50% { box-shadow: 0 0 0 6px rgba(255,209,102,.22), 0 1px 7px #000; } }
 .squad-marker { z-index: 19; display: grid; place-items: center; width: calc(24px * var(--ui-scale)); height: calc(24px * var(--ui-scale)); border: 2px solid white; border-radius: 4px; background: #b86bff; color: white; font-size: calc(9px * var(--ui-scale)); font-weight: 800; }
 .marker-popup, .ruler-readout {
@@ -177,6 +208,42 @@ button:hover, button.active, button[aria-pressed="true"] { border-color: var(--a
 .marker-popup small { color: var(--muted); }
 .ruler-readout { top: calc(12px * var(--ui-scale)); color: #ffe29a; pointer-events: none; }
 .map-viewport.ruler-active { cursor: crosshair; }
+
+.settings-dialog { width: min(610px, 92vw); max-height: 88vh; padding: 0; border: 1px solid var(--line); border-radius: 9px; color: var(--text); background: var(--panel); box-shadow: 0 20px 70px #000; }
+.settings-dialog::backdrop { background: rgba(0,0,0,.62); }
+.dialog-card { display: grid; gap: 14px; padding: 16px; }
+.dialog-card > header, .floor-editor > header { display: flex; align-items: center; justify-content: space-between; font-size: 1.08em; }
+.dialog-card > header button, .floor-editor > header button { padding: 1px 8px; font-size: 1.25em; }
+.dialog-card label, .floor-editor label { display: grid; gap: 5px; color: #cbd3d7; }
+.toggle-row { display: flex !important; align-items: center; gap: 8px !important; }
+.segmented { display: grid; grid-template-columns: repeat(3, 1fr); }
+.segmented button { border-radius: 0; }
+.segmented button:first-child { border-radius: 5px 0 0 5px; }
+.segmented button:last-child { border-radius: 0 5px 5px 0; }
+.segmented button.active { background: #564b31; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: 10px; }
+.trader-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 7px; margin-top: 7px; }
+.trader-level { display: flex; align-items: center; justify-content: space-between; gap: 7px; padding: 5px 7px; border: 1px solid #2d3a40; border-radius: 5px; }
+.trader-level select { padding: 3px 5px; }
+.dialog-help { margin: 0; color: var(--muted); font-size: .86em; }
+.password-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
+.password-row button { padding-inline: 9px; }
+#squadRoomLabel[hidden], #squadHostLabel[hidden], #squadPasswordLabel[hidden] { display: none; }
+.squad-status { margin: 0; padding: 8px 9px; border: 1px solid #334149; border-radius: 5px; color: var(--muted); background: rgba(255,255,255,.025); font-size: .86em; }
+.squad-status[data-state="connected"] { border-color: #387d57; color: #83dfa5; }
+.squad-status[data-state="listening"], .squad-status[data-state="connecting"] { border-color: #8a7135; color: #f1ce74; }
+.squad-status[data-state="error"] { border-color: #8e3e45; color: #ff919b; }
+.dialog-card footer { display: flex; justify-content: flex-end; gap: 8px; }
+.member-list { min-height: 42px; padding: 9px; border: 1px solid #2d3a40; border-radius: 5px; color: var(--muted); }
+
+.floor-editor { position: fixed; z-index: 80; top: calc(var(--toolbar-height) + 12px); right: 12px; width: min(340px, 90vw); display: grid; gap: 9px; padding: 13px; border: 1px solid var(--accent); border-radius: 8px; background: rgba(20,28,32,.98); box-shadow: 0 12px 40px #000; }
+.floor-editor[hidden] { display: none; }
+.floor-editor p { margin: 0; color: var(--muted); }
+.editor-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+.floor-zone-shape { fill: rgba(73,176,255,.13); stroke: #49b0ff; stroke-width: .35; stroke-dasharray: 1 .6; vector-effect: non-scaling-stroke; }
+.floor-zone-current { fill: rgba(255,209,102,.12); stroke: #ffd166; stroke-width: .45; vector-effect: non-scaling-stroke; }
+.floor-zone-point { fill: #ffd166; stroke: #101416; stroke-width: .22; vector-effect: non-scaling-stroke; }
+.map-viewport.floor-editing { cursor: crosshair; }
 
 @media (max-width: 860px) {
   .content.panel-right { grid-template-columns: 1fr; grid-template-rows: 1fr minmax(170px, 28%); }

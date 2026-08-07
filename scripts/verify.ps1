@@ -10,6 +10,7 @@ Set-StrictMode -Version Latest
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $ProjectDir = Join-Path $RepoRoot "eft-where-am-i"
 $ProjectFile = Join-Path $ProjectDir "eft-where-am-i.csproj"
+$SquadSmokeProject = Join-Path $RepoRoot "tests\SquadSyncSmoke\SquadSyncSmoke.csproj"
 
 if (-not (Test-Path -LiteralPath (Join-Path $RepoRoot ".tools\dotnet\dotnet.exe"))) {
     & (Join-Path $PSScriptRoot "bootstrap.ps1")
@@ -41,11 +42,18 @@ Write-Host "Checking map JavaScript and three-anchor calibration..."
 Assert-LastExitCode "map.js syntax check"
 & $NodeExe (Join-Path $RepoRoot "scripts\verify-map-calibration.mjs")
 Assert-LastExitCode "map calibration check"
+& $NodeExe (Join-Path $RepoRoot "scripts\verify-map-features.mjs")
+Assert-LastExitCode "map feature coverage check"
+& $NodeExe (Join-Path $RepoRoot "scripts\verify-upstream-parity.mjs")
+Assert-LastExitCode "upstream feature parity check"
+& $NodeExe (Join-Path $RepoRoot "scripts\audit-battle-pass-coordinates.mjs")
+Assert-LastExitCode "Battle Pass coordinate audit"
 
 Write-Host "Validating JSON assets..."
 @(
     (Join-Path $ProjectDir "assets\settings.json"),
     (Join-Path $ProjectDir "floor_db.json"),
+    (Join-Path $ProjectDir "html\battle-pass-locations.json"),
     (Join-Path $ProjectDir "html\map-markers.json"),
     (Join-Path $ProjectDir "html\quest-locations.json"),
     (Join-Path $ProjectDir "translations\en.json"),
@@ -60,6 +68,10 @@ Assert-LastExitCode "dotnet restore"
 & $DotnetExe build $ProjectFile -c $Configuration --no-restore
 Assert-LastExitCode "dotnet build"
 
+Write-Host "Running encrypted direct squad loopback test..."
+& $DotnetExe run --project $SquadSmokeProject -c $Configuration
+Assert-LastExitCode "direct squad smoke test"
+
 $OutputDir = Join-Path $ProjectDir "bin\$Configuration\net10.0-windows"
 @(
     "EFT-Where-Am-I.exe",
@@ -69,6 +81,7 @@ $OutputDir = Join-Path $ProjectDir "bin\$Configuration\net10.0-windows"
     "html\map.css",
     "html\map.html",
     "html\map.js",
+    "html\battle-pass-locations.json",
     "html\map-markers.json",
     "html\panel.html",
     "html\quest-locations.json",

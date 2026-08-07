@@ -3,10 +3,11 @@
 
   const QUEST_DATA_URL = "quest-locations.json";
   const MARKER_DATA_URL = "map-markers.json";
+  const BATTLE_PASS_DATA_URL = "battle-pass-locations.json";
   const SVG_ROOT = "https://assets.tarkov.dev/maps/svg";
   const MAPS = {
     factory: { dataKey: "factory", id: 0, tdevId: "55f2d3fd4bdc2d5f408b4567", svg: "Factory.svg", floors: ["Basement", "Ground_Floor", "Second_Floor", "Third_Floor"], defaultFloor: "Ground_Floor", rotation: 90, bounds: [[77, -64.5], [-65.5, 67.4]], anchors: [{ world: [77, 67.4], map: [0, 0] }, { world: [77, -64.5], map: [100, 0] }, { world: [-65.5, 67.4], map: [0, 100] }] },
-    customs: { dataKey: "customs", id: 1, tdevId: "56f40101d2720b2a4d8b45d6", svg: "Customs.svg", floors: ["Ground_Level", "Underground_Level", "Second_Floor", "Third_Floor"], defaultFloor: "Ground_Level", rotation: 180, bounds: [[698, -307], [-372, 237]], anchors: [{ world: [698, -307], map: [0, 0] }, { world: [-372, -307], map: [100, 0] }, { world: [698, 237], map: [0, 100] }] },
+    customs: { dataKey: "customs", id: 1, tdevId: "56f40101d2720b2a4d8b45d6", svg: "Customs.svg", floors: ["Underground_Level", "Ground_Level", "Second_Floor", "Third_Floor"], defaultFloor: "Ground_Level", rotation: 180, bounds: [[698, -307], [-372, 237]], anchors: [{ world: [698, -307], map: [0, 0] }, { world: [-372, -307], map: [100, 0] }, { world: [698, 237], map: [0, 100] }] },
     woods: { dataKey: "woods", id: 2, tdevId: "5704e3c2d2720bac5b8b4567", svg: "Woods.svg", floors: ["Ground_Level"], defaultFloor: "Ground_Level", rotation: 180, bounds: [[646, -914], [-761, 442]], anchors: [{ world: [646, -914], map: [0, 0] }, { world: [-761, -914], map: [100, 0] }, { world: [646, 442], map: [0, 100] }] },
     shoreline: { dataKey: "shoreline", id: 3, tdevId: "5704e554d2720bac5b8b456e", svg: "Shoreline.svg", floors: ["Underground_Level", "Ground_Level", "Second_Floor", "Third_Floor"], defaultFloor: "Ground_Level", rotation: 180, bounds: [[504, -415], [-1056, 618]], anchors: [{ world: [504, -415], map: [0, 0] }, { world: [-1056, -415], map: [100, 0] }, { world: [504, 618], map: [0, 100] }] },
     interchange: { dataKey: "interchange", id: 4, tdevId: "5714dbc024597771384a510d", svg: "Interchange.svg", floors: ["Ground_Level", "First_Floor", "Second_Floor"], defaultFloor: "Ground_Level", rotation: 180, bounds: [[598, -442], [-433, 426]], anchors: [{ world: [598, -442], map: [0, 0] }, { world: [-433, -442], map: [100, 0] }, { world: [598, 426], map: [0, 100] }] },
@@ -14,7 +15,10 @@
     reserve: { dataKey: "reserve", id: 6, tdevId: "5704e5fad2720bc05b8b4567", svg: "Reserve.svg", floors: ["Bunkers", "Ground_Level"], defaultFloor: "Ground_Level", rotation: 180, bounds: [[289, -274], [-303, 272]], anchors: [{ world: [289, -274], map: [0, 0] }, { world: [-303, -274], map: [100, 0] }, { world: [289, 272], map: [0, 100] }] },
     lighthouse: { dataKey: "lighthouse", id: 7, tdevId: "5704e4dad2720bb55b8b4567", svg: "Lighthouse.svg", floors: ["Ground_Level"], defaultFloor: "Ground_Level", rotation: 180, bounds: [[515, -998], [-545, 725]], anchors: [{ world: [515, -998], map: [0, 0] }, { world: [-545, -998], map: [100, 0] }, { world: [515, 725], map: [0, 100] }] },
     streets: { dataKey: "streetsoftarkov", id: 8, tdevId: "5714dc692459777137212e12", svg: "StreetsOfTarkov.svg", floors: ["Underground_Level", "Ground_Level", "Second_Floor", "Third_Floor", "Fourth_Floor", "Fifth_Floor"], defaultFloor: "Ground_Level", rotation: 180, bounds: [[323, -295], [-280, 532]], anchors: [{ world: [323, -295], map: [0, 0] }, { world: [-280, -295], map: [100, 0] }, { world: [323, 532], map: [0, 100] }] },
-    "ground-zero": { dataKey: "groundzero", id: 9, tdevId: "653e6760052c01c1c805532f", svg: "GroundZero.svg", floors: ["Underground_Level", "Ground_Level", "Second_Floor", "Third_Floor"], defaultFloor: "Ground_Level", rotation: 180, bounds: [[249, -124], [-99, 364]], anchors: [{ world: [249, -124], map: [0, 0] }, { world: [-99, -124], map: [100, 0] }, { world: [249, 364], map: [0, 100] }] }
+    "ground-zero": { dataKey: "groundzero", id: 9, tdevId: "653e6760052c01c1c805532f", svg: "GroundZero.svg", floors: ["Underground_Level", "Ground_Level", "Second_Floor", "Third_Floor"], defaultFloor: "Ground_Level", rotation: 180, bounds: [[249, -124], [-99, 364]], anchors: [{ world: [249, -124], map: [0, 0] }, { world: [-99, -124], map: [100, 0] }, { world: [249, 364], map: [0, 100] }] },
+    terminal: { dataKey: "terminal", id: 10, tdevId: "65cc8f81a9aac3e77d0cfd3e", svg: "Terminal.svg", floors: ["Ground_Level"], defaultFloor: "Ground_Level", rotation: 180, bounds: [[463, -580], [-433, 475]], anchors: [{ world: [463, -580], map: [0, 0] }, { world: [-433, -580], map: [100, 0] }, { world: [463, 475], map: [0, 100] }] },
+    labyrinth: { dataKey: "the-labyrinth", id: 11, tdevId: "6733700029c367a3d40b02af", tiles: "https://assets.tarkov.dev/maps/labyrinth/main/{z}/{x}/{y}.png", tileZoom: 2, floors: ["Main"], defaultFloor: "Main", rotation: 270, bounds: [[-52, -37], [53, 76]], anchors: [{ world: [-52, -37], map: [0, 0] }, { world: [-52, 76], map: [100, 0] }, { world: [53, -37], map: [0, 100] }] },
+    icebreaker: { dataKey: "icebreaker", id: 12, tdevId: "69af492a4819ea4ba10a69c5", tiles: "https://assets.tarkov.dev/maps/icebreaker/{layer}/{z}/{x}/{y}.png", tileZoom: 2, tileLayers: { "Control_Room": "00_control_room", "Engine_Room": "01_engine_room", "Engine_Room_Upper": "02_engine_room_upper", "Fuel_Pumps_Lower": "03_fuel_pumps_lower", "Fuel_Pumps": "04_fuel_pumps", "Storage_Security": "05_storage_ecurity", "Infirmary": "06_infirmary", "Helipad": "07_helipad", "Gym_Canteen": "08_gym-canteen", "Accommodation_Lower": "09_accommodation_lower", "Accommodation_Mid": "10_accommodation_mid", "Accommodation_Upper": "11_accommodation_upper", "Officers_Deck": "12_officers_deck", "Stairs_Blocked": "13_stairs_blocked", "Bridge": "14_bridge", "Bridge_Roof": "15_bridge_roof" }, floors: ["Control_Room", "Engine_Room", "Engine_Room_Upper", "Fuel_Pumps_Lower", "Fuel_Pumps", "Storage_Security", "Infirmary", "Helipad", "Gym_Canteen", "Accommodation_Lower", "Accommodation_Mid", "Accommodation_Upper", "Officers_Deck", "Stairs_Blocked", "Bridge", "Bridge_Roof"], defaultFloor: "Infirmary", rotation: 180, bounds: [[77, -64.5], [-65.5, 67.4]], anchors: [{ world: [77, -64.5], map: [0, 0] }, { world: [-65.5, -64.5], map: [100, 0] }, { world: [77, 67.4], map: [0, 100] }] }
   };
   const FLOOR_ALIASES = {};
   const LAYERS = [
@@ -27,23 +31,66 @@
     { id: "spawn-aipmc", group: "Spawns", label: "AI PMC spawn", symbol: "A", color: "#82aaff" },
     { id: "spawn-sniper", group: "Spawns", label: "Sniper Scav", symbol: "N", color: "#ffb65c" },
     { id: "boss", group: "Spawns", label: "Boss spawn", symbol: "B", color: "#ef6262" },
-    { id: "lock", group: "Usable", label: "Locked door / key", symbol: "K", color: "#d7b96f" },
-    { id: "switch", group: "Usable", label: "Switch", symbol: "W", color: "#cfa7ff" },
+    { id: "cultist", group: "Spawns", label: "Cultist spawn", symbol: "C", color: "#9f78c9" },
+    { id: "rogue", group: "Spawns", label: "Rogue spawn", symbol: "R", color: "#df805c" },
+    { id: "raider", group: "Spawns", label: "Raider spawn", symbol: "R", color: "#da6d76" },
+    { id: "lock", group: "Usable", label: "All unlocks", symbol: "K", color: "#d7b96f" },
+    { id: "lock-door", group: "Usable", label: "Locked room / door", symbol: "D", color: "#d7b96f" },
+    { id: "lock-container", group: "Usable", label: "Locked container", symbol: "C", color: "#bf9c61" },
+    { id: "lock-trunk", group: "Usable", label: "Locked trunk", symbol: "T", color: "#a88f66" },
+    { id: "key-spawn", group: "Usable", label: "Key spawn", symbol: "K", color: "#f2d67c" },
+    { id: "switch", group: "Usable", label: "Lever / switch", symbol: "W", color: "#cfa7ff" },
     { id: "stationary", group: "Usable", label: "Stationary weapon", symbol: "G", color: "#ff8e5c" },
     { id: "btr", group: "Usable", label: "BTR stop", symbol: "R", color: "#ad9b7b" },
     { id: "hazard-mine", group: "Hazards", label: "Minefield", symbol: "!", color: "#ff5a5a" },
     { id: "hazard-sniper", group: "Hazards", label: "Sniper boundary", symbol: "!", color: "#ff925a" },
-    { id: "container", group: "Loot", label: "Loot container", symbol: "L", color: "#c99d65" },
-    { id: "loose-item", group: "Loot", label: "Loose item", symbol: "I", color: "#ffd166" }
+    { id: "container-cache", group: "Loot", label: "Cache", symbol: "C", color: "#b59767" },
+    { id: "container-ammo", group: "Loot", label: "Ammo box", symbol: "A", color: "#9c9275" },
+    { id: "container-grenade", group: "Loot", label: "Grenade box", symbol: "G", color: "#8d9568" },
+    { id: "container-weapon", group: "Loot", label: "Weapon box", symbol: "W", color: "#9f805e" },
+    { id: "container-register", group: "Loot", label: "Cash register", symbol: "$", color: "#c3a864" },
+    { id: "container-body", group: "Loot", label: "Dead body", symbol: "D", color: "#96716b" },
+    { id: "container-jacket", group: "Loot", label: "Jacket", symbol: "J", color: "#8e735d" },
+    { id: "container-drawer", group: "Loot", label: "Drawer", symbol: "D", color: "#a98867" },
+    { id: "container-bag", group: "Loot", label: "Sports bag", symbol: "B", color: "#718c72" },
+    { id: "container-suitcase", group: "Loot", label: "Suitcase", symbol: "S", color: "#7f8b91" },
+    { id: "container-crate", group: "Loot", label: "Wooden crate", symbol: "C", color: "#9b744c" },
+    { id: "container-toolbox", group: "Loot", label: "Toolbox", symbol: "T", color: "#b47154" },
+    { id: "container-pc", group: "Loot", label: "PC block", symbol: "P", color: "#6e8895" },
+    { id: "container-medcase", group: "Loot", label: "Medcase", symbol: "+", color: "#c77777" },
+    { id: "container-medbag", group: "Loot", label: "Medbag", symbol: "+", color: "#db8585" },
+    { id: "container-safe", group: "Loot", label: "Safe", symbol: "S", color: "#8e9194" },
+    { id: "container-stash", group: "Loot", label: "Shturman's stash", symbol: "S", color: "#8b7253" },
+    { id: "container-technical", group: "Loot", label: "Technical supply crate", symbol: "T", color: "#8d8066" },
+    { id: "container-medical", group: "Loot", label: "Medical supply crate", symbol: "+", color: "#bd7676" },
+    { id: "container-ration", group: "Loot", label: "Ration supply crate", symbol: "R", color: "#9a9160" },
+    { id: "container-other", group: "Loot", label: "Other container", symbol: "L", color: "#c99d65" },
+    { id: "loose-item", group: "Loot", label: "Loose item", symbol: "I", color: "#ffd166" },
+    { id: "battle-pass", group: "Loot", label: "Battle Pass", symbol: "", color: "#ff2727" }
   ];
   const LAYER_BY_ID = new Map(LAYERS.map(layer => [layer.id, layer]));
+  const CONTAINER_LAYER_BY_TYPE = {
+    "buried-barrel-cache": "container-cache", "ground-cache": "container-cache",
+    "wooden-ammo-box": "container-ammo", "grenade-box": "container-grenade", "weapon-box": "container-weapon",
+    "bank-cash-register": "container-register", "cash-register": "container-register",
+    "civilian-body": "container-body", "dead-scav": "container-body", "lab-technician-body": "container-body",
+    "pmc-body": "container-body", "scav-body": "container-body", jacket: "container-jacket", drawer: "container-drawer",
+    "duffle-bag": "container-bag", "plastic-suitcase": "container-suitcase", "wooden-crate": "container-crate",
+    toolbox: "container-toolbox", "pc-block": "container-pc", medcase: "container-medcase", "medbag-smu06": "container-medbag",
+    safe: "container-safe", "bank-safe": "container-safe", "shturmans-stash": "container-stash",
+    "technical-supply-crate": "container-technical", "medical-supply-crate": "container-medical",
+    "ration-supply-crate": "container-ration"
+  };
 
   const state = {
     mapKey: new URLSearchParams(location.search).get("map") || "interchange",
     map: null,
     quests: [],
+    traders: [],
     markerData: null,
+    battlePassData: null,
     mapMarkers: null,
+    keyItemIds: new Set(),
     visibleLayers: new Set(["extract-pmc", "extract-scav", "extract-coop", "transit"]),
     focusedItemId: null,
     rulerActive: false,
@@ -53,12 +100,18 @@
     currentFloor: "",
     markerMode: "arrows",
     panelPosition: "right",
+    panelOffset: { x: -1, y: -1 },
     wallColors: false,
     uiScale: 1,
     transform: { x: 0, y: 0, scale: 1 },
     svgAspect: 1,
     mapFrame: { left: 0, top: 0, width: 1, height: 1 },
-    player: null
+    player: null,
+    language: "en",
+    progress: { useProgress: false, filter: "all", edition: "standard", faction: "Any", playerLevel: 1, traderLevels: {}, completedQuests: new Set() },
+    squad: { enabled: false, mode: "off", name: "Player", room: "eft-local", host: "", password: "", port: 38473 },
+    squadStatus: { mode: "off", state: "off", message: "Squad sharing is off." },
+    floorEditor: { enabled: false, zones: [], floors: [], vertices: [] }
   };
 
   const el = Object.fromEntries([
@@ -67,7 +120,13 @@
     "mapWorld", "svgHost", "markerLayer", "mapStatus", "requirementsPanel", "requirementsHandle",
     "requirementsList", "pinCount", "wallToggle", "markerMode", "panelPosition", "questToggle",
     "rulerToggle", "measurementLayer", "rulerReadout", "markerPopup", "hidePanels", "fullScreen",
-    "zoomIn", "zoomOut", "zoomReset"
+    "zoomIn", "zoomOut", "zoomReset", "progressToggle", "floorEditToggle", "progressDialog", "progressForm", "useProgress",
+    "questFilterButtons", "gameEdition", "playerFaction", "playerLevel", "traderLevels", "resetProgress",
+    "saveProgress", "questFilterSummary", "squadToggle", "squadCount", "squadDialog", "squadForm",
+    "squadMode", "squadName", "squadRoom", "squadHost", "squadPassword", "squadPort", "squadMembers", "saveSquad",
+    "squadRoomLabel", "squadHostLabel", "squadPasswordLabel", "generateSquadPassword", "squadHelp", "squadStatus",
+    "floorEditorPanel", "floorEditorExit", "floorZoneName", "floorZoneFloor", "floorZoneMin", "floorZoneMax",
+    "floorUndo", "floorComplete", "floorDelete", "floorEditorStatus", "floorSave"
   ].map(id => [id, document.getElementById(id)]));
 
   function post(action, data = {}) {
@@ -114,20 +173,27 @@
     state.focusedItemId = null;
     state.measurePoints = [];
     state.currentFloor = state.map.defaultFloor;
+    setSquadMembers(state.squadMembers);
+    if (state.floorEditor.enabled) setFloorEditor(false);
     el.mapStatus.textContent = `Loading ${state.mapKey}…`;
     renderFloorButtons();
     try {
-      const response = await fetch(`${SVG_ROOT}/${state.map.svg}`, { cache: "force-cache" });
-      if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-      const text = await response.text();
-      const doc = new DOMParser().parseFromString(text, "image/svg+xml");
-      const svg = doc.documentElement;
-      svg.removeAttribute("width");
-      svg.removeAttribute("height");
-      svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
-      el.svgHost.replaceChildren(document.importNode(svg, true));
-      const viewBox = String(svg.getAttribute("viewBox") || "0 0 1 1").trim().split(/[\s,]+/).map(Number);
-      state.svgAspect = viewBox.length === 4 && viewBox[2] > 0 && viewBox[3] > 0 ? viewBox[2] / viewBox[3] : 1;
+      if (state.map.svg) {
+        const response = await fetch(`${SVG_ROOT}/${state.map.svg}`, { cache: "force-cache" });
+        if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+        const text = await response.text();
+        const doc = new DOMParser().parseFromString(text, "image/svg+xml");
+        const svg = doc.documentElement;
+        svg.removeAttribute("width");
+        svg.removeAttribute("height");
+        svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+        el.svgHost.replaceChildren(document.importNode(svg, true));
+        const viewBox = String(svg.getAttribute("viewBox") || "0 0 1 1").trim().split(/[\s,]+/).map(Number);
+        state.svgAspect = viewBox.length === 4 && viewBox[2] > 0 && viewBox[3] > 0 ? viewBox[2] / viewBox[3] : 1;
+      } else if (state.map.tiles) {
+        state.svgAspect = 1;
+        renderTileMap();
+      } else throw new Error("No public map artwork is configured");
       layoutMapWorld();
       applyFloor();
       applyWallPalette();
@@ -137,11 +203,29 @@
       renderMarkers();
       renderMeasurement();
       resetView();
-      el.mapStatus.textContent = "tarkov.dev SVG · wheel to zoom · drag to pan";
+      el.mapStatus.textContent = `tarkov.dev ${state.map.svg ? "SVG" : "tiles"} · wheel to zoom · Alt+wheel for floors · drag to pan`;
       post("map-ready", { map: state.mapKey });
     } catch (error) {
       el.mapStatus.textContent = `Map load failed: ${error.message}`;
     }
+  }
+
+  function renderTileMap() {
+    if (!state.map?.tiles) return;
+    const zoom = Number(state.map.tileZoom || 2);
+    const size = 2 ** zoom;
+    const layer = state.map.tileLayers?.[state.currentFloor] || "main";
+    const grid = document.createElement("div");
+    grid.className = "tile-grid";
+    grid.style.setProperty("--tile-count", size);
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+      const image = document.createElement("img");
+      image.alt = "";
+      image.draggable = false;
+      image.src = state.map.tiles.replace("{layer}", layer).replace("{z}", zoom).replace("{x}", x).replace("{y}", y);
+      grid.append(image);
+    }
+    el.svgHost.replaceChildren(grid);
   }
 
   async function loadQuests() {
@@ -150,7 +234,9 @@
       if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
       const snapshot = await response.json();
       state.quests = snapshot.tasks || [];
+      state.traders = snapshot.traders || [];
       el.questStatus.hidden = true;
+      renderProgressForm();
       renderQuests();
       renderRequirements();
       renderMarkers();
@@ -165,6 +251,7 @@
       const response = await fetch(MARKER_DATA_URL, { cache: "no-cache" });
       if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
       state.markerData = await response.json();
+      state.keyItemIds = new Set(state.markerData.keyItemIds || []);
       state.mapMarkers = state.markerData.maps?.find(map => map.id === state.map?.tdevId) || null;
       el.markerDataStatus.hidden = true;
       renderLayerList();
@@ -176,9 +263,49 @@
     }
   }
 
+  async function loadBattlePassData() {
+    try {
+      const response = await fetch(BATTLE_PASS_DATA_URL, { cache: "no-cache" });
+      if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+      state.battlePassData = await response.json();
+      renderLayerList();
+      renderMarkers();
+    } catch (error) {
+      console.warn(`Battle Pass marker data load failed: ${error.message}`);
+    }
+  }
+
   function mapQuests() {
     if (!state.map) return [];
     return state.quests.filter(quest => quest.objectives?.some(objective => objectiveLocationsOnMap(objective).length));
+  }
+
+  function compareRequirement(actual, method, wanted) {
+    if (method === ">") return actual > wanted;
+    if (method === "<") return actual < wanted;
+    if (method === "<=") return actual <= wanted;
+    if (method === "==" || method === "=") return actual === wanted;
+    return actual >= wanted;
+  }
+
+  function questAvailable(quest) {
+    if (!state.progress.useProgress) return true;
+    if (Number(quest.minPlayerLevel || 0) > state.progress.playerLevel) return false;
+    if (quest.factionName && quest.factionName !== "Any" && state.progress.faction !== "Any" && quest.factionName !== state.progress.faction) return false;
+    for (const requirement of quest.taskRequirements || []) {
+      if (!state.progress.completedQuests.has(String(requirement.task))) return false;
+    }
+    for (const requirement of quest.traderRequirements || []) {
+      const actual = Number(state.progress.traderLevels[String(requirement.trader)] || 1);
+      if (!compareRequirement(actual, requirement.compareMethod, Number(requirement.value || 0))) return false;
+    }
+    return true;
+  }
+
+  function questMatchesFilter(quest) {
+    if (state.progress.filter === "kappa") return Boolean(quest.kappaRequired);
+    if (state.progress.filter === "story") return !quest.lightkeeperRequired;
+    return true;
   }
 
   function objectiveLocationsOnMap(objective) {
@@ -189,20 +316,39 @@
   function renderQuests() {
     const query = el.questSearch.value.trim().toLowerCase();
     const fragment = document.createDocumentFragment();
-    for (const quest of mapQuests().filter(q => !query || q.name.toLowerCase().includes(query))) {
+    const visible = mapQuests().filter(quest => questMatchesFilter(quest) && questAvailable(quest) &&
+      (!query || quest.name.toLowerCase().includes(query)));
+    el.questFilterSummary.textContent = `${state.progress.filter[0].toUpperCase()}${state.progress.filter.slice(1)} · ${visible.length} quests${state.progress.useProgress ? " · available now" : ""}`;
+    for (const quest of visible) {
+      const completed = state.progress.completedQuests.has(String(quest.id));
       const label = document.createElement("label");
       label.className = "quest-row";
+      label.classList.toggle("completed", completed);
       const checkbox = document.createElement("input");
       checkbox.type = "checkbox";
       checkbox.checked = state.pinned.has(String(quest.id)) || state.pinned.has(quest.name);
       checkbox.addEventListener("change", () => toggleQuest(quest, checkbox.checked));
       const text = document.createElement("span");
+      text.className = "quest-copy";
       const locations = quest.objectives.reduce((count, objective) => count + objectiveLocationsOnMap(objective).length, 0);
       text.innerHTML = `<strong>${escapeHtml(quest.name)}</strong><small>${locations} map location${locations === 1 ? "" : "s"}</small>`;
-      label.append(checkbox, text);
+      const complete = document.createElement("button");
+      complete.type = "button";
+      complete.className = `quest-complete${completed ? " done" : ""}`;
+      complete.textContent = completed ? "Done" : "Mark done";
+      complete.addEventListener("click", event => { event.preventDefault(); toggleQuestCompletion(quest); });
+      label.append(checkbox, text, complete);
       fragment.append(label);
     }
     el.questList.replaceChildren(fragment);
+  }
+
+  function toggleQuestCompletion(quest) {
+    const id = String(quest.id);
+    state.progress.completedQuests.has(id) ? state.progress.completedQuests.delete(id) : state.progress.completedQuests.add(id);
+    persistProgress();
+    renderQuests();
+    renderRequirements();
   }
 
   function toggleQuest(quest, selected) {
@@ -241,7 +387,11 @@
       if (quest.minPlayerLevel) requirements.push(`Player level ${quest.minPlayerLevel}+`);
       for (const requirement of quest.taskRequirements || []) {
         const required = byId.get(String(requirement.task));
-        if (required) requirements.push(`Complete: ${required.name}`);
+        if (required) requirements.push(`${state.progress.completedQuests.has(String(requirement.task)) ? "✓" : "○"} Complete: ${required.name}`);
+      }
+      for (const requirement of quest.traderRequirements || []) {
+        const trader = state.traders.find(value => String(value.id) === String(requirement.trader));
+        requirements.push(`${trader?.name || requirement.trader} ${requirement.requirementType || "level"} ${requirement.compareMethod || ">="} ${requirement.value}`);
       }
       for (const keyGroup of quest.neededKeys || []) {
         if (keyGroup.map !== state.map?.tdevId) continue;
@@ -290,6 +440,7 @@
   }
 
   function applyFloor() {
+    if (state.map?.tiles) { renderTileMap(); return; }
     const svg = el.svgHost.querySelector("svg");
     if (!svg || !state.map) return;
     const known = new Set(state.map.floors);
@@ -311,6 +462,7 @@
       .locked { fill:#864d42 !important; }
       .wood { fill:#69472e !important; }
       .metal { fill:#60727a !important; }
+      #Rooms path[style*="stroke"][style*="fill:"]:not([style*="fill:none"]) { fill:#6f665b !important; }
     `;
     svg.append(style);
   }
@@ -328,41 +480,72 @@
     return state.markerData?.containerNames?.[id] || id;
   }
 
-  function extractLayerId(faction) {
-    if (faction === "pmc") return "extract-pmc";
-    if (faction === "scav") return "extract-scav";
-    return "extract-coop";
+  function isCoopExtract(extract) {
+    return /coop|co-op|cooperation|scav.?pmc|factory gate/i.test(String(extract?.name || ""));
   }
 
-  function spawnLayerId(spawn) {
+  function extractLayerIds(extract) {
+    const layers = [];
+    if (isCoopExtract(extract)) layers.push("extract-coop");
+    if (extract.faction === "pmc" || extract.faction === "shared") layers.push("extract-pmc");
+    if (extract.faction === "scav" || extract.faction === "shared") layers.push("extract-scav");
+    return layers.length ? layers : ["extract-coop"];
+  }
+
+  function spawnLayerIds(spawn) {
     const categories = new Set(spawn.categories || []);
-    if (categories.has("sniper")) return "spawn-sniper";
-    if (categories.has("botpmc")) return "spawn-aipmc";
-    if (categories.has("player")) return "spawn-pmc";
-    if (categories.has("bot")) return "spawn-scav";
-    return null;
+    const sides = new Set(spawn.sides || []);
+    const layers = [];
+    if (categories.has("sniper")) layers.push("spawn-sniper");
+    if (categories.has("botpmc")) layers.push("spawn-aipmc");
+    if (categories.has("player") || (!categories.size && sides.has("pmc"))) layers.push("spawn-pmc");
+    if (categories.has("bot") || sides.has("scav")) layers.push("spawn-scav");
+    if (!layers.length && sides.has("pmc")) layers.push("spawn-pmc");
+    return [...new Set(layers)];
+  }
+
+  function bossLayerId(boss) {
+    const name = String(boss.normalizedName || boss.name || "").toLowerCase();
+    if (name.includes("cultist")) return "cultist";
+    if (name === "rogue" || name.includes("exusec")) return "rogue";
+    if (name === "raider" || name.includes("pmcbot")) return "raider";
+    return "boss";
+  }
+
+  function containerLayerId(containerId) {
+    return CONTAINER_LAYER_BY_TYPE[state.markerData?.containerTypes?.[containerId]] || "container-other";
+  }
+
+  function lockLayerIds(lock) {
+    const subtype = lock.lockType === "door" ? "lock-door" : lock.lockType === "trunk" ? "lock-trunk" : "lock-container";
+    return ["lock", subtype];
+  }
+
+  function keyItemIdsAt(loot) {
+    return (loot.items || []).filter(id => state.keyItemIds.has(id));
   }
 
   function layerCounts() {
     const counts = Object.fromEntries(LAYERS.map(layer => [layer.id, 0]));
     const map = state.mapMarkers;
     if (!map) return counts;
-    for (const extract of map.extracts || []) counts[extractLayerId(extract.faction)]++;
+    for (const extract of map.extracts || []) for (const layerId of extractLayerIds(extract)) counts[layerId]++;
     counts.transit = map.transits?.length || 0;
     for (const spawn of map.spawns || []) {
-      const layerId = spawnLayerId(spawn);
-      if (layerId) counts[layerId]++;
+      for (const layerId of spawnLayerIds(spawn)) counts[layerId]++;
     }
-    counts.boss = map.bosses?.length || 0;
-    counts.lock = map.locks?.length || 0;
+    for (const boss of map.bosses || []) counts[bossLayerId(boss)]++;
+    for (const lock of map.locks || []) for (const layerId of lockLayerIds(lock)) counts[layerId]++;
+    counts["key-spawn"] = (map.looseLoot || []).filter(loot => keyItemIdsAt(loot).length).length;
     counts.switch = map.switches?.length || 0;
     counts.stationary = map.stationaryWeapons?.length || 0;
     counts.btr = map.btrStops?.length || 0;
     for (const hazard of map.hazards || []) counts[hazard.type === "minefield" ? "hazard-mine" : "hazard-sniper"]++;
-    counts.container = map.containers?.length || 0;
+    for (const container of map.containers || []) counts[containerLayerId(container.id)]++;
     counts["loose-item"] = state.focusedItemId
       ? (map.looseLoot || []).filter(loot => loot.items?.includes(state.focusedItemId)).length
       : map.looseLoot?.length || 0;
+    counts["battle-pass"] = state.battlePassData?.maps?.[state.mapKey]?.length || 0;
     return counts;
   }
 
@@ -374,7 +557,7 @@
       const section = document.createElement("section");
       section.className = "layer-group";
       const heading = document.createElement("h3");
-      heading.textContent = groupName;
+        heading.textContent = t(groupName);
       section.append(heading);
       for (const layer of LAYERS.filter(candidate => candidate.group === groupName)) {
         const label = document.createElement("label");
@@ -386,9 +569,10 @@
         checkbox.addEventListener("change", () => toggleLayer(layer.id, checkbox.checked));
         const swatch = document.createElement("span");
         swatch.className = "layer-swatch";
+        swatch.classList.add(`layer-swatch-${layer.id}`);
         swatch.style.setProperty("--marker-color", layer.color);
         const name = document.createElement("span");
-        name.textContent = layer.label;
+        name.textContent = t(layer.label);
         const count = document.createElement("small");
         count.className = "layer-count";
         count.textContent = String(counts[layer.id]);
@@ -404,6 +588,7 @@
   function toggleLayer(layerId, enabled) {
     enabled ? state.visibleLayers.add(layerId) : state.visibleLayers.delete(layerId);
     localStorage.setItem("eft-visible-layers", JSON.stringify([...state.visibleLayers]));
+    post("layer-visibility-changed", { layers: [...state.visibleLayers] });
     renderMarkers();
   }
 
@@ -424,6 +609,7 @@
     state.focusedItemId = itemId;
     state.visibleLayers.add("loose-item");
     localStorage.setItem("eft-visible-layers", JSON.stringify([...state.visibleLayers]));
+    post("layer-visibility-changed", { layers: [...state.visibleLayers] });
     renderLayerList();
     renderSearchResults();
     renderMarkers();
@@ -471,13 +657,13 @@
     }
 
     const locations = [];
-    for (const extract of state.mapMarkers?.extracts || []) locations.push({ title: extract.name, detail: "Extraction", layer: extractLayerId(extract.faction), position: extract.position });
-    for (const transit of state.mapMarkers?.transits || []) locations.push({ title: transit.name, detail: "Transit", layer: "transit", position: transit.position });
-    for (const boss of state.mapMarkers?.bosses || []) locations.push({ title: boss.name, detail: "Boss spawn", layer: "boss", position: boss.position });
-    for (const lock of state.mapMarkers?.locks || []) locations.push({ title: markerItemName(lock.keyId), detail: "Required key", layer: "lock", position: lock.position });
+    for (const extract of state.mapMarkers?.extracts || []) locations.push({ title: extract.name, detail: "Extraction", layers: extractLayerIds(extract), position: extract.position });
+    for (const transit of state.mapMarkers?.transits || []) locations.push({ title: transit.name, detail: "Transit", layers: ["transit"], position: transit.position });
+    for (const boss of state.mapMarkers?.bosses || []) locations.push({ title: boss.name, detail: LAYER_BY_ID.get(bossLayerId(boss)).label, layers: [bossLayerId(boss)], position: boss.position });
+    for (const lock of state.mapMarkers?.locks || []) locations.push({ title: markerItemName(lock.keyId), detail: LAYER_BY_ID.get(lockLayerIds(lock)[1]).label, layers: lockLayerIds(lock), position: lock.position });
     const seen = new Set();
     const locationMatches = locations.filter(result => {
-      const key = `${result.layer}:${result.title}`;
+      const key = `${result.layers.join(",")}:${result.title}`;
       if (seen.has(key) || !result.title.toLowerCase().includes(query)) return false;
       seen.add(key);
       return true;
@@ -488,7 +674,7 @@
       heading.textContent = "Map locations";
       fragment.append(heading);
       for (const result of locationMatches) addSearchResult(fragment, result.title, result.detail, () => {
-        state.visibleLayers.add(result.layer);
+        for (const layerId of result.layers) state.visibleLayers.add(layerId);
         renderLayerList();
         renderMarkers();
         panToWorld(readPosition(result.position));
@@ -510,16 +696,22 @@
     el.markerPopup.querySelector("button").addEventListener("click", () => { el.markerPopup.hidden = true; });
   }
 
-  function addMapMarker(fragment, layerId, rawPosition, title, body = "", itemId = null) {
-    if (!state.visibleLayers.has(layerId)) return;
+  function addMapMarker(fragment, layerIds, rawPosition, title, body = "", itemId = null) {
+    const memberships = Array.isArray(layerIds) ? layerIds : [layerIds];
+    const layerId = memberships.find(id => state.visibleLayers.has(id));
+    if (!layerId) return;
     const layer = LAYER_BY_ID.get(layerId);
     const position = readPosition(rawPosition);
     if (![position.x, position.y, position.z].every(Number.isFinite)) return;
     const projected = worldToPercent(position.x, position.z);
-    if (projected.left < 0 || projected.left > 100 || projected.top < 0 || projected.top > 100) return;
+    const outside = projected.left < 0 || projected.left > 100 || projected.top < 0 || projected.top > 100;
+    projected.left = Math.min(99.4, Math.max(.6, projected.left));
+    projected.top = Math.min(99.4, Math.max(.6, projected.top));
     const marker = document.createElement("div");
     marker.className = "map-marker";
-    marker.dataset.layer = layerId;
+    marker.classList.add(`layer-${layerId}`);
+    marker.dataset.layer = memberships.join(" ");
+    if (outside) marker.classList.add("edge-clamped");
     if (itemId && itemId === state.focusedItemId) marker.classList.add("item-focused");
     marker.style.left = `${projected.left}%`;
     marker.style.top = `${projected.top}%`;
@@ -535,7 +727,7 @@
     button.title = `${title}${body ? ` — ${body}` : ""}`;
     button.addEventListener("click", event => {
       event.stopPropagation();
-      showMarkerPopup({ title, body, itemId, coordinates: `X ${position.x.toFixed(1)} · Y ${position.y.toFixed(1)} · Z ${position.z.toFixed(1)}` });
+      showMarkerPopup({ title, body: `${body}${outside ? `${body ? " · " : ""}source point is outside the SVG boundary and is pinned to the nearest edge` : ""}`, itemId, coordinates: `X ${position.x.toFixed(1)} · Y ${position.y.toFixed(1)} · Z ${position.z.toFixed(1)}` });
     });
     marker.append(button);
     fragment.append(marker);
@@ -548,32 +740,53 @@
       const conditions = [];
       if (extract.switches?.length) conditions.push("switch activation required");
       if (extract.transferItem) conditions.push(`${extract.transferItem.count}× ${markerItemName(extract.transferItem.item)}`);
-      addMapMarker(fragment, extractLayerId(extract.faction), extract.position, extract.name,
+      addMapMarker(fragment, extractLayerIds(extract), extract.position, extract.name,
         `${extract.faction.toUpperCase()} extraction${conditions.length ? ` · ${conditions.join(" · ")}` : ""}`,
         extract.transferItem?.item || null);
     }
     for (const transit of map.transits || []) addMapMarker(fragment, "transit", transit.position, transit.name, "Transit extraction");
     for (const spawn of map.spawns || []) {
-      const layerId = spawnLayerId(spawn);
-      if (layerId) addMapMarker(fragment, layerId, spawn.position, LAYER_BY_ID.get(layerId).label, (spawn.sides || []).join(", "));
+      const layerIds = spawnLayerIds(spawn);
+      if (layerIds.length) addMapMarker(fragment, layerIds, spawn.position, layerIds.map(id => LAYER_BY_ID.get(id).label).join(" / "), (spawn.sides || []).join(", "));
     }
-    for (const boss of map.bosses || []) addMapMarker(fragment, "boss", boss.position, boss.name, `${Math.round((boss.chance || 0) * 100)}% map spawn chance${boss.area ? ` · ${boss.area}` : ""}`);
-    for (const lock of map.locks || []) addMapMarker(fragment, "lock", lock.position, markerItemName(lock.keyId), `${lock.lockType || "Lock"}${lock.needsPower ? " · power required" : ""}`, lock.keyId);
-    for (const sw of map.switches || []) addMapMarker(fragment, "switch", sw.position, "Switch", sw.type || "Usable switch");
+    for (const boss of map.bosses || []) {
+      const layerId = bossLayerId(boss);
+      addMapMarker(fragment, layerId, boss.position, boss.name, `${LAYER_BY_ID.get(layerId).label} · ${Math.round((boss.chance || 0) * 100)}% map spawn chance${boss.area ? ` · ${boss.area}` : ""}`);
+    }
+    for (const lock of map.locks || []) addMapMarker(fragment, lockLayerIds(lock), lock.position, markerItemName(lock.keyId), `${LAYER_BY_ID.get(lockLayerIds(lock)[1]).label}${lock.needsPower ? " · power required" : ""}`, lock.keyId);
+    for (const sw of map.switches || []) addMapMarker(fragment, "switch", sw.position, sw.name || "Lever / switch", sw.type || "Usable switch");
     for (const weapon of map.stationaryWeapons || []) addMapMarker(fragment, "stationary", weapon.position, weapon.name, "Stationary weapon");
-    for (const stop of map.btrStops || []) addMapMarker(fragment, "btr", stop.position, "BTR stop", "Armored transport stop");
+    for (const stop of map.btrStops || []) addMapMarker(fragment, "btr", stop.position, stop.name || "BTR stop", "Armored transport stop");
     for (const hazard of map.hazards || []) {
       const layerId = hazard.type === "minefield" ? "hazard-mine" : "hazard-sniper";
       addMapMarker(fragment, layerId, hazard.position, LAYER_BY_ID.get(layerId).label, "Danger zone");
     }
-    for (const container of map.containers || []) addMapMarker(fragment, "container", container.position, markerContainerName(container.id), "Loot container");
+    for (const container of map.containers || []) {
+      const layerId = containerLayerId(container.id);
+      addMapMarker(fragment, layerId, container.position, markerContainerName(container.id), LAYER_BY_ID.get(layerId).label);
+    }
     for (const loot of map.looseLoot || []) {
       const ids = loot.items || [];
       if (state.focusedItemId && !ids.includes(state.focusedItemId)) continue;
-      const focusId = state.focusedItemId || ids[0];
+      const keyIds = keyItemIdsAt(loot);
+      const focusId = state.focusedItemId || keyIds[0] || ids[0];
       const names = ids.slice(0, 5).map(markerItemName);
       const extra = ids.length > 5 ? ` +${ids.length - 5} more` : "";
-      addMapMarker(fragment, "loose-item", loot.position, markerItemName(focusId), `${names.join(", ")}${extra}`, focusId);
+      addMapMarker(fragment, keyIds.length ? ["key-spawn", "loose-item"] : "loose-item", loot.position, markerItemName(focusId), `${names.join(", ")}${extra}`, focusId);
+    }
+  }
+
+  function renderBattlePassMarkers(fragment) {
+    if (!state.visibleLayers.has("battle-pass")) return;
+    for (const location of state.battlePassData?.maps?.[state.mapKey] || []) {
+      const details = [
+        location.documents,
+        location.detail,
+        location.confidence ? `Confidence: ${location.confidence}` : "",
+        location.coordinateBasis === "reported-poi-center" ? "Coordinate: estimated POI center" : "",
+        location.coordinateNote
+      ].filter(Boolean).join(" · ");
+      addMapMarker(fragment, "battle-pass", location.position, location.title || "Battle Pass document", details);
     }
   }
 
@@ -582,6 +795,7 @@
     if (!state.map) return;
     const fragment = document.createDocumentFragment();
     renderMapDataMarkers(fragment);
+    renderBattlePassMarkers(fragment);
     const currentRank = mapFloorRank(state.currentFloor);
     for (const quest of pinnedQuests()) {
       for (const objective of quest.objectives || []) {
@@ -614,6 +828,7 @@
       }
     }
     for (const member of state.squadMembers) {
+      if (normalizeMapKey(member.map) !== state.mapKey) continue;
       const position = readPosition(member);
       const pos = worldToPercent(position.x, position.z);
       const marker = document.createElement("div");
@@ -700,7 +915,7 @@
   }
 
   function renderMeasurement() {
-    el.measurementLayer.replaceChildren();
+    el.measurementLayer.querySelectorAll(".measurement-line,.measurement-point").forEach(node => node.remove());
     el.rulerReadout.hidden = true;
     if (!state.measurePoints.length) return;
     const ns = "http://www.w3.org/2000/svg";
@@ -773,10 +988,20 @@
     });
   }
 
-  function quaternionYaw(qx, qy, qz, qw) {
-    const siny = 2 * (qw * qy + qx * qz);
-    const cosy = 1 - 2 * (qy * qy + qz * qz);
-    return Math.atan2(siny, cosy) * 180 / Math.PI;
+  function quaternionForward(qx, qy, qz, qw) {
+    return {
+      x: 2 * (qx * qz + qw * qy),
+      z: 1 - 2 * (qx * qx + qy * qy)
+    };
+  }
+
+  function playerHeadingOnMap(player) {
+    const forward = quaternionForward(player.qx, player.qy, player.qz, player.qw);
+    const origin = worldToPercent(player.x, player.z);
+    const target = worldToPercent(player.x + forward.x, player.z + forward.z);
+    const dx = (target.left - origin.left) * state.mapFrame.width;
+    const dy = (target.top - origin.top) * state.mapFrame.height;
+    return Math.atan2(dx, -dy) * 180 / Math.PI;
   }
 
   function renderPlayerMarker() {
@@ -785,9 +1010,7 @@
     marker.className = "player-marker";
     marker.style.left = `${pos.left}%`;
     marker.style.top = `${pos.top}%`;
-    let mapRotation = state.map.rotation;
-    if (mapRotation === 90 || mapRotation === 270) mapRotation += 180;
-    const heading = quaternionYaw(state.player.qx, state.player.qy, state.player.qz, state.player.qw) + mapRotation;
+    const heading = playerHeadingOnMap(state.player);
     marker.style.setProperty("--heading", `${heading}deg`);
     marker.title = `Player: ${state.player.x.toFixed(1)}, ${state.player.y.toFixed(1)}, ${state.player.z.toFixed(1)}`;
     el.markerLayer.append(marker);
@@ -819,7 +1042,198 @@
   function setSquadMembers(members) {
     state.squadMembers = Array.isArray(members) ? members.filter(member =>
       [member?.x, member?.z].every(value => Number.isFinite(Number(value)))) : [];
+    el.squadCount.textContent = String(state.squadMembers.filter(member => normalizeMapKey(member.map) === state.mapKey).length);
+    renderSquadMembers();
     renderMarkers();
+  }
+
+  function progressPayload() {
+    return {
+      useProgress: state.progress.useProgress,
+      filter: state.progress.filter,
+      edition: state.progress.edition,
+      faction: state.progress.faction,
+      playerLevel: state.progress.playerLevel,
+      traderLevels: state.progress.traderLevels,
+      completedQuests: [...state.progress.completedQuests]
+    };
+  }
+
+  function persistProgress() {
+    post("progress-settings-changed", progressPayload());
+  }
+
+  function setProgress(value = {}) {
+    state.progress = {
+      useProgress: Boolean(value.useProgress),
+      filter: ["story", "kappa", "all"].includes(value.filter) ? value.filter : "all",
+      edition: value.edition || "standard",
+      faction: ["Any", "USEC", "BEAR"].includes(value.faction) ? value.faction : "Any",
+      playerLevel: Math.min(100, Math.max(1, Number(value.playerLevel) || 1)),
+      traderLevels: value.traderLevels && typeof value.traderLevels === "object" ? value.traderLevels : {},
+      completedQuests: new Set((value.completedQuests || []).map(String))
+    };
+    renderProgressForm();
+    renderQuests();
+    renderRequirements();
+  }
+
+  function renderProgressForm() {
+    el.useProgress.checked = state.progress.useProgress;
+    el.gameEdition.value = state.progress.edition;
+    el.playerFaction.value = state.progress.faction;
+    el.playerLevel.value = String(state.progress.playerLevel);
+    for (const button of el.questFilterButtons.querySelectorAll("button"))
+      button.classList.toggle("active", button.dataset.filter === state.progress.filter);
+    const fragment = document.createDocumentFragment();
+    const progressTraders = new Set(["prapor", "therapist", "skier", "peacekeeper", "mechanic", "ragman", "jaeger", "ref"]);
+    for (const trader of state.traders) {
+      if (!progressTraders.has(trader.normalizedName)) continue;
+      const row = document.createElement("label");
+      row.className = "trader-level";
+      const name = document.createElement("span");
+      name.textContent = trader.name;
+      const select = document.createElement("select");
+      select.dataset.traderId = String(trader.id);
+      for (let level = 1; level <= Math.min(4, Number(trader.maxLevel) || 4); level++) {
+        const option = document.createElement("option");
+        option.value = String(level);
+        option.textContent = `LL${level}`;
+        select.append(option);
+      }
+      select.value = String(state.progress.traderLevels[String(trader.id)] || 1);
+      row.append(name, select);
+      fragment.append(row);
+    }
+    el.traderLevels.replaceChildren(fragment);
+  }
+
+  function readProgressForm() {
+    const traderLevels = {};
+    for (const select of el.traderLevels.querySelectorAll("select[data-trader-id]")) traderLevels[select.dataset.traderId] = Number(select.value);
+    state.progress.useProgress = el.useProgress.checked;
+    state.progress.edition = el.gameEdition.value;
+    state.progress.faction = el.playerFaction.value;
+    state.progress.playerLevel = Math.min(100, Math.max(1, Number(el.playerLevel.value) || 1));
+    state.progress.traderLevels = traderLevels;
+    persistProgress();
+    renderQuests();
+    renderRequirements();
+  }
+
+  function setSquadSettings(value = {}) {
+    const mode = ["lan", "host", "client"].includes(value.mode) ? value.mode : (value.enabled ? "lan" : "off");
+    state.squad = {
+      enabled: mode !== "off", mode, name: value.name || "Player", room: value.room || "eft-local",
+      host: value.host || "", password: value.password || "",
+      port: Math.min(65535, Math.max(1024, Number(value.port) || 38473))
+    };
+    el.squadMode.value = state.squad.mode;
+    el.squadName.value = state.squad.name;
+    el.squadRoom.value = state.squad.room;
+    el.squadHost.value = state.squad.host;
+    el.squadPassword.value = state.squad.password;
+    el.squadPort.value = String(state.squad.port);
+    updateSquadFields();
+  }
+
+  function updateSquadFields() {
+    const mode = el.squadMode.value;
+    el.squadRoomLabel.hidden = mode !== "lan";
+    el.squadHostLabel.hidden = mode !== "client";
+    el.squadPasswordLabel.hidden = mode !== "host" && mode !== "client";
+    el.squadHelp.textContent = mode === "host"
+      ? "Forward this UDP port on the host router and share the public IP, port, and password. The password stays in memory only."
+      : mode === "client"
+        ? "Enter the host's public IP or DNS name. The host must forward the selected UDP port."
+        : mode === "lan"
+          ? "Local multicast only. The room code separates groups and is not encryption."
+          : "Choose Host to open a room or Client to connect to one.";
+  }
+
+  function setSquadStatus(value = {}) {
+    state.squadStatus = { mode: value.mode || "off", state: value.state || "off", message: value.message || "" };
+    el.squadStatus.dataset.state = state.squadStatus.state;
+    el.squadStatus.textContent = state.squadStatus.message || "Squad sharing is off.";
+  }
+
+  function createSquadPassword() {
+    const bytes = crypto.getRandomValues(new Uint8Array(18));
+    return btoa(String.fromCharCode(...bytes)).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
+  }
+
+  function renderSquadMembers() {
+    const members = state.squadMembers.filter(member => normalizeMapKey(member.map) === state.mapKey);
+    el.squadMembers.textContent = members.length ? members.map(member => `${member.name} · ${Number(member.x).toFixed(1)}, ${Number(member.y).toFixed(1)}, ${Number(member.z).toFixed(1)}`).join("\n") : "No squad members online.";
+  }
+
+  function selectFloorByHotkey(keyIndex) {
+    if (!state.map) return false;
+    const ranked = state.map.floors.map(floor => ({ floor, rank: floorRank(floor) })).filter(item => item.rank != null);
+    let target;
+    if (keyIndex === 0) target = ranked.filter(item => item.rank < 0).sort((a, b) => a.rank - b.rank)[0];
+    else if (keyIndex === 1) target = ranked.find(item => item.rank === 0) || ranked.find(item => item.rank === 1);
+    else target = ranked.find(item => item.rank === keyIndex - 1) || ranked.find(item => item.rank === keyIndex);
+    if (!target && state.map.tileLayers) {
+      const base = Math.max(0, state.map.floors.indexOf(state.map.defaultFloor));
+      const index = keyIndex === 0 ? 0 : Math.min(state.map.floors.length - 1, base + keyIndex - 1);
+      target = { floor: state.map.floors[index] };
+    }
+    return target ? selectFloor(target.floor) : false;
+  }
+
+  function setFloorEditor(enabled, zones = [], floors = []) {
+    state.floorEditor.enabled = Boolean(enabled);
+    if (enabled) {
+      state.floorEditor.zones = Array.isArray(zones) ? structuredClone(zones) : [];
+      state.floorEditor.floors = Array.isArray(floors) ? structuredClone(floors) : [];
+      state.floorEditor.vertices = [];
+      const names = state.floorEditor.floors.length ? state.floorEditor.floors.map(floor => floor.name) : state.map.floors;
+      el.floorZoneFloor.replaceChildren(...names.map(name => Object.assign(document.createElement("option"), { value: name, textContent: friendlyFloor(name) })));
+    }
+    el.floorEditorPanel.hidden = !state.floorEditor.enabled;
+    el.mapViewport.classList.toggle("floor-editing", state.floorEditor.enabled);
+    renderFloorEditor();
+    return state.floorEditor.enabled;
+  }
+
+  function addFloorVertex(clientX, clientY) {
+    const point = screenToPercent(clientX, clientY);
+    if (point.left < 0 || point.left > 100 || point.top < 0 || point.top > 100) return;
+    const world = percentToWorld(point.left, point.top);
+    state.floorEditor.vertices.push({ x: Math.round(world.x * 1000) / 1000, y: Math.round(world.z * 1000) / 1000 });
+    renderFloorEditor();
+  }
+
+  function renderFloorEditor() {
+    el.measurementLayer.querySelectorAll(".floor-zone-shape,.floor-zone-current,.floor-zone-point").forEach(node => node.remove());
+    if (!state.floorEditor.enabled) return;
+    const ns = "http://www.w3.org/2000/svg";
+    const draw = (points, className, close) => {
+      if (!points.length) return;
+      const projected = points.map(point => worldToPercent(Number(point.x), Number(point.y)));
+      const polygon = document.createElementNS(ns, close ? "polygon" : "polyline");
+      polygon.setAttribute("class", className);
+      polygon.setAttribute("points", projected.map(point => `${point.left},${point.top}`).join(" "));
+      el.measurementLayer.append(polygon);
+      if (!close) for (const point of projected) {
+        const dot = document.createElementNS(ns, "circle");
+        dot.setAttribute("class", "floor-zone-point"); dot.setAttribute("cx", point.left); dot.setAttribute("cy", point.top); dot.setAttribute("r", ".65");
+        el.measurementLayer.append(dot);
+      }
+    };
+    for (const zone of state.floorEditor.zones) draw(zone.polygon || [], "floor-zone-shape", true);
+    draw(state.floorEditor.vertices, "floor-zone-current", false);
+    el.floorEditorStatus.textContent = `${state.floorEditor.zones.length} zones · ${state.floorEditor.vertices.length} points`;
+  }
+
+  function completeFloorZone() {
+    if (state.floorEditor.vertices.length < 3) { el.floorEditorStatus.textContent = "At least 3 points are required."; return; }
+    const min = Number(el.floorZoneMin.value), max = Number(el.floorZoneMax.value);
+    if (!Number.isFinite(min) || !Number.isFinite(max) || min >= max) { el.floorEditorStatus.textContent = "Height min must be below max."; return; }
+    state.floorEditor.zones.push({ name: el.floorZoneName.value.trim() || "Zone", floor_label: el.floorZoneFloor.value, z_min: min, z_max: max, polygon: state.floorEditor.vertices, holes: [] });
+    state.floorEditor.vertices = [];
+    renderFloorEditor();
   }
 
   function setScale(scale) {
@@ -827,33 +1241,72 @@
     document.documentElement.style.setProperty("--ui-scale", state.uiScale);
   }
 
+  const KOREAN = {
+    Layers: "레이어", Quests: "퀘스트", Progress: "진행도", Squad: "분대", "Floor editor": "층 편집", Ruler: "거리 측정",
+    "Hide panels": "패널 숨기기", "Show panels": "패널 보이기", "Full screen": "전체 화면", Fit: "맞춤",
+    "Wall colors": "벽 색상", "Floor markers": "층 마커", Panel: "패널", right: "오른쪽", bottom: "아래", floating: "이동식",
+    arrows: "화살표", opacity: "반투명", both: "둘 다"
+  };
+  KOREAN.Loot = "아이템 스폰";
+  KOREAN["Battle Pass"] = "배틀패스";
+  function t(value) { return state.language === "ko" ? (KOREAN[value] || value) : value; }
+  function applyLanguage() {
+    el.layersToggle.textContent = t("Layers"); el.questToggle.textContent = t("Quests"); el.progressToggle.textContent = t("Progress");
+    el.floorEditToggle.textContent = t("Floor editor");
+    el.squadToggle.firstChild.textContent = `${t("Squad")} `; el.rulerToggle.textContent = t("Ruler");
+    el.fullScreen.textContent = t("Full screen"); el.zoomReset.textContent = t("Fit");
+    const hidden = el.content.classList.contains("panels-hidden"); el.hidePanels.textContent = t(hidden ? "Show panels" : "Hide panels");
+    setPanelPosition(state.panelPosition); setMarkerMode(state.markerMode); setWallColors(state.wallColors);
+    renderLayerList();
+  }
+
   function setPanelPosition(position) {
     state.panelPosition = ["right", "bottom", "floating"].includes(position) ? position : "right";
     el.content.classList.remove("panel-right", "panel-bottom", "panel-floating");
     el.content.classList.add(`panel-${state.panelPosition}`);
-    el.panelPosition.textContent = `Panel: ${state.panelPosition}`;
+    if (state.panelPosition === "floating" && state.panelOffset.x >= 0 && state.panelOffset.y >= 0) {
+      el.requirementsPanel.style.left = `${state.panelOffset.x}px`;
+      el.requirementsPanel.style.top = `${state.panelOffset.y}px`;
+      el.requirementsPanel.style.right = "auto";
+      el.requirementsPanel.style.bottom = "auto";
+    } else if (state.panelPosition !== "floating") {
+      el.requirementsPanel.style.left = ""; el.requirementsPanel.style.top = "";
+      el.requirementsPanel.style.right = ""; el.requirementsPanel.style.bottom = "";
+    }
+    el.panelPosition.textContent = `${t("Panel")}: ${t(state.panelPosition)}`;
     localStorage.setItem("eft-panel-position", state.panelPosition);
   }
 
   function setMarkerMode(mode) {
     state.markerMode = ["arrows", "opacity", "both"].includes(mode) ? mode : "arrows";
-    el.markerMode.textContent = `Floor markers: ${state.markerMode}`;
+    el.markerMode.textContent = `${t("Floor markers")}: ${t(state.markerMode)}`;
     renderMarkers();
   }
 
   function setWallColors(enabled) {
     state.wallColors = Boolean(enabled);
     el.wallToggle.setAttribute("aria-pressed", String(state.wallColors));
-    el.wallToggle.textContent = `Wall colors: ${state.wallColors ? "on" : "off"}`;
+    el.wallToggle.textContent = `${t("Wall colors")}: ${state.wallColors ? (state.language === "ko" ? "켜짐" : "on") : (state.language === "ko" ? "꺼짐" : "off")}`;
     applyWallPalette();
   }
 
   function configure(options = {}) {
+    state.language = options.language === "ko" ? "ko" : "en";
+    document.documentElement.lang = state.language;
+    if (options.panelOffset && Number.isFinite(Number(options.panelOffset.x)) && Number.isFinite(Number(options.panelOffset.y)))
+      state.panelOffset = { x: Number(options.panelOffset.x), y: Number(options.panelOffset.y) };
     setScale(options.uiScale);
     setPanelPosition(options.panelPosition || state.panelPosition);
     setMarkerMode(options.markerMode || state.markerMode);
     setWallColors(options.wallColors);
     window.__eftAutoPan = options.autoPanning !== false;
+    applyLanguage();
+    if (options.progress) setProgress(options.progress);
+    if (options.squad) setSquadSettings(options.squad);
+    if (Array.isArray(options.visibleLayers)) {
+      state.visibleLayers = new Set(options.visibleLayers.filter(id => LAYER_BY_ID.has(id)));
+      renderLayerList(); renderMarkers();
+    }
     if (Array.isArray(options.pinnedQuests)) setPinnedQuests(options.pinnedQuests);
     if (options.map && normalizeMapKey(options.map) !== state.mapKey) loadMap(options.map);
   }
@@ -923,6 +1376,10 @@
   let drag = null;
   el.mapViewport.addEventListener("pointerdown", event => {
     if (event.target.closest("button")) return;
+    if (state.floorEditor.enabled) {
+      addFloorVertex(event.clientX, event.clientY);
+      return;
+    }
     if (state.rulerActive) {
       addRulerPoint(event.clientX, event.clientY);
       return;
@@ -939,7 +1396,16 @@
     applyTransform();
   });
   el.mapViewport.addEventListener("pointerup", () => { drag = null; el.mapViewport.classList.remove("dragging"); });
-  el.mapViewport.addEventListener("wheel", event => { event.preventDefault(); zoomAt(event.deltaY < 0 ? 1.13 : .885, event.clientX, event.clientY); }, { passive: false });
+  el.mapViewport.addEventListener("wheel", event => {
+    event.preventDefault();
+    if (event.altKey && state.map) {
+      const current = state.map.floors.indexOf(state.currentFloor);
+      const next = Math.min(state.map.floors.length - 1, Math.max(0, current + (event.deltaY < 0 ? 1 : -1)));
+      if (next !== current) selectFloor(state.map.floors[next]);
+      return;
+    }
+    zoomAt(event.deltaY < 0 ? 1.13 : .885, event.clientX, event.clientY);
+  }, { passive: false });
 
   let panelDrag = null;
   el.requirementsHandle.addEventListener("pointerdown", event => {
@@ -956,7 +1422,13 @@
     el.requirementsPanel.style.right = "auto";
     el.requirementsPanel.style.bottom = "auto";
   });
-  el.requirementsHandle.addEventListener("pointerup", () => { panelDrag = null; });
+  el.requirementsHandle.addEventListener("pointerup", () => {
+    if (panelDrag) {
+      state.panelOffset = { x: parseFloat(el.requirementsPanel.style.left) || 0, y: parseFloat(el.requirementsPanel.style.top) || 0 };
+      post("panel-offset-changed", state.panelOffset);
+    }
+    panelDrag = null;
+  });
 
   el.layersToggle.addEventListener("click", () => {
     el.questDrawer.classList.remove("open");
@@ -971,7 +1443,7 @@
   el.rulerToggle.addEventListener("click", () => setRuler(!state.rulerActive));
   el.hidePanels.addEventListener("click", () => {
     const hidden = el.content.classList.toggle("panels-hidden");
-    el.hidePanels.textContent = hidden ? "Show panels" : "Hide panels";
+    el.hidePanels.textContent = t(hidden ? "Show panels" : "Hide panels");
   });
   el.fullScreen.addEventListener("click", () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen());
   el.wallToggle.addEventListener("click", () => { setWallColors(!state.wallColors); post("wall-colors-changed", { enabled: state.wallColors }); });
@@ -980,6 +1452,37 @@
   el.zoomIn.addEventListener("click", () => zoomAt(1.2, innerWidth / 2, innerHeight / 2));
   el.zoomOut.addEventListener("click", () => zoomAt(1 / 1.2, innerWidth / 2, innerHeight / 2));
   el.zoomReset.addEventListener("click", resetView);
+  el.progressToggle.addEventListener("click", () => { renderProgressForm(); el.progressDialog.showModal(); });
+  el.floorEditToggle.addEventListener("click", () => {
+    if (window.chrome?.webview) post("toggle-floor-edit-mode");
+    else setFloorEditor(!state.floorEditor.enabled, [], []);
+  });
+  el.questFilterButtons.addEventListener("click", event => {
+    const button = event.target.closest("button[data-filter]");
+    if (!button) return;
+    state.progress.filter = button.dataset.filter;
+    renderProgressForm();
+  });
+  el.progressForm.addEventListener("submit", event => { event.preventDefault(); readProgressForm(); el.progressDialog.close(); });
+  el.resetProgress.addEventListener("click", () => { state.progress.completedQuests.clear(); persistProgress(); renderQuests(); renderRequirements(); });
+  el.squadToggle.addEventListener("click", () => { setSquadSettings(state.squad); renderSquadMembers(); el.squadDialog.showModal(); });
+  el.squadMode.addEventListener("change", updateSquadFields);
+  el.generateSquadPassword.addEventListener("click", () => { el.squadPassword.value = createSquadPassword(); el.squadPassword.type = "text"; });
+  el.squadForm.addEventListener("submit", event => {
+    event.preventDefault();
+    const mode = el.squadMode.value;
+    const requiresPassword = mode === "host" || mode === "client";
+    el.squadPassword.setCustomValidity(requiresPassword && el.squadPassword.value.length < 8 ? "Use at least 8 characters." : "");
+    if (!el.squadForm.reportValidity()) return;
+    setSquadSettings({ mode, enabled: mode !== "off", name: el.squadName.value.trim(), room: el.squadRoom.value.trim(), host: el.squadHost.value.trim(), password: el.squadPassword.value, port: Number(el.squadPort.value) });
+    post("squad-settings-changed", state.squad);
+    el.squadDialog.close();
+  });
+  el.floorEditorExit.addEventListener("click", () => { setFloorEditor(false); post("exit-floor-edit-mode"); });
+  el.floorUndo.addEventListener("click", () => { state.floorEditor.vertices.pop(); renderFloorEditor(); });
+  el.floorComplete.addEventListener("click", completeFloorZone);
+  el.floorDelete.addEventListener("click", () => { state.floorEditor.zones.pop(); renderFloorEditor(); });
+  el.floorSave.addEventListener("click", () => post("save-floor-zones", { data: JSON.stringify(state.floorEditor.zones) }));
   new ResizeObserver(() => {
     layoutMapWorld();
     resetView();
@@ -991,14 +1494,18 @@
     setPinnedQuests,
     setPlayerPosition,
     setSquadMembers,
+    setSquadStatus,
     focusItem,
     toggleLayer,
     selectFloor,
     selectFloorByIndex: index => state.map?.floors[index] ? selectFloor(state.map.floors[index]) : false,
+    selectFloorByHotkey,
+    setProgress,
+    setFloorEditor,
     toggleRequirements: () => { el.requirementsPanel.hidden = !el.requirementsPanel.hidden; return el.requirementsPanel.hidden; },
     resetView,
     getCalibrationReport: calibrationReport,
-    getState: () => ({ map: state.mapKey, floor: state.currentFloor, pinned: [...state.pinned], markerMode: state.markerMode, panelPosition: state.panelPosition, wallColors: state.wallColors, visibleLayers: [...state.visibleLayers], focusedItemId: state.focusedItemId })
+    getState: () => ({ map: state.mapKey, floor: state.currentFloor, pinned: [...state.pinned], markerMode: state.markerMode, panelPosition: state.panelPosition, wallColors: state.wallColors, visibleLayers: [...state.visibleLayers], focusedItemId: state.focusedItemId, progress: progressPayload(), floorEditor: { enabled: state.floorEditor.enabled, zones: state.floorEditor.zones.length } })
   };
 
   try {
@@ -1010,4 +1517,5 @@
   loadMap(state.mapKey);
   loadQuests();
   loadMarkerData();
+  loadBattlePassData();
 })();

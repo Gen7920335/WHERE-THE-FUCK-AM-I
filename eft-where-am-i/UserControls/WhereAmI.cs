@@ -19,6 +19,8 @@ namespace eft_where_am_i
         private JavaScriptExecutor jsExecutor;
         private QuestRepository questRepository;
         private FloorManager floorManager;
+        private readonly SquadSyncService squadSync = new SquadSyncService();
+        private string squadPassword = string.Empty; // Session-only: never written to settings.json.
         private readonly Dictionary<string, string> mapDisplayNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             { "ground-zero", "Ground Zero" },
@@ -52,7 +54,10 @@ namespace eft_where_am_i
             "lighthouse",
             "reserve",
             "streets",
-            "lab"
+            "lab",
+            "labyrinth",
+            "terminal",
+            "icebreaker"
         };
         private string siteUrl;
         private bool whereAmIClick = false;
@@ -77,6 +82,9 @@ namespace eft_where_am_i
 
             // Load 이벤트 핸들러 등록
             this.Load += WhereAmI_Load;
+            this.Disposed += (_, _) => squadSync.Dispose();
+            squadSync.MembersChanged += OnSquadMembersChanged;
+            squadSync.StatusChanged += OnSquadStatusChanged;
         }
 
         private async void WhereAmI_Load(object? sender, EventArgs e)
@@ -93,6 +101,7 @@ namespace eft_where_am_i
                 jsExecutor = new JavaScriptExecutor(webView2);
                 questRepository = new QuestRepository();
                 floorManager = new FloorManager();
+                ConfigureSquadSync();
 
                 // 4. 앱 시작 시 패널을 강제로 열어둠
                 await RestorePanelVisibilityAsync(appSettings.latest_map, forceOpen: true);
@@ -120,6 +129,7 @@ namespace eft_where_am_i
         {
             // 새로운 설정 반영
             appSettings = updatedSettings;
+            ConfigureSquadSync();
 
             // 화면 갱신 (언어/경로 등 UI 업데이트)
             LoadSettings();
@@ -448,9 +458,8 @@ namespace eft_where_am_i
                         break;
 
                     case "hide-show-panel":
-                        btnHideShowPannel_Click(null, null);
+                        await ToggleAndSavePanelStateAsync();
                         // 패널 상태 저장 (클릭 처리 후 딜레이를 두고 상태 읽기)
-                        _ = SavePanelStateAsync();
                         break;
 
                     case "full-screen":
@@ -756,9 +765,32 @@ namespace eft_where_am_i
                 map = appSettings.latest_map,
                 uiScale = appSettings.ui_scale,
                 panelPosition = appSettings.quest_panel_position,
+                panelOffset = new { x = appSettings.quest_panel_offset_x, y = appSettings.quest_panel_offset_y },
                 markerMode = appSettings.quest_floor_marker_mode,
                 wallColors = appSettings.tarkov_wall_colors,
-                autoPanning = appSettings.auto_panning
+                visibleLayers = appSettings.map_visible_layers ?? new List<string>(),
+                autoPanning = appSettings.auto_panning,
+                language = appSettings.language,
+                progress = new
+                {
+                    useProgress = appSettings.map_use_progress,
+                    filter = appSettings.map_quest_filter,
+                    edition = appSettings.game_edition,
+                    faction = appSettings.player_faction,
+                    playerLevel = appSettings.player_level,
+                    traderLevels = appSettings.trader_levels ?? new Dictionary<string, int>(),
+                    completedQuests = appSettings.completed_quests ?? new List<string>()
+                },
+                squad = new
+                {
+                    enabled = EffectiveSquadMode() != "off",
+                    mode = EffectiveSquadMode(),
+                    name = appSettings.squad_name,
+                    room = appSettings.squad_room,
+                    host = appSettings.squad_host,
+                    password = squadPassword,
+                    port = appSettings.squad_port
+                }
             };
             string optionsJson = Newtonsoft.Json.JsonConvert.SerializeObject(options);
             await webView2.ExecuteScriptAsync($"window.eftMap?.configure({optionsJson})");
@@ -802,6 +834,7 @@ namespace eft_where_am_i
 
             string positionJson = Newtonsoft.Json.JsonConvert.SerializeObject(new { x, y, z, qx, qy, qz, qw });
             await webView2.ExecuteScriptAsync($"window.eftMap?.setPlayerPosition({positionJson})");
+            squadSync.UpdatePose(appSettings.latest_map, x, y, z, qx, qy, qz, qw);
 
             string floorName = floorManager?.GetFloorName(appSettings.latest_map, x, y, z);
             if (!string.IsNullOrWhiteSpace(floorName))
@@ -991,6 +1024,20 @@ namespace eft_where_am_i
             SaveSettings();
         }
 
+        private async Task ToggleAndSavePanelStateAsync()
+        {
+            if (string.Equals(webView2.Source?.Host, "eft-map.local", StringComparison.OrdinalIgnoreCase))
+            {
+                string result = await webView2.ExecuteScriptAsync("window.eftMap?.toggleRequirements()");
+                appSettings.panel_hidden_per_map[appSettings.latest_map] = string.Equals(result, "true", StringComparison.OrdinalIgnoreCase);
+                SaveSettings();
+                return;
+            }
+
+            btnHideShowPannel_Click(null, null);
+            await SavePanelStateAsync();
+        }
+
         private async void btnFullScreen_Click(object sender, EventArgs e)
         {
             if (string.Equals(webView2.Source?.Host, "eft-map.local", StringComparison.OrdinalIgnoreCase))
@@ -1036,11 +1083,15 @@ namespace eft_where_am_i
 
         private async Task ToggleFloorEditModeAsync()
         {
+            bool isLocalMap = string.Equals(webView2.Source?.Host, "eft-map.local", StringComparison.OrdinalIgnoreCase);
             if (isFloorEditMode)
             {
                 // Exit edit mode
                 AppLogger.Info("FloorEdit", "Exiting floor edit mode");
-                await jsExecutor.DisableFloorEditModeAsync();
+                if (isLocalMap)
+                    await webView2.ExecuteScriptAsync("window.eftMap?.setFloorEditor(false)");
+                else
+                    await jsExecutor.DisableFloorEditModeAsync();
                 isFloorEditMode = false;
                 // Update button text
                 if (webView2_panel_ui.CoreWebView2 != null)
@@ -1059,7 +1110,10 @@ namespace eft_where_am_i
                 string floorsJson = floorManager?.GetFloorsJson(appSettings.latest_map) ?? "[]";
 
                 // Enable edit mode with overlay + editor UI
-                await jsExecutor.EnableFloorEditModeAsync(zonesJson, floorsJson);
+                if (isLocalMap)
+                    await webView2.ExecuteScriptAsync($"window.eftMap?.setFloorEditor(true, {zonesJson}, {floorsJson})");
+                else
+                    await jsExecutor.EnableFloorEditModeAsync(zonesJson, floorsJson);
                 isFloorEditMode = true;
 
                 // Update button text
@@ -1091,8 +1145,18 @@ namespace eft_where_am_i
                         await RestoreQuestsAsync(appSettings.latest_map);
                         break;
 
+                    case "toggle-floor-edit-mode":
+                        await ToggleFloorEditModeAsync();
+                        break;
+
                     case "panel-position-changed":
                         appSettings.quest_panel_position = message["position"]?.ToString() ?? "right";
+                        SaveSettings();
+                        break;
+
+                    case "panel-offset-changed":
+                        appSettings.quest_panel_offset_x = message["x"]?.Value<double>() ?? -1;
+                        appSettings.quest_panel_offset_y = message["y"]?.Value<double>() ?? -1;
                         SaveSettings();
                         break;
 
@@ -1104,6 +1168,36 @@ namespace eft_where_am_i
                     case "wall-colors-changed":
                         appSettings.tarkov_wall_colors = message["enabled"]?.Value<bool>() ?? false;
                         SaveSettings();
+                        break;
+
+                    case "layer-visibility-changed":
+                        appSettings.map_visible_layers = message["layers"]?.ToObject<List<string>>() ?? new List<string>();
+                        SaveSettings();
+                        break;
+
+                    case "progress-settings-changed":
+                        appSettings.map_use_progress = message["useProgress"]?.Value<bool>() ?? false;
+                        appSettings.map_quest_filter = message["filter"]?.ToString() ?? "all";
+                        appSettings.game_edition = message["edition"]?.ToString() ?? "standard";
+                        appSettings.player_faction = message["faction"]?.ToString() ?? "Any";
+                        appSettings.player_level = Math.Clamp(message["playerLevel"]?.Value<int>() ?? 1, 1, 100);
+                        appSettings.trader_levels = message["traderLevels"]?.ToObject<Dictionary<string, int>>() ?? new Dictionary<string, int>();
+                        appSettings.completed_quests = message["completedQuests"]?.ToObject<List<string>>() ?? new List<string>();
+                        SaveSettings();
+                        break;
+
+                    case "squad-settings-changed":
+                        string squadMode = message["mode"]?.ToString()?.Trim().ToLowerInvariant() ?? "off";
+                        if (squadMode != "lan" && squadMode != "host" && squadMode != "client") squadMode = "off";
+                        appSettings.squad_mode = squadMode;
+                        appSettings.squad_enabled = squadMode != "off";
+                        appSettings.squad_name = message["name"]?.ToString() ?? "Player";
+                        appSettings.squad_room = message["room"]?.ToString() ?? "eft-local";
+                        appSettings.squad_host = message["host"]?.ToString()?.Trim() ?? string.Empty;
+                        appSettings.squad_port = Math.Clamp(message["port"]?.Value<int>() ?? 38473, 1024, 65535);
+                        squadPassword = message["password"]?.ToString() ?? string.Empty;
+                        SaveSettings();
+                        ConfigureSquadSync();
                         break;
 
                     case "polygon-vertex-added":
@@ -1131,7 +1225,10 @@ namespace eft_where_am_i
                         floorManager?.UpdateZonesFromJson(appSettings.latest_map, zonesData);
 
                         // Exit edit mode after save
-                        await jsExecutor.DisableFloorEditModeAsync();
+                        if (string.Equals(webView2.Source?.Host, "eft-map.local", StringComparison.OrdinalIgnoreCase))
+                            await webView2.ExecuteScriptAsync("window.eftMap?.setFloorEditor(false)");
+                        else
+                            await jsExecutor.DisableFloorEditModeAsync();
                         isFloorEditMode = false;
                         if (webView2_panel_ui.CoreWebView2 != null)
                         {
@@ -1142,7 +1239,10 @@ namespace eft_where_am_i
                         break;
 
                     case "exit-floor-edit-mode":
-                        await jsExecutor.DisableFloorEditModeAsync();
+                        if (string.Equals(webView2.Source?.Host, "eft-map.local", StringComparison.OrdinalIgnoreCase))
+                            await webView2.ExecuteScriptAsync("window.eftMap?.setFloorEditor(false)");
+                        else
+                            await jsExecutor.DisableFloorEditModeAsync();
                         isFloorEditMode = false;
                         if (webView2_panel_ui.CoreWebView2 != null)
                         {
@@ -1260,6 +1360,46 @@ namespace eft_where_am_i
         }
 
         // Ctrl+Numpad 핫키 → 층 이름 후보 매핑 (순서대로 시도, 첫 매칭 클릭)
+        private void ConfigureSquadSync()
+        {
+            if (appSettings == null) return;
+            squadSync.Configure(EffectiveSquadMode(), appSettings.squad_name, appSettings.squad_room,
+                appSettings.squad_host, squadPassword, appSettings.squad_port);
+        }
+
+        private string EffectiveSquadMode()
+        {
+            string mode = appSettings?.squad_mode?.Trim().ToLowerInvariant() ?? "off";
+            if (mode == "off" && appSettings?.squad_enabled == true) return "lan";
+            return mode == "lan" || mode == "host" || mode == "client" ? mode : "off";
+        }
+
+        private void OnSquadMembersChanged(IReadOnlyList<SquadMember> members)
+        {
+            if (IsDisposed || Disposing) return;
+            if (InvokeRequired)
+            {
+                try { BeginInvoke(new Action(() => OnSquadMembersChanged(members))); } catch { }
+                return;
+            }
+            if (webView2.CoreWebView2 == null) return;
+            string json = Newtonsoft.Json.JsonConvert.SerializeObject(members);
+            _ = webView2.ExecuteScriptAsync($"window.eftMap?.setSquadMembers({json})");
+        }
+
+        private void OnSquadStatusChanged(SquadConnectionStatus status)
+        {
+            if (IsDisposed || Disposing) return;
+            if (InvokeRequired)
+            {
+                try { BeginInvoke(new Action(() => OnSquadStatusChanged(status))); } catch { }
+                return;
+            }
+            if (webView2.CoreWebView2 == null) return;
+            string json = Newtonsoft.Json.JsonConvert.SerializeObject(status);
+            _ = webView2.ExecuteScriptAsync($"window.eftMap?.setSquadStatus({json})");
+        }
+
         private static readonly Dictionary<int, string[]> FloorHotkeyMap = new Dictionary<int, string[]>
         {
             { 0, new[] { "Basement", "Bunker" } },   // Numpad 0 → 지하
@@ -1282,8 +1422,7 @@ namespace eft_where_am_i
 
             if (string.Equals(webView2.Source?.Host, "eft-map.local", StringComparison.OrdinalIgnoreCase))
             {
-                int floorIndex = keyIndex == 0 ? 0 : keyIndex;
-                await webView2.ExecuteScriptAsync($"window.eftMap?.selectFloorByIndex({floorIndex})");
+                await webView2.ExecuteScriptAsync($"window.eftMap?.selectFloorByHotkey({keyIndex})");
                 return;
             }
 
