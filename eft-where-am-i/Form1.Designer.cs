@@ -21,6 +21,7 @@ namespace eft_where_am_i_chasrp
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(Form1));
             panelSideMenu = new Panel();
             btnWhereAmI = new Button();
+            btnSetting = new Button();
             checkBoxHide = new CheckBox();
             timerSliding = new System.Windows.Forms.Timer(components);
             panel1 = new Panel();
@@ -29,6 +30,7 @@ namespace eft_where_am_i_chasrp
 
             panelSideMenu.BackColor = Color.FromArgb(64, 64, 64);
             panelSideMenu.Controls.Add(btnWhereAmI);
+            panelSideMenu.Controls.Add(btnSetting);
             panelSideMenu.Controls.Add(checkBoxHide);
             panelSideMenu.Dock = DockStyle.Left;
             panelSideMenu.Location = new Point(0, 0);
@@ -45,13 +47,30 @@ namespace eft_where_am_i_chasrp
             btnWhereAmI.Font = new Font("굴림", 15F, FontStyle.Bold);
             btnWhereAmI.ForeColor = Color.White;
             btnWhereAmI.Image = (Image)resources.GetObject("btnWhereAmI.Image");
-            btnWhereAmI.Location = new Point(0, 0);
+            btnWhereAmI.Location = new Point(0, 94);
             btnWhereAmI.Margin = new Padding(3, 4, 3, 4);
             btnWhereAmI.Name = "btnWhereAmI";
             btnWhereAmI.RightToLeft = RightToLeft.No;
             btnWhereAmI.Size = new Size(75, 94);
-            btnWhereAmI.TabIndex = 1;
+            btnWhereAmI.TabIndex = 2;
             btnWhereAmI.UseVisualStyleBackColor = true;
+            btnWhereAmI.Click += btnWhereAmI_Click;
+
+            btnSetting.Dock = DockStyle.Top;
+            btnSetting.FlatAppearance.BorderSize = 0;
+            btnSetting.FlatAppearance.MouseDownBackColor = Color.FromArgb(60, 60, 60);
+            btnSetting.FlatAppearance.MouseOverBackColor = Color.FromArgb(70, 70, 70);
+            btnSetting.FlatStyle = FlatStyle.Flat;
+            btnSetting.Font = new Font("굴림", 15F, FontStyle.Bold);
+            btnSetting.ForeColor = Color.White;
+            btnSetting.Image = (Image)resources.GetObject("btnSetting.Image");
+            btnSetting.Location = new Point(0, 0);
+            btnSetting.Margin = new Padding(3, 4, 3, 4);
+            btnSetting.Name = "btnSetting";
+            btnSetting.Size = new Size(75, 94);
+            btnSetting.TabIndex = 1;
+            btnSetting.UseVisualStyleBackColor = true;
+            btnSetting.Click += btnSetting_Click;
 
             checkBoxHide.Appearance = Appearance.Button;
             checkBoxHide.Dock = DockStyle.Bottom;
@@ -100,6 +119,7 @@ namespace eft_where_am_i_chasrp
 
         private System.Windows.Forms.Panel panelSideMenu;
         private System.Windows.Forms.CheckBox checkBoxHide;
+        private System.Windows.Forms.Button btnSetting;
         private System.Windows.Forms.Button btnWhereAmI;
         private System.Windows.Forms.Timer timerSliding;
         private System.Windows.Forms.Panel panel1;

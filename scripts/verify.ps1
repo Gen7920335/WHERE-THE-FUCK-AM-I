@@ -86,6 +86,7 @@ $OutputDir = Join-Path $ProjectDir "bin\$Configuration\net10.0-windows"
     "html\map-markers.json",
     "html\panel.html",
     "html\quest-locations.json",
+    "html\settings.html",
     "translations\en.json",
     "translations\ko.json"
 ) | ForEach-Object {

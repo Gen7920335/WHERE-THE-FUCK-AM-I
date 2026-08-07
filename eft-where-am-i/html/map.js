@@ -1409,7 +1409,7 @@
   }
 
   function setIconScale(scale) {
-    state.iconScale = Math.min(2.5, Math.max(.5, Number(scale) || 1));
+    state.iconScale = Math.min(6.5, Math.max(.5, Number(scale) || 1));
     applyScaleVariables();
     localStorage.setItem("eft-icon-scale", String(state.iconScale));
     return state.iconScale;

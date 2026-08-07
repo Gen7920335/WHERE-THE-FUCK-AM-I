@@ -498,7 +498,7 @@ namespace eft_where_am_i
                         break;
 
                     case "icon-scale-preview":
-                        double previewScale = Math.Clamp(message["scale"]?.Value<double>() ?? 1.0, 0.5, 2.5);
+                        double previewScale = Math.Clamp(message["scale"]?.Value<double>() ?? 1.0, 0.5, 6.5);
                         if (webView2.CoreWebView2 != null)
                         {
                             await webView2.ExecuteScriptAsync(
@@ -507,7 +507,7 @@ namespace eft_where_am_i
                         break;
 
                     case "icon-scale-changed":
-                        appSettings.icon_scale = Math.Clamp(message["scale"]?.Value<double>() ?? 1.0, 0.5, 2.5);
+                        appSettings.icon_scale = Math.Clamp(message["scale"]?.Value<double>() ?? 1.0, 0.5, 6.5);
                         SaveSettings();
                         break;
 
@@ -1196,7 +1196,7 @@ namespace eft_where_am_i
                         break;
 
                     case "icon-scale-changed":
-                        appSettings.icon_scale = Math.Clamp(message["scale"]?.Value<double>() ?? 1.0, 0.5, 2.5);
+                        appSettings.icon_scale = Math.Clamp(message["scale"]?.Value<double>() ?? 1.0, 0.5, 6.5);
                         SaveSettings();
                         break;
 

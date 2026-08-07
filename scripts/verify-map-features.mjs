@@ -7,7 +7,11 @@ const mapJs = await readFile(resolve(repoRoot, "eft-where-am-i/html/map.js"), "u
 const mapCss = await readFile(resolve(repoRoot, "eft-where-am-i/html/map.css"), "utf8");
 const mapHtml = await readFile(resolve(repoRoot, "eft-where-am-i/html/map.html"), "utf8");
 const panelHtml = await readFile(resolve(repoRoot, "eft-where-am-i/html/panel.html"), "utf8");
+const settingsHtml = await readFile(resolve(repoRoot, "eft-where-am-i/html/settings.html"), "utf8");
+const formCs = await readFile(resolve(repoRoot, "eft-where-am-i/Form1.cs"), "utf8");
+const formDesignerCs = await readFile(resolve(repoRoot, "eft-where-am-i/Form1.Designer.cs"), "utf8");
 const whereAmICs = await readFile(resolve(repoRoot, "eft-where-am-i/UserControls/WhereAmI.cs"), "utf8");
+const settingPageCs = await readFile(resolve(repoRoot, "eft-where-am-i/UserControls/SettingPage.cs"), "utf8");
 const settingsCs = await readFile(resolve(repoRoot, "eft-where-am-i/Classes/SettingsHandler.cs"), "utf8");
 const floorManagerCs = await readFile(resolve(repoRoot, "eft-where-am-i/Classes/FloorManager.cs"), "utf8");
 const squadSyncCs = await readFile(resolve(repoRoot, "eft-where-am-i/Classes/SquadSyncService.cs"), "utf8");
@@ -226,8 +230,8 @@ for (const token of ["squadMembers: []", "renderPositionMarker", "playerHeadingO
 if (!mapHtml.includes('id="mapLabelLayer"') || !mapCss.includes(".map-place-label") || !mapCss.includes("-webkit-text-stroke: .5px #000")) {
   throw new Error("Original-style map place-name rendering is missing");
 }
-if (!panelHtml.includes('id="iconScaleSlider"') || !panelHtml.includes('min="50" max="250"') || mapHtml.includes('id="iconScaleSlider"')) {
-  throw new Error("The 50%-250% icon-scale control must live in the top control panel");
+if (!panelHtml.includes('id="iconScaleSlider"') || !panelHtml.includes('min="50" max="650"') || mapHtml.includes('id="iconScaleSlider"')) {
+  throw new Error("The 50%-650% icon-scale control must live in the top control panel");
 }
 const requirementsPanelIndex = mapHtml.indexOf('id="requirementsPanel"');
 const floorButtonsIndex = mapHtml.indexOf('id="floorButtons"');
@@ -263,9 +267,23 @@ for (const token of ["ConfigureSquadSync", "UpdatePose", "OnSquadMembersChanged"
   if (!whereAmICs.includes(token)) throw new Error(`Squad application bridge is missing: ${token}`);
 }
 for (const removedLegacyServerUi of ["serverLocation_Title", "serverLocation_HistoryTitle", "ServerLocation"]) {
-  if (mapHtml.includes(removedLegacyServerUi) || panelHtml.includes(removedLegacyServerUi) || whereAmICs.includes(removedLegacyServerUi)) {
+  if (mapHtml.includes(removedLegacyServerUi) || panelHtml.includes(removedLegacyServerUi) || settingsHtml.includes(removedLegacyServerUi) ||
+      formCs.includes(removedLegacyServerUi) || formDesignerCs.includes(removedLegacyServerUi) || whereAmICs.includes(removedLegacyServerUi)) {
     throw new Error(`Removed legacy server-location screen is still reachable: ${removedLegacyServerUi}`);
   }
+}
+for (const settingsToken of ["SettingPage", "settingPageControl", "btnSetting_Click"]) {
+  if (!formCs.includes(settingsToken)) throw new Error(`Left-side settings screen is missing: ${settingsToken}`);
+}
+if (!formDesignerCs.includes("btnWhereAmI") || !formDesignerCs.includes("btnSetting") || formDesignerCs.includes("btnServerLocation")) {
+  throw new Error("The left navigation must contain only the map and settings screen buttons");
+}
+if (!settingPageCs.includes("html/settings.html") || !settingsHtml.includes('id="iconScaleSlider"')) {
+  throw new Error("The restored settings screen is incomplete");
+}
+if (!settingsHtml.includes('min="50" max="650"') || !mapJs.includes("Math.min(6.5") ||
+    !whereAmICs.includes(", 0.5, 6.5)") || !settingPageCs.includes(", 0.5, 6.5)")) {
+  throw new Error("Icon scaling must be enforced from 50% through 650% in every settings path");
 }
 
 const forwardSource = mapJs.match(/function quaternionForward\([^)]*\) \{[\s\S]*?\n  \}/)?.[0];

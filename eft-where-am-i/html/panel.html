@@ -150,7 +150,7 @@
     </section>
     <section class="flex justify-center items-center w-full icon-scale-top" style="grid-column: 4; grid-row: 3;">
       <label id="iconScaleLabel" for="iconScaleSlider" class="text-xs lg:text-sm xl:text-base font-medium">Icon Size</label>
-      <input id="iconScaleSlider" type="range" min="50" max="250" step="5" value="100" oninput="previewIconScale()" onchange="commitIconScale()">
+      <input id="iconScaleSlider" type="range" min="50" max="650" step="5" value="100" oninput="previewIconScale()" onchange="commitIconScale()">
       <output id="iconScaleValue" for="iconScaleSlider" class="text-xs lg:text-sm xl:text-base font-medium">100%</output>
     </section>
   </div>
@@ -338,7 +338,7 @@
     }
 
     function setIconScaleControl(scale) {
-      const percent = Math.min(250, Math.max(50, Math.round((Number(scale) || 1) * 100)));
+      const percent = Math.min(650, Math.max(50, Math.round((Number(scale) || 1) * 100)));
       document.getElementById('iconScaleSlider').value = percent;
       document.getElementById('iconScaleValue').textContent = percent + '%';
     }
