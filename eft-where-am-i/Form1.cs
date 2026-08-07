@@ -34,6 +34,7 @@ namespace eft_where_am_i_chasrp
             // 화면 3개 생성 (딱 1번만)
             whereAmIControl = new WhereAmI();
             settingPageControl = new SettingPage();
+            settingPageControl.SquadSettingsRequested += (_, _) => whereAmIControl.OpenSquadSettings();
 
             // Panel에 미리 추가
             panel1.Controls.Add(whereAmIControl);

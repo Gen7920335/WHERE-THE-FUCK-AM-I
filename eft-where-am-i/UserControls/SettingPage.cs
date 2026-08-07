@@ -18,6 +18,8 @@ namespace eft_where_am_i
         private readonly SettingsHandler settingsHandler; // SettingsHandler 인스턴스
         private AppSettings appSettings; // AppSettings 참조
 
+        public event EventHandler? SquadSettingsRequested;
+
         public SettingPage()
         {
             InitializeComponent();
@@ -228,6 +230,10 @@ namespace eft_where_am_i
                     case "ui-scale-changed":
                         appSettings.ui_scale = Math.Clamp(message["scale"]?.Value<double>() ?? 1.0, 0.65, 2.0);
                         SaveSettings();
+                        break;
+
+                    case "open-squad":
+                        SquadSettingsRequested?.Invoke(this, EventArgs.Empty);
                         break;
 
                     case "auto-detect-log-path":

@@ -160,6 +160,21 @@
     </div>
   </section>
 
+  <!-- Multiplayer Settings -->
+  <section class="mb-6">
+    <p id="squadSettingsTitle" class="mb-2 text-xl">Multiplayer</p>
+    <p id="squadSettingsDescription" class="mb-3 text-base text-gray-600">
+      Host or join a squad session and share map positions.
+    </p>
+    <button
+      id="squadSettingsButton"
+      onclick="openSquadSettings()"
+      class="bg-blue-500 text-white rounded py-1.5 px-4 text-base font-medium hover:bg-blue-600 shadow-sm"
+    >
+      Open Multiplayer Settings
+    </button>
+  </section>
+
   <!-- App Version Settings -->
   <section class="mb-6">
     <p id="appVersionText" class="mb-2 text-xl">
@@ -246,6 +261,9 @@
       document.getElementById('checkUpdateButton').textContent = i18next.t('checkUpdateButton');
       document.getElementById('mapInterfaceTitle').textContent = i18next.t('mapInterfaceTitle');
       document.getElementById('uiScaleLabel').textContent = i18next.t('uiScaleLabel');
+      document.getElementById('squadSettingsTitle').textContent = i18next.t('squadSettingsTitle');
+      document.getElementById('squadSettingsDescription').textContent = i18next.t('squadSettingsDescription');
+      document.getElementById('squadSettingsButton').textContent = i18next.t('squadSettingsButton');
     }
 
     function setTheme(theme) {
@@ -277,6 +295,10 @@
       const percent = Number(document.getElementById('uiScaleSlider').value);
       document.getElementById('uiScaleValue').textContent = percent + '%';
       window.chrome.webview.postMessage(JSON.stringify({ action: 'ui-scale-changed', scale: percent / 100 }));
+    }
+
+    function openSquadSettings() {
+      window.chrome.webview.postMessage(JSON.stringify({ action: 'open-squad' }));
     }
 
     // 언어 선택 시 호출되는 함수

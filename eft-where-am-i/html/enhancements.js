@@ -5,7 +5,15 @@
   const state = {
     uiScale: 1,
     fontScale: 1,
-    iconScale: 1
+    iconScale: 1,
+    questRequirementsPanel: {
+      mode: 'right',
+      x: 0,
+      y: 80,
+      width: 360,
+      height: 520,
+      collapsed: false
+    }
   };
 
   const clamp = (value, min, max, fallback) => {
@@ -118,6 +126,11 @@
           scale: var(--wtf-icon-scale);
           transform-origin: center;
         }
+        [data-wtf-commercial-hidden="true"] {
+          display: none !important;
+          pointer-events: none !important;
+          visibility: hidden !important;
+        }
       `;
       (document.head || root).appendChild(style);
     }
@@ -132,7 +145,18 @@
     state.uiScale = clamp(settings.uiScale, 0.65, 2, 1);
     state.fontScale = clamp(settings.fontScale, 0.5, 1.5, 1);
     state.iconScale = clamp(settings.iconScale, 0.5, 6.5, 1);
+    const panel = settings.questRequirementsPanel || {};
+    const mode = String(panel.mode || 'right').toLowerCase();
+    state.questRequirementsPanel = {
+      mode: mode === 'bottom' || mode === 'floating' ? mode : 'right',
+      x: clamp(panel.x, 0, Math.max(0, window.innerWidth - 260), 0),
+      y: clamp(panel.y, 0, Math.max(0, window.innerHeight - 120), 80),
+      width: clamp(panel.width, 260, 1200, 360),
+      height: clamp(panel.height, 120, 1000, 520),
+      collapsed: Boolean(panel.collapsed)
+    };
     applyDomScale();
+    applyQuestRequirementsPanelLayout();
     requestMarkerRedraw();
   };
 
@@ -146,6 +170,13 @@
     domObserver: null,
     mapObserver: null,
     resizeObserver: null,
+    questRequirementsCache: new Map(),
+    questRequirementsPending: new Map(),
+    questRequirementsLoadChain: Promise.resolve(),
+    selectedQuests: [],
+    questSelectionKey: '',
+    questRequirementsSaveTimer: 0,
+    questRequirementsResizeObserver: null,
     updateFrame: 0,
     hydrateFrame: 0
   };
@@ -173,32 +204,153 @@
         cursor: default !important;
         opacity: .45;
       }
-      #wtf-battle-pass-control {
-        align-items: center;
-        border-top: 1px solid rgba(154, 136, 102, .45);
-        cursor: pointer;
+      #wtf-quest-requirements-panel {
+        background: rgba(20, 20, 18, .97);
+        border: 1px solid rgba(154, 136, 102, .72);
+        box-shadow: 0 7px 24px rgba(0, 0, 0, .65);
+        box-sizing: border-box;
+        color: #d8d3c6;
         display: flex;
-        gap: 8px;
-        margin-top: 8px;
-        padding: 8px 5px 4px;
+        flex-direction: column;
+        min-height: 120px;
+        min-width: 260px;
+        overflow: hidden;
+        position: fixed;
+        resize: both;
+        z-index: 10000;
+      }
+      #wtf-quest-requirements-panel[hidden] {
+        display: none !important;
+      }
+      #wtf-quest-requirements-panel.wtf-collapsed {
+        height: auto !important;
+        min-height: 0;
+        resize: none;
+      }
+      .wtf-quest-requirements-header {
+        align-items: center;
+        background: rgba(49, 46, 39, .98);
+        border-bottom: 1px solid rgba(154, 136, 102, .45);
+        cursor: move;
+        display: flex;
+        flex: 0 0 auto;
+        gap: 6px;
+        min-height: 34px;
+        padding: 4px 6px 4px 10px;
         user-select: none;
       }
-      #wtf-battle-pass-control:hover {
-        color: var(--tm-text-bright, #fff);
+      .wtf-quest-requirements-title {
+        color: #eee9dd;
+        flex: 1 1 auto;
+        font-size: 13px;
+        font-weight: 700;
+        min-width: 0;
       }
-      .wtf-battle-pass-check {
-        appearance: auto !important;
-        -webkit-appearance: checkbox !important;
-        width: 14px !important;
-        min-width: 14px !important;
-        height: 14px !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        accent-color: #075fd1;
+      .wtf-quest-requirements-button {
+        align-items: center;
+        background: #27251f;
+        border: 1px solid rgba(154, 136, 102, .6);
+        color: #c8c1b2;
+        cursor: pointer;
+        display: inline-flex;
+        font: 700 11px/1 sans-serif;
+        height: 23px;
+        justify-content: center;
+        min-width: 25px;
+        padding: 0 6px;
       }
-      .wtf-battle-pass-count {
-        margin-left: auto;
-        opacity: .7;
+      .wtf-quest-requirements-button:hover,
+      .wtf-quest-requirements-button.wtf-active {
+        background: #514b3d;
+        color: #fff;
+      }
+      .wtf-quest-requirements-body {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: auto;
+        padding: 8px;
+      }
+      .wtf-collapsed .wtf-quest-requirements-body {
+        display: none;
+      }
+      .wtf-quest-requirements-card {
+        background: rgba(38, 36, 31, .82);
+        border-left: 3px solid #8e7d5c;
+        margin-bottom: 8px;
+        padding: 8px 9px;
+      }
+      .wtf-quest-requirements-name {
+        color: #f0eadc;
+        font-size: 13px;
+        font-weight: 700;
+        margin-bottom: 7px;
+      }
+      .wtf-quest-requirements-section + .wtf-quest-requirements-section {
+        margin-top: 7px;
+      }
+      .wtf-quest-requirements-label {
+        color: #a99b7c;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: .06em;
+        margin-bottom: 3px;
+        text-transform: uppercase;
+      }
+      .wtf-quest-requirements-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      .wtf-quest-requirements-list li {
+        line-height: 1.35;
+        padding: 2px 0 2px 13px;
+        position: relative;
+      }
+      .wtf-quest-requirements-list li::before {
+        color: #8e7d5c;
+        content: '•';
+        left: 2px;
+        position: absolute;
+      }
+      .wtf-quest-requirements-status {
+        color: #a49d90;
+        font-size: 11px;
+        padding: 4px 1px;
+      }
+      #wtf-quest-requirements-loader {
+        border: 0;
+        height: 1px;
+        left: -10000px;
+        opacity: 0;
+        pointer-events: none;
+        position: fixed;
+        top: -10000px;
+        width: 1px;
+      }
+      #wtf-battle-pass-control {
+        cursor: pointer;
+        user-select: none;
+      }
+      .wtf-battle-pass-icon-wrap {
+        align-items: center;
+        display: inline-flex !important;
+        height: 20px;
+        justify-content: center;
+        width: 20px;
+      }
+      .wtf-battle-pass-icon-wrap .wtf-blue-cross {
+        height: 13px;
+        width: 13px;
+      }
+      .wtf-battle-pass-icon-wrap .wtf-blue-cross::before {
+        height: 13px;
+        left: 5px;
+        width: 3px;
+      }
+      .wtf-battle-pass-icon-wrap .wtf-blue-cross::after {
+        height: 3px;
+        top: 5px;
+        width: 13px;
       }
       .wtf-blue-cross {
         display: inline-block;
@@ -326,6 +478,345 @@
     (document.head || document.documentElement).appendChild(style);
   };
 
+  const postQuestRequirementsLayout = () => {
+    const panel = document.getElementById('wtf-quest-requirements-panel');
+    if (!panel) return;
+    const layout = state.questRequirementsPanel;
+    const rect = panel.getBoundingClientRect();
+    if (!layout.collapsed && rect.width >= 260 && rect.height >= 120) {
+      layout.width = rect.width;
+      layout.height = rect.height;
+    }
+    window.chrome?.webview?.postMessage(JSON.stringify({
+      action: 'quest-requirements-layout',
+      mode: layout.mode,
+      x: layout.x,
+      y: layout.y,
+      width: layout.width,
+      height: layout.height,
+      collapsed: layout.collapsed
+    }));
+  };
+
+  const scheduleQuestRequirementsLayoutSave = () => {
+    clearTimeout(wtfOverlayState.questRequirementsSaveTimer);
+    wtfOverlayState.questRequirementsSaveTimer = setTimeout(postQuestRequirementsLayout, 180);
+  };
+
+  const applyQuestRequirementsPanelLayout = () => {
+    const panel = document.getElementById('wtf-quest-requirements-panel');
+    if (!panel) return;
+    const layout = state.questRequirementsPanel;
+    const mode = layout.mode;
+    const leftPanelRect = document.querySelector('.panel_left')?.getBoundingClientRect();
+    const rightPanelRect = document.querySelector('.panel_right')?.getBoundingClientRect();
+    const leftBoundary = leftPanelRect?.width > 0 ? leftPanelRect.right + 10 : 10;
+    const rightBoundary = rightPanelRect?.width > 0 ? rightPanelRect.left - 10 : window.innerWidth - 10;
+    const centerWidth = Math.max(260, rightBoundary - leftBoundary);
+    const width = Math.min(layout.width, mode === 'bottom' ? centerWidth : Math.max(260, window.innerWidth - 20));
+    const dockTop = rightPanelRect?.height > 0 ? Math.max(10, rightPanelRect.top) : 72;
+    const height = Math.min(layout.height, Math.max(120, window.innerHeight - dockTop - 10));
+
+    panel.classList.toggle('wtf-collapsed', layout.collapsed);
+    panel.dataset.mode = mode;
+    panel.style.left = '';
+    panel.style.right = '';
+    panel.style.top = '';
+    panel.style.bottom = '';
+    panel.style.transform = '';
+    panel.style.width = `${width}px`;
+    panel.style.height = layout.collapsed ? 'auto' : `${height}px`;
+
+    if (mode === 'bottom') {
+      panel.style.left = `${leftBoundary + centerWidth / 2}px`;
+      panel.style.bottom = '10px';
+      panel.style.transform = 'translateX(-50%)';
+    } else if (mode === 'floating') {
+      const x = Math.min(Math.max(0, layout.x), Math.max(0, window.innerWidth - width));
+      const y = Math.min(Math.max(0, layout.y), Math.max(0, window.innerHeight - (layout.collapsed ? 34 : height)));
+      layout.x = x;
+      layout.y = y;
+      panel.style.left = `${x}px`;
+      panel.style.top = `${y}px`;
+    } else {
+      panel.style.right = rightPanelRect?.width > 0
+        ? `${Math.max(10, window.innerWidth - rightPanelRect.left + 10)}px`
+        : '10px';
+      panel.style.top = `${dockTop}px`;
+    }
+
+    panel.querySelector('[data-dock="right"]')?.classList.toggle('wtf-active', mode === 'right');
+    panel.querySelector('[data-dock="bottom"]')?.classList.toggle('wtf-active', mode === 'bottom');
+    const collapseButton = panel.querySelector('[data-action="collapse"]');
+    if (collapseButton) {
+      collapseButton.textContent = layout.collapsed ? '+' : '−';
+      collapseButton.title = layout.collapsed ? 'Expand' : 'Collapse';
+    }
+  };
+
+  const setQuestRequirementsDock = (mode) => {
+    state.questRequirementsPanel.mode = mode;
+    applyQuestRequirementsPanelLayout();
+    scheduleQuestRequirementsLayoutSave();
+  };
+
+  const installQuestRequirementsDrag = (panel, header) => {
+    header.addEventListener('pointerdown', (event) => {
+      if (event.button !== 0 || event.target.closest('button')) return;
+      const rect = panel.getBoundingClientRect();
+      const offsetX = event.clientX - rect.left;
+      const offsetY = event.clientY - rect.top;
+      state.questRequirementsPanel.mode = 'floating';
+      state.questRequirementsPanel.x = rect.left;
+      state.questRequirementsPanel.y = rect.top;
+      applyQuestRequirementsPanelLayout();
+      header.setPointerCapture(event.pointerId);
+
+      const move = (moveEvent) => {
+        const maxX = Math.max(0, window.innerWidth - panel.offsetWidth);
+        const maxY = Math.max(0, window.innerHeight - panel.offsetHeight);
+        state.questRequirementsPanel.x = Math.min(maxX, Math.max(0, moveEvent.clientX - offsetX));
+        state.questRequirementsPanel.y = Math.min(maxY, Math.max(0, moveEvent.clientY - offsetY));
+        panel.style.left = `${state.questRequirementsPanel.x}px`;
+        panel.style.top = `${state.questRequirementsPanel.y}px`;
+      };
+      const finish = () => {
+        header.removeEventListener('pointermove', move);
+        header.removeEventListener('pointerup', finish);
+        header.removeEventListener('pointercancel', finish);
+        scheduleQuestRequirementsLayoutSave();
+      };
+      header.addEventListener('pointermove', move);
+      header.addEventListener('pointerup', finish);
+      header.addEventListener('pointercancel', finish);
+    });
+  };
+
+  const ensureQuestRequirementsPanel = () => {
+    let panel = document.getElementById('wtf-quest-requirements-panel');
+    if (panel) return panel;
+
+    panel = document.createElement('section');
+    panel.id = 'wtf-quest-requirements-panel';
+    panel.hidden = true;
+    panel.setAttribute('aria-label', 'Pinned quest requirements');
+
+    const header = document.createElement('div');
+    header.className = 'wtf-quest-requirements-header';
+    const title = document.createElement('div');
+    title.className = 'wtf-quest-requirements-title';
+    title.textContent = 'Quest requirements';
+
+    const rightButton = document.createElement('button');
+    rightButton.type = 'button';
+    rightButton.className = 'wtf-quest-requirements-button';
+    rightButton.dataset.dock = 'right';
+    rightButton.textContent = 'R';
+    rightButton.title = 'Dock right';
+    rightButton.addEventListener('click', () => setQuestRequirementsDock('right'));
+
+    const bottomButton = document.createElement('button');
+    bottomButton.type = 'button';
+    bottomButton.className = 'wtf-quest-requirements-button';
+    bottomButton.dataset.dock = 'bottom';
+    bottomButton.textContent = 'B';
+    bottomButton.title = 'Dock bottom';
+    bottomButton.addEventListener('click', () => setQuestRequirementsDock('bottom'));
+
+    const collapseButton = document.createElement('button');
+    collapseButton.type = 'button';
+    collapseButton.className = 'wtf-quest-requirements-button';
+    collapseButton.dataset.action = 'collapse';
+    collapseButton.addEventListener('click', () => {
+      state.questRequirementsPanel.collapsed = !state.questRequirementsPanel.collapsed;
+      applyQuestRequirementsPanelLayout();
+      scheduleQuestRequirementsLayoutSave();
+    });
+
+    const body = document.createElement('div');
+    body.className = 'wtf-quest-requirements-body';
+    header.append(title, rightButton, bottomButton, collapseButton);
+    panel.append(header, body);
+    (document.body || document.documentElement).appendChild(panel);
+    installQuestRequirementsDrag(panel, header);
+
+    if (window.ResizeObserver) {
+      wtfOverlayState.questRequirementsResizeObserver?.disconnect();
+      wtfOverlayState.questRequirementsResizeObserver = new ResizeObserver(() => {
+        if (!panel.hidden && !state.questRequirementsPanel.collapsed) {
+          scheduleQuestRequirementsLayoutSave();
+        }
+      });
+      wtfOverlayState.questRequirementsResizeObserver.observe(panel);
+    }
+    applyQuestRequirementsPanelLayout();
+    return panel;
+  };
+
+  const ensureQuestRequirementsLoader = () => {
+    let iframe = document.getElementById('wtf-quest-requirements-loader');
+    if (!iframe) {
+      iframe = document.createElement('iframe');
+      iframe.id = 'wtf-quest-requirements-loader';
+      iframe.tabIndex = -1;
+      iframe.setAttribute('aria-hidden', 'true');
+      (document.body || document.documentElement).appendChild(iframe);
+    }
+    return iframe;
+  };
+
+  const normalizeQuestStepText = (element) => {
+    const preferred = element.querySelector('.step-text') || element.querySelector('.step-body') || element;
+    return String(preferred.textContent || '').replace(/\s+/g, ' ').replace(/^•\s*/, '').trim();
+  };
+
+  const scrapeQuestRequirements = async (quest) => {
+    const iframe = ensureQuestRequirementsLoader();
+    await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('Quest detail page timed out')), 20000);
+      iframe.onload = () => {
+        clearTimeout(timeout);
+        resolve();
+      };
+      iframe.onerror = () => {
+        clearTimeout(timeout);
+        reject(new Error('Quest detail page failed to load'));
+      };
+      iframe.src = `/progression/quests?quest=${encodeURIComponent(quest.id)}`;
+    });
+
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      const frameDocument = iframe.contentDocument;
+      const objectivesRoot = frameDocument?.querySelector('.quest .objectives');
+      if (objectivesRoot) {
+        const headings = [...objectivesRoot.querySelectorAll('.title')];
+        const getList = (label) => {
+          const heading = headings.find((element) => element.textContent.trim() === label);
+          const list = heading?.nextElementSibling?.matches('ul')
+            ? heading.nextElementSibling
+            : heading?.parentElement?.querySelector('ul.list');
+          return [...(list?.querySelectorAll(':scope > li') || [])]
+            .map(normalizeQuestStepText)
+            .filter(Boolean);
+        };
+        return {
+          requirements: getList('Requirements'),
+          objectives: getList('Objectives')
+        };
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    throw new Error('Quest requirements were not found');
+  };
+
+  const loadQuestRequirements = (quest) => {
+    if (wtfOverlayState.questRequirementsCache.has(quest.id)) {
+      return Promise.resolve(wtfOverlayState.questRequirementsCache.get(quest.id));
+    }
+    if (wtfOverlayState.questRequirementsPending.has(quest.id)) {
+      return wtfOverlayState.questRequirementsPending.get(quest.id);
+    }
+
+    const pending = wtfOverlayState.questRequirementsLoadChain
+      .catch(() => undefined)
+      .then(() => scrapeQuestRequirements(quest))
+      .then((details) => {
+        wtfOverlayState.questRequirementsCache.set(quest.id, details);
+        return details;
+      })
+      .catch((error) => {
+        const details = { error: error?.message || 'Unable to load quest requirements' };
+        wtfOverlayState.questRequirementsCache.set(quest.id, details);
+        return details;
+      })
+      .finally(() => {
+        wtfOverlayState.questRequirementsPending.delete(quest.id);
+        renderQuestRequirementsPanel();
+      });
+    wtfOverlayState.questRequirementsPending.set(quest.id, pending);
+    wtfOverlayState.questRequirementsLoadChain = pending;
+    return pending;
+  };
+
+  const appendQuestRequirementsSection = (card, label, items, emptyText) => {
+    const section = document.createElement('div');
+    section.className = 'wtf-quest-requirements-section';
+    const heading = document.createElement('div');
+    heading.className = 'wtf-quest-requirements-label';
+    heading.textContent = label;
+    section.appendChild(heading);
+    if (items.length) {
+      const list = document.createElement('ul');
+      list.className = 'wtf-quest-requirements-list';
+      for (const item of items) {
+        const row = document.createElement('li');
+        row.textContent = item;
+        list.appendChild(row);
+      }
+      section.appendChild(list);
+    } else {
+      const empty = document.createElement('div');
+      empty.className = 'wtf-quest-requirements-status';
+      empty.textContent = emptyText;
+      section.appendChild(empty);
+    }
+    card.appendChild(section);
+  };
+
+  const renderQuestRequirementsPanel = () => {
+    const panel = ensureQuestRequirementsPanel();
+    const quests = wtfOverlayState.selectedQuests;
+    panel.hidden = quests.length === 0;
+    if (!quests.length) return;
+
+    const title = panel.querySelector('.wtf-quest-requirements-title');
+    const body = panel.querySelector('.wtf-quest-requirements-body');
+    title.textContent = `Quest requirements (${quests.length})`;
+    body.replaceChildren();
+
+    for (const quest of quests) {
+      const card = document.createElement('article');
+      card.className = 'wtf-quest-requirements-card';
+      const name = document.createElement('div');
+      name.className = 'wtf-quest-requirements-name';
+      name.textContent = quest.name;
+      card.appendChild(name);
+
+      const details = wtfOverlayState.questRequirementsCache.get(quest.id);
+      if (!details) {
+        const loading = document.createElement('div');
+        loading.className = 'wtf-quest-requirements-status';
+        loading.textContent = 'Loading requirements…';
+        card.appendChild(loading);
+        loadQuestRequirements(quest);
+      } else if (details.error) {
+        const error = document.createElement('div');
+        error.className = 'wtf-quest-requirements-status';
+        error.textContent = details.error;
+        card.appendChild(error);
+      } else {
+        appendQuestRequirementsSection(card, 'Prerequisites', details.requirements || [], 'No prerequisite quests');
+        appendQuestRequirementsSection(card, 'Objectives', details.objectives || [], 'No objectives listed');
+      }
+      body.appendChild(card);
+    }
+    applyQuestRequirementsPanelLayout();
+  };
+
+  const syncQuestRequirementsPanel = () => {
+    const quests = [...document.querySelectorAll('div.items.scroll div.no-wrap.d-flex.selected[data-quest-uid]')]
+      .map((row) => ({
+        id: row.dataset.questUid || '',
+        name: getQuestNameElement(row)?.textContent?.trim() || 'Quest'
+      }))
+      .filter((quest) => quest.id);
+    const key = quests.map((quest) => `${quest.id}:${quest.name}`).join('|');
+    if (key === wtfOverlayState.questSelectionKey) return;
+    wtfOverlayState.questSelectionKey = key;
+    wtfOverlayState.selectedQuests = quests;
+    renderQuestRequirementsPanel();
+  };
+
   const getQuestNameElement = (row) => {
     for (const child of row?.children || []) {
       if (child.tagName === 'SPAN' && !child.classList.contains('alt')) return child;
@@ -352,7 +843,10 @@
       view: window
     }));
 
-    setTimeout(() => syncNativeQuestCheckbox(row, checkbox), 120);
+    setTimeout(() => {
+      syncNativeQuestCheckbox(row, checkbox);
+      syncQuestRequirementsPanel();
+    }, 120);
   };
 
   const addNativeQuestCheckboxes = () => {
@@ -397,42 +891,65 @@
     const leftPanel = document.querySelector('.panel_left');
     if (!leftPanel) return;
 
-    let control = document.getElementById('wtf-battle-pass-control');
-    if (!control || control.parentElement !== leftPanel) {
-      control?.remove();
-      control = document.createElement('label');
-      control.id = 'wtf-battle-pass-control';
+    const lootTitle = [...leftPanel.querySelectorAll('.two-columns > .mb-5 > div:first-child > .bold')]
+      .find((element) => element.textContent.trim().toLowerCase() === 'loot');
+    const lootItems = lootTitle?.parentElement?.nextElementSibling;
+    if (!lootItems?.classList.contains('items')) return;
 
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.className = 'wtf-battle-pass-check';
-      checkbox.checked = wtfOverlayState.battlePassVisible;
-      checkbox.setAttribute('aria-label', 'Toggle Battle Pass document spawns');
-      checkbox.addEventListener('change', (event) => {
+    const scopeAttributes = [...((lootItems.firstElementChild || lootTitle).attributes || [])]
+      .filter((attribute) => attribute.name.startsWith('data-v-'))
+      .map((attribute) => attribute.name);
+    const applyScope = (element) => {
+      for (const attribute of scopeAttributes) element.setAttribute(attribute, '');
+      return element;
+    };
+
+    let control = document.getElementById('wtf-battle-pass-control');
+    if (!control || control.parentElement !== lootItems || control.tagName !== 'DIV') {
+      control?.remove();
+      control = applyScope(document.createElement('div'));
+      control.id = 'wtf-battle-pass-control';
+      control.className = 'd-flex h-space-between mb-5 no-wrap inactive';
+      control.tabIndex = 0;
+      control.setAttribute('role', 'checkbox');
+      control.title = 'Toggle Battle Pass document spawns';
+
+      const toggle = (event) => {
+        event.preventDefault();
         event.stopPropagation();
-        setBattlePassVisible(checkbox.checked, true);
+        setBattlePassVisible(!wtfOverlayState.battlePassVisible, true);
+      };
+      control.addEventListener('click', toggle);
+      control.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') toggle(event);
       });
 
+      const label = applyScope(document.createElement('span'));
+      label.className = 'd-flex';
+      const iconWrap = applyScope(document.createElement('div'));
+      iconWrap.className = 'fs-0 wtf-battle-pass-icon-wrap';
       const icon = document.createElement('span');
       icon.className = 'wtf-blue-cross';
       icon.setAttribute('aria-hidden', 'true');
+      iconWrap.appendChild(icon);
+      label.append(iconWrap, document.createTextNode(' Battle Pass'));
 
-      const label = document.createElement('span');
-      label.textContent = 'Battle Pass';
-
-      const count = document.createElement('span');
-      count.className = 'wtf-battle-pass-count';
+      const count = applyScope(document.createElement('span'));
+      count.className = 'sub alt';
+      count.dataset.wtfBattlePassCount = '';
       count.textContent = String(wtfOverlayState.battlePass.markers?.length || 0);
 
-      control.append(checkbox, icon, label, count);
-      leftPanel.appendChild(control);
+      control.append(label, document.createTextNode('\u00a0 '), count);
+      lootItems.appendChild(control);
     } else {
-      const checkbox = control.querySelector('.wtf-battle-pass-check');
-      const count = control.querySelector('.wtf-battle-pass-count');
-      if (checkbox) checkbox.checked = wtfOverlayState.battlePassVisible;
-      if (count) count.textContent = String(wtfOverlayState.battlePass.markers?.length || 0);
-      if (control !== leftPanel.lastElementChild) leftPanel.appendChild(control);
+      const count = control.querySelector('[data-wtf-battle-pass-count]');
+      const countText = String(wtfOverlayState.battlePass.markers?.length || 0);
+      if (count && count.textContent !== countText) count.textContent = countText;
+      if (control !== lootItems.lastElementChild) lootItems.appendChild(control);
     }
+    control.classList.toggle('active', wtfOverlayState.battlePassVisible);
+    control.classList.toggle('inactive', !wtfOverlayState.battlePassVisible);
+    control.setAttribute('aria-checked', wtfOverlayState.battlePassVisible ? 'true' : 'false');
   };
 
   const getLayoutOffset = (element, ancestor) => {
@@ -604,8 +1121,12 @@
     if (wtfOverlayState.battlePassLayer) {
       wtfOverlayState.battlePassLayer.hidden = !wtfOverlayState.battlePassVisible;
     }
-    const checkbox = document.querySelector('.wtf-battle-pass-check');
-    if (checkbox) checkbox.checked = wtfOverlayState.battlePassVisible;
+    const control = document.getElementById('wtf-battle-pass-control');
+    if (control) {
+      control.classList.toggle('active', wtfOverlayState.battlePassVisible);
+      control.classList.toggle('inactive', !wtfOverlayState.battlePassVisible);
+      control.setAttribute('aria-checked', wtfOverlayState.battlePassVisible ? 'true' : 'false');
+    }
     if (notifyHost) {
       window.chrome?.webview?.postMessage(JSON.stringify({
         action: 'battle-pass-toggle',
@@ -614,10 +1135,66 @@
     }
   };
 
+  const hideCommercialAndPaidUi = () => {
+    const hide = (element) => {
+      if (!(element instanceof Element)) return;
+      element.setAttribute('data-wtf-commercial-hidden', 'true');
+      element.setAttribute('aria-hidden', 'true');
+      if ('inert' in element) element.inert = true;
+    };
+
+    document.querySelectorAll([
+      '.content.maps > .p-relative',
+      '.content.maps .head-pilot',
+      '.content.maps .alert-box',
+      '.panel_right > .user-layers-panel',
+      '.panel_right > .squad-panel',
+      '[class*="paywall" i]',
+      '[class*="pro-only" i]',
+      '[data-premium="true"]',
+      '[data-pro-only="true"]'
+    ].join(',')).forEach(hide);
+
+    document.querySelectorAll('a[href]').forEach((link) => {
+      const href = String(link.getAttribute('href') || '').toLowerCase();
+      if (href.includes('patreon.com') || href.includes('boosty.to')) {
+        hide(link.closest('li, .d-flex, .mb-5') || link);
+      }
+    });
+
+    document.querySelectorAll('a, button, [role="button"], label, span, div').forEach((element) => {
+      if (element.closest('[data-wtf-commercial-hidden="true"]')) return;
+      const text = String(element.textContent || '').replace(/\s+/g, ' ').trim();
+      if (!text || text.length > 220) return;
+
+      if (/in the free version|upgrade to pro|available (?:with|in) (?:the )?pro|pro version only/i.test(text)) {
+        hide(element.closest('a, button, [role="button"], li') || element);
+        return;
+      }
+
+      if (/^use your progress\s*[✘✕×x]?$/i.test(text)) {
+        hide(element);
+        hide(element.nextElementSibling);
+        return;
+      }
+
+      if (/^(?:pro|premium|subscribe|upgrade|unlock pro)$/i.test(text)) {
+        const interactive = element.closest('a, button, [role="button"], label, li');
+        const compactParent = element.parentElement
+          && String(element.parentElement.textContent || '').replace(/\s+/g, ' ').trim().length <= text.length + 48
+          ? element.parentElement
+          : null;
+        hide(interactive || compactParent || element);
+      }
+    });
+  };
+
   const hydrateWtfEnhancementDom = () => {
     wtfOverlayState.hydrateFrame = 0;
     installWtfOverlayStyles();
+    hideCommercialAndPaidUi();
     addNativeQuestCheckboxes();
+    syncQuestRequirementsPanel();
     ensureBattlePassControl();
     ensureBattlePassLayer();
     ensureSquadLayer();
@@ -638,6 +1215,7 @@
       subtree: true
     });
     window.addEventListener('resize', scheduleBattlePassPositionUpdate, { passive: true });
+    window.addEventListener('resize', applyQuestRequirementsPanelLayout, { passive: true });
     scheduleWtfEnhancementHydration();
   };
 

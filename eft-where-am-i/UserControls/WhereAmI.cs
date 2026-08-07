@@ -631,7 +631,16 @@ namespace eft_where_am_i
             {
                 uiScale = appSettings.ui_scale,
                 fontScale = appSettings.font_scale,
-                iconScale = appSettings.icon_scale
+                iconScale = appSettings.icon_scale,
+                questRequirementsPanel = new
+                {
+                    mode = appSettings.quest_requirements_panel_mode,
+                    x = appSettings.quest_requirements_panel_x,
+                    y = appSettings.quest_requirements_panel_y,
+                    width = appSettings.quest_requirements_panel_width,
+                    height = appSettings.quest_requirements_panel_height,
+                    collapsed = appSettings.quest_requirements_panel_collapsed
+                }
             });
             await webView2.ExecuteScriptAsync($"window.__wtfSetEnhancementSettings?.({settingsJson});");
         }
@@ -686,6 +695,11 @@ namespace eft_where_am_i
             squadForm ??= new SquadForm(squadNetworkService);
             IWin32Window owner = (IWin32Window?)FindForm() ?? this;
             squadForm.ShowOrActivate(owner);
+        }
+
+        public void OpenSquadSettings()
+        {
+            OpenSquadWindow();
         }
 
         private void OnSquadPositionsChanged()
@@ -1139,6 +1153,22 @@ namespace eft_where_am_i
                         bool battlePassVisible = message["checked"]?.Value<bool>() ?? false;
                         appSettings.battle_pass_visible_per_map ??= new Dictionary<string, bool>();
                         appSettings.battle_pass_visible_per_map[appSettings.latest_map] = battlePassVisible;
+                        SaveSettings();
+                        break;
+
+                    case "quest-requirements-layout":
+                        string panelMode = message["mode"]?.ToString()?.ToLowerInvariant() ?? "right";
+                        appSettings.quest_requirements_panel_mode = panelMode == "bottom" || panelMode == "floating"
+                            ? panelMode
+                            : "right";
+                        appSettings.quest_requirements_panel_x = Math.Max(0, message["x"]?.Value<double>() ?? 0);
+                        appSettings.quest_requirements_panel_y = Math.Max(0, message["y"]?.Value<double>() ?? 80);
+                        appSettings.quest_requirements_panel_width = Math.Clamp(
+                            message["width"]?.Value<double>() ?? 360, 260, 1200);
+                        appSettings.quest_requirements_panel_height = Math.Clamp(
+                            message["height"]?.Value<double>() ?? 520, 120, 1000);
+                        appSettings.quest_requirements_panel_collapsed =
+                            message["collapsed"]?.Value<bool>() ?? false;
                         SaveSettings();
                         break;
 

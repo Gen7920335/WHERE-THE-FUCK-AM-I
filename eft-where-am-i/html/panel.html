@@ -131,14 +131,7 @@
         </label>
       </div>
     </section>
-    <section class="flex justify-center items-center w-full gap-1" style="grid-column: 2; grid-row: 3;">
-      <button
-        id="squadButton"
-        onclick="openSquad()"
-        class="bg-white border rounded py-1 px-2 text-xs lg:text-sm xl:text-base font-medium hover:bg-gray-100 w-full"
-      >
-        Squad
-      </button>
+    <section class="flex justify-center items-center w-full" style="grid-column: 2; grid-row: 3;">
       <button
         id="floorDbEditorButton"
         onclick="toggleFloorEditMode()"
@@ -202,7 +195,6 @@
       document.getElementById('autoScreenshotCleanupLabel').textContent = i18next.t('autoScreenshotCleanupLabel');
       document.getElementById('fontScaleLabel').textContent = i18next.t('fontScaleLabel');
       document.getElementById('iconScaleLabel').textContent = i18next.t('iconScaleLabel');
-      document.getElementById('squadButton').textContent = i18next.t('squadButton');
     }
 
     function setTheme(theme) {
@@ -353,10 +345,6 @@
       } catch (error) {
         console.error("setAutoScreenshotCleanupCheckboxState error:", error);
       }
-    }
-
-    function openSquad() {
-      window.chrome.webview.postMessage(JSON.stringify({ action: 'open-squad' }));
     }
 
     function setScaleControls(fontScale, iconScale) {

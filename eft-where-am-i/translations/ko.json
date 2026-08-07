@@ -54,5 +54,8 @@
     "serverLocation_Reason": "사유 : ",
     "serverLocation_Error": "오류 발생",
     "serverLocation_OfflineCol": "오프라인 / 매칭안됨",
-    "squadButton": "스쿼드"
+    "squadButton": "스쿼드",
+    "squadSettingsTitle": "멀티플레이어",
+    "squadSettingsDescription": "스쿼드 세션을 열거나 참가하여 지도 위치를 공유합니다.",
+    "squadSettingsButton": "멀티플레이어 설정 열기"
 }

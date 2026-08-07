@@ -54,5 +54,8 @@
     "serverLocation_Reason": "Reason : ",
     "serverLocation_Error": "Error Occurred",
     "serverLocation_OfflineCol": "Offline / Unmatched",
-    "squadButton": "Squad"
+    "squadButton": "Squad",
+    "squadSettingsTitle": "Multiplayer",
+    "squadSettingsDescription": "Host or join a squad session and share map positions.",
+    "squadSettingsButton": "Open Multiplayer Settings"
 }

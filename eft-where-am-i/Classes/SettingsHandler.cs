@@ -312,9 +312,16 @@ namespace eft_where_am_i.Classes
         public double ui_scale { get; set; } = 1.0;
         public double font_scale { get; set; } = 1.0;
         public double icon_scale { get; set; } = 1.0;
+        public string quest_requirements_panel_mode { get; set; } = "right";
+        public double quest_requirements_panel_x { get; set; } = 0;
+        public double quest_requirements_panel_y { get; set; } = 80;
+        public double quest_requirements_panel_width { get; set; } = 360;
+        public double quest_requirements_panel_height { get; set; } = 520;
+        public bool quest_requirements_panel_collapsed { get; set; } = false;
         public Dictionary<string, bool> battle_pass_visible_per_map { get; set; } = new Dictionary<string, bool>();
         public string squad_name { get; set; } = string.Empty;
         public string squad_host { get; set; } = "127.0.0.1";
         public int squad_port { get; set; } = 16243;
+        public string squad_mode { get; set; } = "host";
     }
 }
