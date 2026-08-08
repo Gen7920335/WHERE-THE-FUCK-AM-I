@@ -8,8 +8,6 @@ using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Reflection;
 using System.Runtime.InteropServices;
-using Velopack;
-using Velopack.Sources;
 
 namespace eft_where_am_i
 {
@@ -268,39 +266,7 @@ namespace eft_where_am_i
 
         private async Task CheckForUpdatesAsync()
         {
-            try
-            {
-                var mgr = new UpdateManager(new GithubSource("https://github.com/Gen7920335/WHERE-THE-FUCK-AM-I", null, false));
-                
-                if (System.Diagnostics.Debugger.IsAttached)
-                {
-                    MessageBox.Show("Cannot check for updates in debugger mode.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    return;
-                }
-
-                var newVersion = await mgr.CheckForUpdatesAsync();
-                if (newVersion != null)
-                {
-                    var message = $"새로운 업데이트(v{newVersion.TargetFullRelease.Version})가 있습니다.\n다운로드 및 설치 후 앱을 재시작하시겠습니까?\n\n" +
-                                  $"A new update (v{newVersion.TargetFullRelease.Version}) is available.\nWould you like to download, install, and restart the app?";
-                                  
-                    var result = MessageBox.Show(message, "업데이트 알림 / Update Notification", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
-
-                    if (result == DialogResult.Yes)
-                    {
-                        await mgr.DownloadUpdatesAsync(newVersion);
-                        mgr.ApplyUpdatesAndRestart(newVersion);
-                    }
-                }
-                else
-                {
-                    MessageBox.Show("현재 최신 버전을 사용 중입니다.\nYou are using the latest version.", "업데이트 확인 / Update Check", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"업데이트 확인 중 오류가 발생했습니다: {ex.Message}", "오류 / Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
+            await PortableUpdateService.CheckAndInstallAsync(this, interactive: true);
         }
 
         private void LoadSettings()

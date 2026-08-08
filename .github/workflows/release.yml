@@ -32,10 +32,12 @@ jobs:
       - name: Publish self-contained portable app
         shell: pwsh
         run: |
+          $version = '${{ github.ref_name }}'.TrimStart('v')
           dotnet publish eft-where-am-i/eft-where-am-i.csproj `
             -c Release `
             -r win-x64 `
             --self-contained true `
+            -p:Version=$version `
             -p:PublishSingleFile=true `
             -p:IncludeNativeLibrariesForSelfExtract=true `
             -p:EnableCompressionInSingleFile=true `
