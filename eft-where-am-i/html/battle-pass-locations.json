@@ -1,7 +1,7 @@
 {
-  "version": 2,
+  "version": 3,
   "updatedAt": "2026-08-08",
-  "coordinatePolicy": "EFT world positions are projected with Tarkov Market's production gamePosToMapPos transforms. Tarkov Market geometry.x maps to EFT world Z and geometry.y maps to EFT world X. reported-poi-center entries remain estimates and are labeled as such in the tooltip.",
+  "coordinatePolicy": "EFT world positions are projected with Tarkov Market's production gamePosToMapPos transforms. Tarkov Market geometry.x maps to EFT world Z and geometry.y maps to EFT world X. Approximate community locations are explicitly labeled reported-poi-center.",
   "verification": {
     "mapBasis": "Tarkov Market production maps",
     "mapUrl": "https://tarkov-market.com/maps/",
@@ -11,8 +11,8 @@
     "markerHash": "42605c5d0e2dc7b0a408d88a691d79de",
     "nativeMarkerCount": 5004,
     "nativeBattlePassCategoryPresent": false,
-    "projectedLocationCount": 140,
-    "projectedLocationsInsideMap": 140,
+    "projectedLocationCount": 171,
+    "projectedLocationsInsideMap": 171,
     "confidencePolicy": {
       "confirmed": "Location reported by multiple community observations; exact point is aligned to an EFT/Tarkov Market world-coordinate reference where available.",
       "reported": "Single or additional community report; verify in raid.",
@@ -20,14 +20,23 @@
     },
     "notes": [
       "Tarkov Market did not expose a native Battle Pass/document marker category at verification time.",
-      "Icebreaker reports exist, but exact per-spawn coordinates were not published; they are intentionally not rendered as fake precise pins."
+      "Large POI-center outliers were corrected against current Tarkov Market markers and polygon centers.",
+      "Community-only room reports are labeled as estimates instead of being presented as exact game coordinates."
     ],
     "currentCommunitySources": [
-      "https://www.reddit.com/r/EscapefromTarkov/comments/1veo5dt/seasonal_documents_loot/",
-      "https://www.reddit.com/r/EscapefromTarkov/comments/1vgp0wa/loot_factory_document_locations/",
-      "https://www.reddit.com/r/EscapefromTarkov/comments/1vf531s/discussion_kord_breach_battlepass_guide/",
+      "https://escapefromtarkov.fandom.com/wiki/BattlePass",
+      "https://perofunyang.github.io/battlepass_interactive_map/",
+      "https://github.com/Perofunyang/battlepass_interactive_map",
+      "https://www.reddit.com/r/EscapefromTarkov/comments/1vf0812/loot_battlepass_documents_locations_customs/",
       "https://www.reddit.com/r/EscapefromTarkov/comments/1vgnd80/discussion_i_havent_found_any_of_the_documents_on/"
-    ]
+    ],
+    "communityMapAttribution": {
+      "name": "Escape from Tarkov Battle Pass Interactive Map",
+      "author": "Perofunyang",
+      "license": "CC BY-NC 4.0",
+      "url": "https://github.com/Perofunyang/battlepass_interactive_map",
+      "changes": "Location descriptions were cross-checked and transformed into Tarkov Market world coordinates; map images and source code were not copied."
+    }
   },
   "maps": {
     "factory": [
@@ -96,8 +105,8 @@
       {"title":"OLI Logistics Office","documents":"설계도·기술 도면 / 재무","detail":"물류 사무실 내부","confidence":"confirmed","position":[83.20,28.12,115.67]},
       {"title":"OLI loading-dock information desk","documents":"설계도·기술 도면 / 재무","detail":"적재장과 가장 가까운 안내 데스크","confidence":"confirmed","position":[38.01,27.95,147.14]},
       {"title":"TTS store","documents":"설계도·기술 도면 / 재무","detail":"Emercom Medical 맞은편 매장","confidence":"confirmed","position":[-50.39,27.70,25.08]},
-      {"title":"Highway scav camp food table","documents":"재무","detail":"새 대형 스캐브 캠프 구석 작은 탁자","confidence":"confirmed","coordinateBasis":"reported-poi-center","coordinateNote":"신규 고속도로 캠프의 공개 제보 위치를 지도 POI 중심으로 환산한 추정 좌표","position":[500.00,0.50,330.00]},
-      {"title":"Station 14-4 KORD facility","documents":"설계도·기술 도면 / 재무","detail":"시설 내부","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"공개 제보의 Station 14-4 시설을 POI 중심으로 환산한 추정 좌표","position":[370.00,1.00,-110.00]},
+      {"title":"Smugglers' camp - round table under green container","documents":"설계 및 기술 문서 / 재무 문서","detail":"밀수꾼 캠프의 녹색 컨테이너 아래 원형 테이블","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"Tarkov Market 밀수꾼 구역 폴리곤과 공개 제보를 대조한 중심 좌표","position":[468.7424,0.5,140.6508]},
+      {"title":"Station 14-4 KORD facility","documents":"설계 및 기술 문서 / 재무 문서","detail":"AARS Station 14-4 KORD 시설 내부","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"Tarkov Market Station 14-4 KORD 퀘스트 마커 기준","position":[-198.1018,1,-358.7415]},
       {"title":"IDEA to Goshan back room","documents":"설계도·기술 도면 / 재무","detail":"IDEA 뒤쪽 방","confidence":"reported","position":[25.00,28.00,-210.00]}
     ],
     "ground-zero": [
@@ -154,7 +163,7 @@
       {"title":"Yellow keycard area","documents":"사용자 / 의료","detail":"단일 제보 지점","confidence":"reported","position":[-212.70,5.15,-376.54]}
     ],
     "woods": [
-      {"title":"Crashed airplane cockpit","documents":"시험 / 기술","detail":"추락 비행기 조종석·기수 내부","confidence":"confirmed","coordinateBasis":"reported-poi-center","coordinateNote":"공개 제보의 추락 비행기 조종석을 POI 중심으로 환산한 추정 좌표","position":[-120.00,15.00,-170.00]},
+      {"title":"Crashed airplane cockpit","documents":"시험 문서 / 기술 문서","detail":"추락한 비행기 조종석 내부","confidence":"confirmed","coordinateBasis":"tarkov-market-reference","position":[-251.2704,15,-28.2958]},
       {"title":"USEC camp LEDX body","documents":"시험 / 기술","detail":"LEDX가 나오는 시체 옆","confidence":"confirmed","position":[283.05,24.04,-439.39]},
       {"title":"USEC camp radio equipment","documents":"시험 / 기술","detail":"북쪽 캠프 위성 안테나와 무전 장비 옆 상자·탁자","confidence":"confirmed","position":[292.48,23.35,-507.38]},
       {"title":"Medical camp corpse trailer","documents":"시험 / 기술","detail":"시체가 가득한 컨테이너·트레일러","confidence":"confirmed","position":[-97.15,-13.19,219.76]},
@@ -166,7 +175,7 @@
       {"title":"Sawmill rectangular barracks","documents":"시험 / 기술","detail":"제재소 주변 막사 바닥","confidence":"reported","position":[-6.21,-0.49,-75.55]},
       {"title":"Village garage house","documents":"시험 / 기술","detail":"탄약 스폰 다리미판 아래","confidence":"confirmed","position":[195.98,1.03,-7.24]},
       {"title":"Village brick house upstairs","documents":"시험 / 기술","detail":"재떨이 옆 매트리스","confidence":"confirmed","position":[180.00,5.00,-20.00]},
-      {"title":"Military Checkpoint black SUV","documents":"시험 / 기술","detail":"Scav House 방향, 죽은 PMC 왼쪽","confidence":"confirmed","coordinateBasis":"reported-poi-center","coordinateNote":"공개 제보의 검문소-Scav House 사이 검은 SUV를 POI 중심으로 환산한 추정 좌표","position":[350.00,-12.00,110.00]},
+      {"title":"Military Checkpoint black SUV","documents":"시험 문서 / 기술 문서","detail":"Military Checkpoint와 Scav House 사이의 검은 SUV 조수석","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"차량 옆 Tarkov Market 시체 마커와 공개 제보를 대조한 근접 좌표","position":[238.4761,-12,100.5738]},
       {"title":"Large Scav Bunker","documents":"시험 / 기술","detail":"대형 스캐브 벙커 내부","confidence":"confirmed","position":[-272.70,7.69,-411.80]},
       {"title":"Sniper Mountain weather station bunkhouse","documents":"시험 / 기술","detail":"산 정상 기상 관측 장비와 벙커 옆 상부 오두막","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"Woods 제보 지도에 표시된 산 정상 기상 관측소·벙커 구역을 공개 Steady Signal 좌표로 환산한 추정 좌표","position":[-209.22,77.52,-279.78]}
     ],
@@ -178,21 +187,53 @@
       {"title":"Checkpoint Fence guard tower","documents":"프로젝트","detail":"책상 서랍 안쪽 공간","confidence":"confirmed","coordinateBasis":"reported-poi-center","coordinateNote":"Tarkov Market 네이티브 Checkpoint Fence 탈출구 중심을 기준으로 한 POI 추정 좌표","position":[61.8752,1.00,131.9897]},
       {"title":"D2 command center switch desks","documents":"PMC 인원 파일 / 프로젝트","detail":"D2 전원 스위치 주변 책상 앞 바닥","confidence":"confirmed","position":[-114.36,-13.71,27.36]},
       {"title":"White Horse building","documents":"PMC 인원 파일 / 프로젝트","detail":"건물 내부 루스 스폰","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"공개 제보의 White Horse 건물을 POI 중심으로 환산한 추정 좌표","position":[-35.00,1.00,-85.00]},
-      {"title":"No Backpack outer two-story shack","documents":"PMC 인원 파일 / 프로젝트","detail":"첫 나무 책상, 열린 서랍 아래","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"공개 제보의 No Backpack 외곽 2층 오두막을 POI 중심으로 환산한 추정 좌표","position":[280.00,1.00,-240.00]}
+      {"title":"No Backpack outer two-story shack","documents":"PMC 인사 파일 / 프로젝트 문서","detail":"Sewer Manhole 인근 외부 2층 초소","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"타르코프 갤러리 좌표 제보와 Sewer Manhole 기준점을 교차검증한 좌표","position":[43.92,-5.35,96.24]}
     ],
     "lighthouse": [
-      {"title":"USEC/Main Chalet upstairs bedroom","documents":"PMC 인원 파일 / 기술","detail":"위층 침실 원형 탁자","confidence":"confirmed","position":[-108.87,25.50,-2.31]},
-      {"title":"Military tent south of helicopter","documents":"PMC 인원 파일","detail":"입구로 들어가자마자 왼쪽 탁자","confidence":"confirmed","position":[-96.00,2.00,-590.00]}
+      {"title":"USEC/Main Chalet upstairs bedroom","documents":"PMC 인사 파일","detail":"Blue Chalet 2층 침실의 원형 테이블","confidence":"confirmed","position":[-108.87,25.5,-2.31]},
+      {"title":"Military tent south of helicopter","documents":"PMC 인사 파일 / 기술 문서","detail":"WTP 남동쪽 수조의 군용 텐트","confidence":"reported","position":[-112.9,2,-481.6],"coordinateBasis":"reported-poi-center","coordinateNote":"한국 커뮤니티 인터랙티브 지도 좌표를 WTP Building 2·Building 3·Blue Chalet 기준점으로 보정한 좌표"},
+      {"title":"WTP Building 2 - 1F radio room","documents":"PMC 인사 파일","detail":"2번 동 1층, 차량 옆 라디오실","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"Tarkov Market Building 2 기준점과 공개 제보를 교차검증한 좌표","position":[-125.1724,2,-748.6296]},
+      {"title":"WTP Building 3 - 2F corner room","documents":"기술 문서","detail":"3번 동 2층 구석 방","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"Tarkov Market Building 3 기준점과 공개 제보를 교차검증한 좌표","position":[-200.0895,7,-656.4039]},
+      {"title":"Train station warehouse - bottom cabinet","documents":"기술 문서","detail":"기차역 옆 창고, 책상 옆 캐비닛 맨 아래 칸","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"한국 커뮤니티 인터랙티브 지도 좌표를 WTP Building 2·Building 3·Blue Chalet 기준점으로 보정한 좌표","position":[-149.9,2,-835]},
+      {"title":"Scav village red house - 1F shelf","documents":"기술 문서","detail":"빨간 2층집 1층 선반","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"한국 커뮤니티 인터랙티브 지도 좌표를 WTP Building 2·Building 3·Blue Chalet 기준점으로 보정한 좌표","position":[-158.7,2,-15.9]},
+      {"title":"Scav village red house - 2F bedroom","documents":"PMC 인사 파일","detail":"빨간 2층집 2층 침실","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"한국 커뮤니티 인터랙티브 지도 좌표를 WTP Building 2·Building 3·Blue Chalet 기준점으로 보정한 좌표","position":[-158.7,6,-15.9]},
+      {"title":"Chalet tennis-court tent and shelf","documents":"PMC 인사 파일 / 기술 문서","detail":"테니스장 텐트 안 책상과 인접 선반","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"한국 커뮤니티 인터랙티브 지도 좌표를 WTP Building 2·Building 3·Blue Chalet 기준점으로 보정한 좌표","position":[-107.8,2,232.5]},
+      {"title":"Northern seaside house by pier - 2F shelf","documents":"기술 문서","detail":"선착장 옆 북쪽 집 2층 선반","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"한국 커뮤니티 인터랙티브 지도 좌표를 WTP Building 2·Building 3·Blue Chalet 기준점으로 보정한 좌표","position":[132.1238,6,287.3118]},
+      {"title":"Main Chalet - living room side","documents":"기술 문서","detail":"큰 별장 거실 옆","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"기존 Chalet 월드 좌표와 공개 제보를 대조한 좌표","position":[-108.87,21,-2.31]}
     ],
     "shoreline": [
       {"title":"Locked Cottage quest boxes","documents":"시험 / 기술","detail":"잠긴 Cottage 앞 마킹 상자 위","confidence":"reported","position":[98.10,-47.19,96.98]},
       {"title":"Resort West Wing 2F fire escape room","documents":"시험 / 기술","detail":"Fire Escape 근처 객실 침대","confidence":"reported","position":[-218.02,2.82,-86.09]},
-      {"title":"Vehicle Extract opposite shack","documents":"시험 / 기술","detail":"V-Ex 게이트 맞은편 작은 오두막","confidence":"reported","position":[-530.00,-16.00,-365.00]}
+      {"title":"Vehicle Extract opposite shack","documents":"시험 문서 / 기술 문서","detail":"Road to North V-Ex 맞은편 건물","confidence":"confirmed","position":[-535.89,-16.98,-337.2],"coordinateBasis":"reported-world-coordinate"},
+      {"title":"HEP power station - second room","documents":"기술 문서","detail":"발전소 내부 두 번째 방","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"공식 위키 설명과 한국 커뮤니티 지점을 Tarkov Market의 방·POI 마커에 맞춘 좌표","position":[-221.0488,-2,191.5689]},
+      {"title":"Smugglers base - northern warehouse","documents":"기술 문서","detail":"밀수꾼 기지 북쪽 창고","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"공식 위키 설명과 한국 커뮤니티 지점을 Tarkov Market의 방·POI 마커에 맞춘 좌표","position":[-566.7503,-6,-216.0061]},
+      {"title":"Pier building - lobby counter","documents":"기술 문서","detail":"Pier 건물 1층 로비 카운터","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"공식 위키 설명과 한국 커뮤니티 지점을 Tarkov Market의 방·POI 마커에 맞춘 좌표","position":[-311.8285,-5,479.5068]},
+      {"title":"Resort West Wing 316","documents":"기술 문서","detail":"서관 316호의 뒤집힌 선반","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"공식 위키 설명과 한국 커뮤니티 지점을 Tarkov Market의 방·POI 마커에 맞춘 좌표","position":[-190,8,-81]},
+      {"title":"Resort West Wing 211","documents":"시험 문서","detail":"서관 211호","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"공식 위키 설명과 한국 커뮤니티 지점을 Tarkov Market의 방·POI 마커에 맞춘 좌표","position":[-199,4.5,-85]},
+      {"title":"Resort East Wing 212","documents":"기술 문서","detail":"동관 212호","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"공식 위키 설명과 한국 커뮤니티 지점을 Tarkov Market의 방·POI 마커에 맞춘 좌표","position":[-307,4.5,-88]},
+      {"title":"Resort East Wing 218","documents":"시험 문서","detail":"동관 218호","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"공식 위키 설명과 한국 커뮤니티 지점을 Tarkov Market의 방·POI 마커에 맞춘 좌표","position":[-333,4.5,-84.8]},
+      {"title":"Resort East Wing 326","documents":"시험 문서","detail":"동관 326호","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"공식 위키 설명과 한국 커뮤니티 지점을 Tarkov Market의 방·POI 마커에 맞춘 좌표","position":[-353,8,-81]},
+      {"title":"Resort admin north wing - 2F safe office","documents":"기술 문서","detail":"북관 2층의 열린 금고 사무실","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"공식 위키 설명과 한국 커뮤니티 지점을 Tarkov Market의 방·POI 마커에 맞춘 좌표","position":[-241.3327,4.5,-153.7425]},
+      {"title":"Radio tower - laptop desk","documents":"기술 문서 / 시험 문서","detail":"라디오 타워의 노트북 책상","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"공식 위키 설명과 한국 커뮤니티 지점을 Tarkov Market의 방·POI 마커에 맞춘 좌표","position":[-708.7436,4,100.2098]},
+      {"title":"Weather station - 2F and tower","documents":"기술 문서 / 시험 문서","detail":"기상관측소 2층과 철탑","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"공식 위키 설명과 한국 커뮤니티 지점을 Tarkov Market의 방·POI 마커에 맞춘 좌표","position":[-488.7451,5,250.512]},
+      {"title":"Resort front bus-stop building","documents":"시험 문서","detail":"리조트 앞 버스정류장 건물 뒷문","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"공식 위키 설명과 한국 커뮤니티 지점을 Tarkov Market의 방·POI 마커에 맞춘 좌표","position":[-134.1,-1,-11.1]},
+      {"title":"Village white-car house - 1F entrance","documents":"시험 문서","detail":"입구에 흰 승용차가 있는 마을 주택 1층","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"공식 위키 설명과 한국 커뮤니티 지점을 Tarkov Market의 방·POI 마커에 맞춘 좌표","position":[451.8,-17,143.5]},
+      {"title":"Pier building - front entrance","documents":"시험 문서","detail":"Pier 건물 정면","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"공식 위키 설명과 한국 커뮤니티 지점을 Tarkov Market의 방·POI 마커에 맞춘 좌표","position":[-308.4345,-5,496.4758]}
     ],
     "labyrinth": [
-      {"title":"Central nuclear room","documents":"설계도·기술 도면","detail":"핵무기 밑부분 옆 상자, 수류탄 상자 근처","confidence":"confirmed","position":[0.00,0.00,0.00]}
+      {"title":"Wooden box","documents":"설계 및 기술 문서","detail":"나무 상자 위","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"한국 커뮤니티 지도 중심 기준 좌표","position":[0,0,0]},
+      {"title":"Dead worker by Observation Room","documents":"의료 문서","detail":"Observation Room 문 옆 작업자 시체","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"Tarkov Market Observation Room 마커 기준","position":[9.1791,0,7.2209]},
+      {"title":"Table by sixth Corpse Room key spawn","documents":"의료 문서","detail":"여섯 번째 Corpse Room 열쇠 스폰 옆 테이블","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"Tarkov Market Corpse Room key spawn 마커 기준","position":[-1.8871,0,3.5506]},
+      {"title":"Dead worker by Assembly Room","documents":"의료 문서","detail":"Assembly Room 옆 작업자 시체 발치","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"공식 위키의 Assembly Room 설명과 중앙 구역 기준","position":[2.5,0,-2.5]},
+      {"title":"Scientist inside Assembly Room","documents":"의료 문서","detail":"Assembly Room 내부 과학자 시체 팔 아래","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"공식 위키의 Assembly Room 설명과 중앙 구역 기준","position":[0,0,-1]}
     ],
-    "icebreaker": [],
+    "icebreaker": [
+      {"title":"Medical Office - level 1","documents":"PMC 인사 파일","detail":"1층 Medical Office 내부","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"Tarkov Market Laboratory/의료 구역 기준","position":[10.8114,0,41.4893]},
+      {"title":"Medical storage - level 1","documents":"시험 문서","detail":"1층 Medical Storage 내부","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"Tarkov Market Main Infirmary 구역 기준","position":[8.5,0,35]},
+      {"title":"Canteen east room - level 3","documents":"시험 문서","detail":"3층 식당 동쪽 방","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"Tarkov Market kitchen 퀘스트 마커 기준","position":[0.7945,8,42.4803]},
+      {"title":"Green-flare room by spawn - level 1","documents":"시험 문서","detail":"1층 스폰 인근 녹색 신호탄 방","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"Tarkov Market 녹색 신호탄 마커 기준","position":[0.8101,0,61.8041]},
+      {"title":"Drone room before helipad - level 2","documents":"시험 문서","detail":"헬리패드 직전 2층 드론 방","confidence":"reported","coordinateBasis":"reported-poi-center","coordinateNote":"Tarkov Market Helipad와 인접 실내 마커 기준","position":[-1.5864,4,-52.1048]}
+    ],
     "terminal": []
   }
 }
