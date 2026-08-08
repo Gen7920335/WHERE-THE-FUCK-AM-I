@@ -29,6 +29,10 @@ jobs:
         working-directory: eft-where-am-i
         run: npm ci
 
+      - name: Build frontend assets
+        working-directory: eft-where-am-i
+        run: npm run build:css
+
       - name: Publish self-contained portable app
         shell: pwsh
         run: |
