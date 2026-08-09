@@ -324,18 +324,20 @@ namespace eft_where_am_i.Classes
 
         private static void CopyPayload(string sourceDirectory, string targetDirectory)
         {
-            string sourceRoot = Path.GetFullPath(sourceDirectory) + Path.DirectorySeparatorChar;
-            string targetRoot = Path.GetFullPath(targetDirectory) + Path.DirectorySeparatorChar;
+            string normalizedSourceDirectory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(sourceDirectory));
+            string normalizedTargetDirectory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(targetDirectory));
+            string sourceRoot = normalizedSourceDirectory + Path.DirectorySeparatorChar;
+            string targetRoot = normalizedTargetDirectory + Path.DirectorySeparatorChar;
             string settingsPath = Path.Combine("assets", "settings.json");
             string backupRoot = Path.Combine(Path.GetTempPath(), "WHERE-THE-FUCK-AM-I", "backups", Guid.NewGuid().ToString("N"));
             List<(string Destination, string? Backup)> appliedFiles = [];
 
             try
             {
-                foreach (string sourceFile in Directory.EnumerateFiles(sourceDirectory, "*", SearchOption.AllDirectories))
+                foreach (string sourceFile in Directory.EnumerateFiles(normalizedSourceDirectory, "*", SearchOption.AllDirectories))
                 {
-                    string relativePath = Path.GetRelativePath(sourceDirectory, sourceFile);
-                    if (relativePath.Equals(settingsPath, StringComparison.OrdinalIgnoreCase) && File.Exists(Path.Combine(targetDirectory, relativePath)))
+                    string relativePath = Path.GetRelativePath(normalizedSourceDirectory, sourceFile);
+                    if (relativePath.Equals(settingsPath, StringComparison.OrdinalIgnoreCase) && File.Exists(Path.Combine(normalizedTargetDirectory, relativePath)))
                         continue;
                     if (relativePath.Equals("app.log", StringComparison.OrdinalIgnoreCase) ||
                         relativePath.Equals("quest_saves.db", StringComparison.OrdinalIgnoreCase) ||
@@ -343,7 +345,7 @@ namespace eft_where_am_i.Classes
                         continue;
 
                     string validatedSource = Path.GetFullPath(sourceFile);
-                    string destination = Path.GetFullPath(Path.Combine(targetDirectory, relativePath));
+                    string destination = Path.GetFullPath(Path.Combine(normalizedTargetDirectory, relativePath));
                     if (!validatedSource.StartsWith(sourceRoot, StringComparison.OrdinalIgnoreCase) ||
                         !destination.StartsWith(targetRoot, StringComparison.OrdinalIgnoreCase))
                         throw new InvalidOperationException("Unsafe update file path.");
