@@ -152,6 +152,11 @@
     </section>
     <section class="scale-stack w-full" style="grid-column: 4; grid-row: 3;">
       <div class="scale-control">
+        <label id="popupOpacityLabel" for="popupOpacitySlider" class="text-xs lg:text-sm xl:text-base font-medium">Popup Opacity</label>
+        <input id="popupOpacitySlider" type="range" min="30" max="100" step="5" value="100" oninput="previewPopupOpacity()" onchange="commitPopupOpacity()">
+        <output id="popupOpacityValue" for="popupOpacitySlider" class="text-xs lg:text-sm xl:text-base font-medium">100%</output>
+      </div>
+      <div class="scale-control">
         <label id="fontScaleLabel" for="fontScaleSlider" class="text-xs lg:text-sm xl:text-base font-medium">Font Size</label>
         <input id="fontScaleSlider" type="range" min="50" max="150" step="5" value="100" oninput="previewFontScale()" onchange="commitFontScale()">
         <output id="fontScaleValue" for="fontScaleSlider" class="text-xs lg:text-sm xl:text-base font-medium">100%</output>
@@ -193,6 +198,7 @@
       document.getElementById('autoPanningLabel').textContent = i18next.t('autoPanningLabel');
       document.getElementById('floorDbEditorButton').textContent = i18next.t('floorDbEditorButton');
       document.getElementById('autoScreenshotCleanupLabel').textContent = i18next.t('autoScreenshotCleanupLabel');
+      document.getElementById('popupOpacityLabel').textContent = i18next.t('popupOpacityLabel');
       document.getElementById('fontScaleLabel').textContent = i18next.t('fontScaleLabel');
       document.getElementById('iconScaleLabel').textContent = i18next.t('iconScaleLabel');
     }
@@ -347,13 +353,27 @@
       }
     }
 
-    function setScaleControls(fontScale, iconScale) {
+    function setScaleControls(fontScale, iconScale, popupOpacity) {
       const fontPercent = Math.min(150, Math.max(50, Math.round((Number(fontScale) || 1) * 100)));
       const iconPercent = Math.min(650, Math.max(50, Math.round((Number(iconScale) || 1) * 100)));
+      const popupPercent = Math.min(100, Math.max(30, Math.round((Number(popupOpacity) || 1) * 100)));
+      document.getElementById('popupOpacitySlider').value = popupPercent;
+      document.getElementById('popupOpacityValue').textContent = popupPercent + '%';
       document.getElementById('fontScaleSlider').value = fontPercent;
       document.getElementById('fontScaleValue').textContent = fontPercent + '%';
       document.getElementById('iconScaleSlider').value = iconPercent;
       document.getElementById('iconScaleValue').textContent = iconPercent + '%';
+    }
+
+    function previewPopupOpacity() {
+      const percent = Number(document.getElementById('popupOpacitySlider').value);
+      document.getElementById('popupOpacityValue').textContent = percent + '%';
+      window.chrome.webview.postMessage(JSON.stringify({ action: 'popup-opacity-preview', opacity: percent / 100 }));
+    }
+
+    function commitPopupOpacity() {
+      const percent = Number(document.getElementById('popupOpacitySlider').value);
+      window.chrome.webview.postMessage(JSON.stringify({ action: 'popup-opacity-changed', opacity: percent / 100 }));
     }
 
     function previewFontScale() {

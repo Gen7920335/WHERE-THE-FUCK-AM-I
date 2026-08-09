@@ -3,9 +3,11 @@
   window.__wtfEnhancementsInstalled = true;
 
   const state = {
+    language: 'en',
     uiScale: 1,
     fontScale: 1,
     iconScale: 1,
+    popupOpacity: 1,
     questRequirementsPanel: {
       mode: 'right',
       x: 0,
@@ -111,6 +113,7 @@
     root.style.setProperty('--wtf-ui-scale', String(state.uiScale));
     root.style.setProperty('--wtf-font-scale', String(state.fontScale));
     root.style.setProperty('--wtf-icon-scale', String(state.iconScale));
+    root.style.setProperty('--wtf-popup-opacity', String(state.popupOpacity));
 
     let style = document.getElementById('wtf-enhancement-styles');
     if (!style) {
@@ -142,9 +145,11 @@
   };
 
   window.__wtfSetEnhancementSettings = (settings = {}) => {
+    state.language = String(settings.language || 'en').toLowerCase();
     state.uiScale = clamp(settings.uiScale, 0.65, 2, 1);
     state.fontScale = clamp(settings.fontScale, 0.5, 1.5, 1);
     state.iconScale = clamp(settings.iconScale, 0.5, 6.5, 1);
+    state.popupOpacity = clamp(settings.popupOpacity, 0.3, 1, 1);
     const panel = settings.questRequirementsPanel || {};
     const mode = String(panel.mode || 'right').toLowerCase();
     state.questRequirementsPanel = {
@@ -158,12 +163,17 @@
     applyDomScale();
     applyQuestRequirementsPanelLayout();
     requestMarkerRedraw();
+    renderQuestRequirementsPanel();
   };
 
   const wtfOverlayState = {
     battlePass: { map: '', markers: [] },
     battlePassVisible: false,
     battlePassLayer: null,
+    battlePassPopup: null,
+    battlePassPopupMarker: null,
+    battlePassPhotoIndex: 0,
+    floorEventsInstalled: false,
     squad: { map: '', members: [] },
     squadLayer: null,
     mapWrap: null,
@@ -177,8 +187,124 @@
     questSelectionKey: '',
     questRequirementsSaveTimer: 0,
     questRequirementsResizeObserver: null,
+    questTranslations: new Map(),
     updateFrame: 0,
     hydrateFrame: 0
+  };
+
+  window.__wtfSetQuestTranslations = (translations = {}) => {
+    wtfOverlayState.questTranslations = new Map(Object.entries(translations || {}));
+    renderQuestRequirementsPanel();
+  };
+
+  const isKoreanQuestMode = () => state.language === 'ko' || state.language.startsWith('ko-');
+
+  const questPanelCopy = (key, count = 0) => {
+    const english = {
+      title: `Quest requirements (${count})`,
+      ariaLabel: 'Pinned quest requirements',
+      prerequisites: 'Prerequisites',
+      objectives: 'Objectives',
+      noPrerequisites: 'No prerequisite quests',
+      noObjectives: 'No objectives listed',
+      loading: 'Loading requirements…',
+      loadError: 'Unable to load quest requirements',
+      dockRight: 'Dock right',
+      dockBottom: 'Dock bottom',
+      expand: 'Expand',
+      collapse: 'Collapse'
+    };
+    if (!isKoreanQuestMode()) return english[key] || key;
+    const korean = {
+      title: `고정 퀘스트 할 일 (${count})`,
+      ariaLabel: '고정한 퀘스트의 선행 조건과 목표',
+      prerequisites: '선행 조건',
+      objectives: '현재 목표',
+      noPrerequisites: '필요한 선행 퀘스트 없음',
+      noObjectives: '표시할 목표 없음',
+      loading: '퀘스트 내용을 불러오는 중…',
+      loadError: '퀘스트 내용을 불러오지 못했습니다',
+      dockRight: '오른쪽에 고정',
+      dockBottom: '아래쪽에 고정',
+      expand: '펼치기',
+      collapse: '접기'
+    };
+    return korean[key] || english[key] || key;
+  };
+
+  const translateEliminationTargetKo = (value) => {
+    let target = String(value || '').trim();
+    const locationMatch = target.match(/^(.+?)\s+(?:on|in)\s+(.+?)(?=\s+while\s+|$)/i);
+    if (locationMatch) {
+      const remainder = target.slice(locationMatch[0].length).trim();
+      target = `${locationMatch[2]}에서 ${locationMatch[1]}${remainder ? ` ${remainder}` : ''}`;
+    }
+    target = target
+      .replace(/\s+while using\s+(.+)$/i, ' — $1 사용 중')
+      .replace(/\s+while wearing\s+(.+)$/i, ' — $1 착용 중')
+      .replace(/\s+without wearing\s+(.+)$/i, ' — $1 미착용')
+      .replace(/\s+with (?:a )?headshots?$/i, ' — 헤드샷으로')
+      .replace(/\s+from (?:a )?distance of (?:more than|over)\s+(.+)$/i, ' — $1 초과 거리에서')
+      .replace(/\s+during (?:the )?night(?:time)?$/i, ' — 야간에');
+    return target;
+  };
+
+  const fallbackQuestStepKo = (source, section) => {
+    let text = String(source || '').replace(/\s+/g, ' ').trim().replace(/[.;]$/, '');
+    if (!text) return text;
+
+    const optional = /^\[?optional\]?[:\s-]*/i.test(text);
+    text = text.replace(/^\[?optional\]?[:\s-]*/i, '');
+    const finish = (value) => optional ? `${value} (선택)` : value;
+    let match;
+
+    if (section === 'requirements') {
+      if ((match = text.match(/^After (?:taking|accepting):?\s*(.+)$/i))) return `${match[1]} 수락 후`;
+      if ((match = text.match(/^After completing:?\s*(.+)$/i))) return `${match[1]} 완료 후`;
+      if ((match = text.match(/^If failed:?\s*(.+)$/i))) return `${match[1]} 실패 시`;
+      if ((match = text.match(/^(?:Completed|Complete):?\s*(.+)$/i))) return `${match[1]} 완료 필요`;
+      if ((match = text.match(/^One of:?\s*(.+)$/i))) return `다음 중 하나 필요: ${match[1]}`;
+      if ((match = text.match(/^Player level\s+(.+)$/i))) return `플레이어 레벨 ${match[1]} 필요`;
+      if ((match = text.match(/^Loyalty level\s+(.+)\s+with\s+(.+)$/i))) return `${match[2]} 우호도 레벨 ${match[1]} 필요`;
+    }
+
+    if ((match = text.match(/^Find and hand over\s+(.+?)\s+in raid$/i))) return finish(`레이드에서 ${match[1]} 찾아 건네주기`);
+    if ((match = text.match(/^Find and hand over\s+(.+)$/i))) return finish(`${match[1]} 찾아 건네주기`);
+    if ((match = text.match(/^Hand over the found in raid item:?\s*(.+)$/i))) return finish(`레이드에서 발견한 ${match[1]} 건네주기`);
+    if ((match = text.match(/^Hand over\s+(.+)$/i))) return finish(`${match[1]} 건네주기`);
+    if ((match = text.match(/^Find\s+(.+?)\s+in raid$/i))) return finish(`레이드에서 ${match[1]} 찾기`);
+    if ((match = text.match(/^Find\s+(.+)$/i))) return finish(`${match[1]} 찾기`);
+    if ((match = text.match(/^(?:Obtain|Acquire|Get)\s+(.+)$/i))) return finish(`${match[1]} 획득하기`);
+    if ((match = text.match(/^Survive and extract from\s+(.+)$/i))) return finish(`${match[1]}에서 생존하여 탈출하기`);
+    if ((match = text.match(/^(?:Extract|Evacuate) from\s+(.+)$/i))) return finish(`${match[1]}에서 탈출하기`);
+    if ((match = text.match(/^Use the transit from\s+(.+?)\s+to\s+(.+)$/i))) return finish(`${match[1]}에서 ${match[2]}로 가는 환승 이용하기`);
+    if ((match = text.match(/^Locate and mark\s+(.+?)\s+with\s+(.+?)(?:\s+(?:on|in)\s+(.+))?$/i))) {
+      return finish(`${match[3] ? `${match[3]}에서 ` : ''}${match[1]} 찾아 ${match[2]}로 표식하기`);
+    }
+    if ((match = text.match(/^Mark\s+(.+?)\s+with\s+(.+)$/i))) return finish(`${match[1]}에 ${match[2]}로 표식하기`);
+    if ((match = text.match(/^Locate\s+(.+?)\s+(?:on|in)\s+(.+)$/i))) return finish(`${match[2]}에서 ${match[1]} 위치 확인하기`);
+    if ((match = text.match(/^(?:Locate|Discover)\s+(.+)$/i))) return finish(`${match[1]} 위치 확인하기`);
+    if ((match = text.match(/^Visit\s+(.+)$/i))) return finish(`${match[1]} 방문하기`);
+    if ((match = text.match(/^(?:Eliminate|Kill)\s+(.+)$/i))) return finish(`${translateEliminationTargetKo(match[1])} 처치하기`);
+    if ((match = text.match(/^Plant\s+(.+?)\s+(?:at|in|on)\s+(.+)$/i))) return finish(`${match[2]}에 ${match[1]} 설치하기`);
+    if ((match = text.match(/^Stash\s+(.+?)\s+(?:at|in|on)\s+(.+)$/i))) return finish(`${match[2]}에 ${match[1]} 숨겨두기`);
+    if ((match = text.match(/^Place\s+(.+?)\s+(?:at|in|on)\s+(.+)$/i))) return finish(`${match[2]}에 ${match[1]} 놓기`);
+    if ((match = text.match(/^(?:Retrieve|Recover)\s+(.+)$/i))) return finish(`${match[1]} 회수하기`);
+    if ((match = text.match(/^(?:Deliver|Turn in)\s+(.+)$/i))) return finish(`${match[1]} 전달하기`);
+    if ((match = text.match(/^Reach\s+(.+)$/i))) return finish(`${match[1]} 달성하기`);
+    if ((match = text.match(/^Complete\s+(.+)$/i))) return finish(`${match[1]} 완료하기`);
+    if ((match = text.match(/^Talk to\s+(.+)$/i))) return finish(`${match[1]}에게 말 걸기`);
+    if ((match = text.match(/^Activate\s+(.+)$/i))) return finish(`${match[1]} 작동시키기`);
+    if ((match = text.match(/^Unlock\s+(.+)$/i))) return finish(`${match[1]} 잠금 해제하기`);
+    if ((match = text.match(/^Use\s+(.+)$/i))) return finish(`${match[1]} 사용하기`);
+    return finish(text);
+  };
+
+  const translateQuestStep = (text, section) => {
+    const source = String(text || '').replace(/\s+/g, ' ').trim();
+    if (!isKoreanQuestMode() || !source) return source;
+    const official = wtfOverlayState.questTranslations.get(source);
+    return official || fallbackQuestStepKo(source, section);
   };
 
   const installWtfOverlayStyles = () => {
@@ -331,6 +457,9 @@
         cursor: pointer;
         user-select: none;
       }
+      .map-popup {
+        opacity: var(--wtf-popup-opacity, 1) !important;
+      }
       .wtf-battle-pass-icon-wrap {
         align-items: center;
         display: inline-flex !important;
@@ -397,15 +526,128 @@
         pointer-events: none !important;
       }
       .wtf-battle-pass-marker {
+        cursor: pointer;
         height: 14px;
         left: 0;
-        pointer-events: none !important;
+        pointer-events: auto !important;
         position: absolute;
         top: 0;
         transform: translate(-50%, -50%) scale(var(--wtf-icon-scale, 1));
         transform-origin: center;
         user-select: none;
         width: 14px;
+      }
+      .wtf-battle-pass-marker.wtf-other-floor {
+        opacity: 0.35;
+      }
+      .wtf-battle-pass-marker:focus-visible {
+        outline: 2px solid #e5b35c;
+        outline-offset: 4px;
+      }
+      .wtf-battle-pass-popup.map-popup {
+        box-sizing: border-box;
+        margin: 0;
+        pointer-events: auto;
+        position: absolute;
+        transform: translateX(calc(-50% - 10px)) translateY(calc(-100% - 24px));
+        transform-origin: calc(50% + 10px) calc(100% + 24px);
+        z-index: 30;
+      }
+      .wtf-battle-pass-popup[hidden] {
+        display: none !important;
+      }
+      .wtf-popup-close {
+        align-items: center;
+        background: transparent !important;
+        border: 0 !important;
+        color: #a49d90 !important;
+        cursor: pointer;
+        display: inline-flex;
+        font-family: Arial, sans-serif;
+        font-size: 24px !important;
+        font-weight: 400 !important;
+        height: 28px;
+        justify-content: center;
+        line-height: 24px !important;
+        margin: -6px -7px 0 8px !important;
+        min-width: 28px !important;
+        padding: 0 !important;
+        width: 28px;
+      }
+      .wtf-popup-close:hover,
+      .wtf-popup-close:focus-visible {
+        color: #e5b35c !important;
+      }
+      .map-popup:not(.wtf-battle-pass-popup) .large.pointer.text-right {
+        display: none !important;
+      }
+      .wtf-battle-pass-title {
+        padding-right: 4px;
+      }
+      .wtf-battle-pass-details {
+        white-space: normal;
+      }
+      .wtf-battle-pass-photo-frame {
+        background: #111;
+        margin-top: 10px;
+        min-height: 180px;
+        overflow: hidden;
+        position: relative;
+      }
+      .wtf-battle-pass-photo {
+        display: block;
+        height: auto;
+        max-height: min(52vh, 520px);
+        object-fit: contain;
+        width: 100%;
+      }
+      .wtf-battle-pass-photo-nav {
+        display: flex;
+        inset: 0;
+        justify-content: space-between;
+        pointer-events: none;
+        position: absolute;
+      }
+      .wtf-battle-pass-photo-nav button {
+        background: linear-gradient(90deg, rgba(0, 0, 0, .72), transparent) !important;
+        border: 0 !important;
+        color: #e5b35c !important;
+        cursor: pointer;
+        font-size: 28px !important;
+        min-width: 42px !important;
+        opacity: .75;
+        padding: 0 8px !important;
+        pointer-events: auto;
+      }
+      .wtf-battle-pass-photo-nav button:last-child {
+        background: linear-gradient(270deg, rgba(0, 0, 0, .72), transparent) !important;
+      }
+      .wtf-battle-pass-photo-nav button:hover {
+        opacity: 1;
+      }
+      .wtf-battle-pass-photo-meta {
+        align-items: center;
+        display: flex;
+        gap: 8px;
+        justify-content: space-between;
+        padding-top: 6px;
+      }
+      .wtf-battle-pass-photo-source {
+        color: #a49d90 !important;
+        font-size: 11px;
+        text-decoration: none;
+      }
+      .wtf-battle-pass-photo-source:hover {
+        color: #e5b35c !important;
+      }
+      .wtf-battle-pass-photo-empty {
+        align-items: center;
+        color: #a49d90;
+        display: flex;
+        justify-content: center;
+        min-height: 180px;
+        padding: 20px;
+        text-align: center;
       }
       #wtf-squad-layer {
         inset: 0;
@@ -550,7 +792,7 @@
     const collapseButton = panel.querySelector('[data-action="collapse"]');
     if (collapseButton) {
       collapseButton.textContent = layout.collapsed ? '+' : '−';
-      collapseButton.title = layout.collapsed ? 'Expand' : 'Collapse';
+      collapseButton.title = layout.collapsed ? questPanelCopy('expand') : questPanelCopy('collapse');
     }
   };
 
@@ -599,20 +841,20 @@
     panel = document.createElement('section');
     panel.id = 'wtf-quest-requirements-panel';
     panel.hidden = true;
-    panel.setAttribute('aria-label', 'Pinned quest requirements');
+    panel.setAttribute('aria-label', questPanelCopy('ariaLabel'));
 
     const header = document.createElement('div');
     header.className = 'wtf-quest-requirements-header';
     const title = document.createElement('div');
     title.className = 'wtf-quest-requirements-title';
-    title.textContent = 'Quest requirements';
+    title.textContent = questPanelCopy('title', 0);
 
     const rightButton = document.createElement('button');
     rightButton.type = 'button';
     rightButton.className = 'wtf-quest-requirements-button';
     rightButton.dataset.dock = 'right';
     rightButton.textContent = 'R';
-    rightButton.title = 'Dock right';
+    rightButton.title = questPanelCopy('dockRight');
     rightButton.addEventListener('click', () => setQuestRequirementsDock('right'));
 
     const bottomButton = document.createElement('button');
@@ -620,7 +862,7 @@
     bottomButton.className = 'wtf-quest-requirements-button';
     bottomButton.dataset.dock = 'bottom';
     bottomButton.textContent = 'B';
-    bottomButton.title = 'Dock bottom';
+    bottomButton.title = questPanelCopy('dockBottom');
     bottomButton.addEventListener('click', () => setQuestRequirementsDock('bottom'));
 
     const collapseButton = document.createElement('button');
@@ -725,7 +967,7 @@
         return details;
       })
       .catch((error) => {
-        const details = { error: error?.message || 'Unable to load quest requirements' };
+        const details = { error: error?.message || questPanelCopy('loadError') };
         wtfOverlayState.questRequirementsCache.set(quest.id, details);
         return details;
       })
@@ -738,7 +980,7 @@
     return pending;
   };
 
-  const appendQuestRequirementsSection = (card, label, items, emptyText) => {
+  const appendQuestRequirementsSection = (card, label, items, emptyText, sectionKind) => {
     const section = document.createElement('div');
     section.className = 'wtf-quest-requirements-section';
     const heading = document.createElement('div');
@@ -750,7 +992,7 @@
       list.className = 'wtf-quest-requirements-list';
       for (const item of items) {
         const row = document.createElement('li');
-        row.textContent = item;
+        row.textContent = translateQuestStep(item, sectionKind);
         list.appendChild(row);
       }
       section.appendChild(list);
@@ -771,7 +1013,10 @@
 
     const title = panel.querySelector('.wtf-quest-requirements-title');
     const body = panel.querySelector('.wtf-quest-requirements-body');
-    title.textContent = `Quest requirements (${quests.length})`;
+    panel.setAttribute('aria-label', questPanelCopy('ariaLabel'));
+    panel.querySelector('[data-dock="right"]')?.setAttribute('title', questPanelCopy('dockRight'));
+    panel.querySelector('[data-dock="bottom"]')?.setAttribute('title', questPanelCopy('dockBottom'));
+    title.textContent = questPanelCopy('title', quests.length);
     body.replaceChildren();
 
     for (const quest of quests) {
@@ -786,17 +1031,27 @@
       if (!details) {
         const loading = document.createElement('div');
         loading.className = 'wtf-quest-requirements-status';
-        loading.textContent = 'Loading requirements…';
+        loading.textContent = questPanelCopy('loading');
         card.appendChild(loading);
         loadQuestRequirements(quest);
       } else if (details.error) {
         const error = document.createElement('div');
         error.className = 'wtf-quest-requirements-status';
-        error.textContent = details.error;
+        error.textContent = isKoreanQuestMode() ? questPanelCopy('loadError') : details.error;
         card.appendChild(error);
       } else {
-        appendQuestRequirementsSection(card, 'Prerequisites', details.requirements || [], 'No prerequisite quests');
-        appendQuestRequirementsSection(card, 'Objectives', details.objectives || [], 'No objectives listed');
+        appendQuestRequirementsSection(
+          card,
+          questPanelCopy('prerequisites'),
+          details.requirements || [],
+          questPanelCopy('noPrerequisites'),
+          'requirements');
+        appendQuestRequirementsSection(
+          card,
+          questPanelCopy('objectives'),
+          details.objectives || [],
+          questPanelCopy('noObjectives'),
+          'objectives');
       }
       body.appendChild(card);
     }
@@ -964,6 +1219,190 @@
     return { left, top };
   };
 
+  const applyNativePopupScope = (element) => {
+    element.setAttribute('data-v-6c75efb4', '');
+    return element;
+  };
+
+  const closeBattlePassPopup = () => {
+    if (wtfOverlayState.battlePassPopup) {
+      wtfOverlayState.battlePassPopup.hidden = true;
+      wtfOverlayState.battlePassPopup.replaceChildren();
+    }
+    wtfOverlayState.battlePassPopupMarker = null;
+    wtfOverlayState.battlePassPhotoIndex = 0;
+  };
+
+  const updateBattlePassPopupPosition = () => {
+    const popup = wtfOverlayState.battlePassPopup;
+    const marker = wtfOverlayState.battlePassPopupMarker;
+    if (!popup?.isConnected || popup.hidden || !marker?.isConnected) return;
+    popup.style.left = marker.style.left;
+    popup.style.top = marker.style.top;
+  };
+
+  const createBattlePassPhotoView = (markerData) => {
+    const photos = Array.isArray(markerData.photos) ? markerData.photos : [];
+    const frame = applyNativePopupScope(document.createElement('div'));
+    frame.className = 'wtf-battle-pass-photo-frame';
+
+    if (!photos.length) {
+      const empty = applyNativePopupScope(document.createElement('div'));
+      empty.className = 'wtf-battle-pass-photo-empty';
+      empty.textContent = state.language === 'ko'
+        ? '이 지점에 직접 연결된 검증 사진이 아직 없습니다.'
+        : 'No verified photo is linked to this spawn yet.';
+      frame.appendChild(empty);
+      return frame;
+    }
+
+    const photoIndex = Math.min(Math.max(0, wtfOverlayState.battlePassPhotoIndex), photos.length - 1);
+    wtfOverlayState.battlePassPhotoIndex = photoIndex;
+    const photoData = photos[photoIndex] || {};
+    const image = applyNativePopupScope(document.createElement('img'));
+    image.className = 'wtf-battle-pass-photo';
+    image.src = String(photoData.url || '');
+    image.alt = String(photoData.caption || markerData.title || 'Battle Pass spawn');
+    image.addEventListener('error', () => {
+      image.hidden = true;
+      const error = applyNativePopupScope(document.createElement('div'));
+      error.className = 'wtf-battle-pass-photo-empty';
+      error.textContent = state.language === 'ko'
+        ? '사진을 불러오지 못했습니다.'
+        : 'The photo could not be loaded.';
+      frame.appendChild(error);
+    }, { once: true });
+    frame.appendChild(image);
+
+    if (photos.length > 1) {
+      const nav = applyNativePopupScope(document.createElement('div'));
+      nav.className = 'wtf-battle-pass-photo-nav';
+      const previous = applyNativePopupScope(document.createElement('button'));
+      previous.type = 'button';
+      previous.textContent = '‹';
+      previous.title = state.language === 'ko' ? '이전 사진' : 'Previous photo';
+      previous.addEventListener('click', (event) => {
+        event.stopPropagation();
+        wtfOverlayState.battlePassPhotoIndex = (photoIndex - 1 + photos.length) % photos.length;
+        renderBattlePassPopup(markerData);
+      });
+      const next = applyNativePopupScope(document.createElement('button'));
+      next.type = 'button';
+      next.textContent = '›';
+      next.title = state.language === 'ko' ? '다음 사진' : 'Next photo';
+      next.addEventListener('click', (event) => {
+        event.stopPropagation();
+        wtfOverlayState.battlePassPhotoIndex = (photoIndex + 1) % photos.length;
+        renderBattlePassPopup(markerData);
+      });
+      nav.append(previous, next);
+      frame.appendChild(nav);
+    }
+    return frame;
+  };
+
+  const renderBattlePassPopup = (markerData) => {
+    const popup = wtfOverlayState.battlePassPopup;
+    if (!popup) return;
+    popup.replaceChildren();
+
+    const inner = applyNativePopupScope(document.createElement('div'));
+    inner.className = 'inner';
+    const header = applyNativePopupScope(document.createElement('div'));
+    header.className = 'd-flex h-space-between v-start';
+    const titleWrap = applyNativePopupScope(document.createElement('div'));
+    titleWrap.className = 'w-100';
+    const title = applyNativePopupScope(document.createElement('div'));
+    title.className = 'title wtf-battle-pass-title';
+    title.textContent = String(markerData.title || 'Battle Pass document');
+    titleWrap.appendChild(title);
+
+    const close = applyNativePopupScope(document.createElement('button'));
+    close.type = 'button';
+    close.className = 'wtf-popup-close';
+    close.textContent = '×';
+    close.title = state.language === 'ko' ? '닫기' : 'Close';
+    close.setAttribute('aria-label', close.title);
+    close.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      closeBattlePassPopup();
+    });
+    header.append(titleWrap, close);
+
+    const details = applyNativePopupScope(document.createElement('div'));
+    details.className = 'wtf-battle-pass-details';
+    details.textContent = String(markerData.details || '');
+    inner.append(header, details, createBattlePassPhotoView(markerData));
+
+    const photos = Array.isArray(markerData.photos) ? markerData.photos : [];
+    const meta = applyNativePopupScope(document.createElement('div'));
+    meta.className = 'wtf-battle-pass-photo-meta';
+    const counter = applyNativePopupScope(document.createElement('span'));
+    counter.className = 'sub alt';
+    counter.textContent = photos.length
+      ? `${wtfOverlayState.battlePassPhotoIndex + 1} / ${photos.length}`
+      : '0 / 0';
+    const source = applyNativePopupScope(document.createElement('a'));
+    source.className = 'wtf-battle-pass-photo-source';
+    source.href = String(markerData.photoSourceUrl || 'https://github.com/Perofunyang/battlepass_interactive_map');
+    source.target = '_blank';
+    source.rel = 'noopener noreferrer';
+    source.textContent = state.language === 'ko' ? '사진 출처' : 'Photo source';
+    meta.append(counter, source);
+    inner.appendChild(meta);
+    popup.appendChild(inner);
+    popup.hidden = false;
+    updateBattlePassPopupPosition();
+  };
+
+  const ensureBattlePassPopup = () => {
+    const mapContainer = document.querySelector('.map-cont');
+    if (!mapContainer) return null;
+    let popup = wtfOverlayState.battlePassPopup;
+    if (!popup?.isConnected || popup.parentElement !== mapContainer) {
+      popup?.remove();
+      popup = applyNativePopupScope(document.createElement('div'));
+      popup.className = 'map-popup wtf-battle-pass-popup';
+      popup.hidden = true;
+      popup.setAttribute('role', 'dialog');
+      popup.addEventListener('pointerdown', (event) => event.stopPropagation());
+      popup.addEventListener('mousedown', (event) => event.stopPropagation());
+      popup.addEventListener('click', (event) => event.stopPropagation());
+      mapContainer.appendChild(popup);
+      wtfOverlayState.battlePassPopup = popup;
+    }
+    return popup;
+  };
+
+  const openBattlePassPopup = (markerData, marker) => {
+    ensureBattlePassPopup();
+    wtfOverlayState.battlePassPopupMarker = marker;
+    wtfOverlayState.battlePassPhotoIndex = 0;
+    renderBattlePassPopup(markerData);
+  };
+
+  const ensureNativeQuestPopupCloseButton = () => {
+    for (const popup of document.querySelectorAll('.map-popup:not(.wtf-battle-pass-popup)')) {
+      const nativeSizeToggle = popup.querySelector('.large.pointer.text-right');
+      nativeSizeToggle?.setAttribute('aria-hidden', 'true');
+      const controls = nativeSizeToggle?.parentElement || popup.querySelector('.ml-15.self-start');
+      if (!controls || controls.querySelector('.wtf-native-popup-close')) continue;
+      const close = applyNativePopupScope(document.createElement('button'));
+      close.type = 'button';
+      close.className = 'wtf-popup-close wtf-native-popup-close';
+      close.textContent = '×';
+      close.title = state.language === 'ko' ? '닫기' : 'Close';
+      close.setAttribute('aria-label', close.title);
+      close.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      });
+      controls.appendChild(close);
+    }
+  };
+
   const updateBattlePassPositions = () => {
     wtfOverlayState.updateFrame = 0;
     const overlay = wtfOverlayState.battlePassLayer;
@@ -996,11 +1435,58 @@
       marker.style.left = (layout.left + originX + (matrix.a * relativeX) + (matrix.c * relativeY) + matrix.e) + 'px';
       marker.style.top = (layout.top + originY + (matrix.b * relativeX) + (matrix.d * relativeY) + matrix.f) + 'px';
     }
+    updateBattlePassPopupPosition();
   };
 
   const scheduleBattlePassPositionUpdate = () => {
     if (wtfOverlayState.updateFrame) return;
     wtfOverlayState.updateFrame = requestAnimationFrame(updateBattlePassPositions);
+  };
+
+  const readFloorLevel = (input) => {
+    if (!input) return null;
+    const text = [
+      input.getAttribute('aria-label'),
+      input.value,
+      input.closest('label')?.textContent,
+      input.parentElement?.textContent
+    ].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+
+    if (/\b(?:basement|bunker|underground)\b/i.test(text)) return 0;
+    if (/\b(?:main|ground)\b/i.test(text)) return 1;
+    const levelMatch = text.match(/\blevel\s*([1-5])\b/i);
+    if (levelMatch) return Number(levelMatch[1]);
+    const shortMatch = text.match(/\b([1-5])\s*(?:f|층)\b/i);
+    return shortMatch ? Number(shortMatch[1]) : null;
+  };
+
+  const updateBattlePassFloorOpacity = () => {
+    const floorInputs = Array.from(document.querySelectorAll('.no-wrap input[name="layers"]'));
+    const selectedInput = floorInputs.find((input) => input.checked || input.getAttribute('aria-checked') === 'true');
+    const selectedFloor = floorInputs.length > 1 ? readFloorLevel(selectedInput) : null;
+
+    for (const marker of document.querySelectorAll('.wtf-battle-pass-marker')) {
+      const markerFloor = Number(marker.dataset.floor);
+      const isOtherFloor = selectedFloor !== null
+        && Number.isFinite(markerFloor)
+        && markerFloor !== selectedFloor;
+      marker.classList.toggle('wtf-other-floor', isOtherFloor);
+    }
+  };
+
+  const installFloorEvents = () => {
+    if (wtfOverlayState.floorEventsInstalled) return;
+    wtfOverlayState.floorEventsInstalled = true;
+    document.addEventListener('change', (event) => {
+      if (event.target instanceof Element && event.target.matches('.no-wrap input[name="layers"]')) {
+        requestAnimationFrame(updateBattlePassFloorOpacity);
+      }
+    });
+    document.addEventListener('click', (event) => {
+      if (event.target instanceof Element && event.target.closest('.no-wrap input[name="layers"], .no-wrap label')) {
+        requestAnimationFrame(updateBattlePassFloorOpacity);
+      }
+    });
   };
 
   const observeMapTransform = (mapContainer, mapWrap) => {
@@ -1024,6 +1510,7 @@
   const renderBattlePassMarkers = () => {
     const overlay = wtfOverlayState.battlePassLayer;
     if (!overlay) return;
+    closeBattlePassPopup();
     overlay.replaceChildren();
     overlay.hidden = !wtfOverlayState.battlePassVisible;
 
@@ -1033,9 +1520,26 @@
       marker.dataset.left = String(markerData.left);
       marker.dataset.top = String(markerData.top);
       marker.dataset.elevation = String(markerData.elevation ?? '');
+      marker.dataset.floor = String(markerData.floor ?? '');
       marker.title = [markerData.title, markerData.details].filter(Boolean).join(' · ');
-      marker.setAttribute('aria-hidden', 'true');
-      marker.tabIndex = -1;
+      marker.setAttribute('role', 'button');
+      marker.setAttribute('aria-label', marker.title);
+      marker.tabIndex = 0;
+      const stopMarkerEvent = (event) => event.stopPropagation();
+      marker.addEventListener('pointerdown', stopMarkerEvent);
+      marker.addEventListener('mousedown', stopMarkerEvent);
+      marker.addEventListener('dblclick', stopMarkerEvent);
+      marker.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        openBattlePassPopup(markerData, marker);
+      });
+      marker.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        event.stopPropagation();
+        openBattlePassPopup(markerData, marker);
+      });
 
       const cross = document.createElement('span');
       cross.className = 'wtf-blue-cross';
@@ -1043,6 +1547,7 @@
       marker.appendChild(cross);
       overlay.appendChild(marker);
     }
+    updateBattlePassFloorOpacity();
     scheduleBattlePassPositionUpdate();
   };
 
@@ -1121,6 +1626,7 @@
     if (wtfOverlayState.battlePassLayer) {
       wtfOverlayState.battlePassLayer.hidden = !wtfOverlayState.battlePassVisible;
     }
+    if (!wtfOverlayState.battlePassVisible) closeBattlePassPopup();
     const control = document.getElementById('wtf-battle-pass-control');
     if (control) {
       control.classList.toggle('active', wtfOverlayState.battlePassVisible);
@@ -1196,7 +1702,10 @@
     syncQuestRequirementsPanel();
     ensureBattlePassControl();
     ensureBattlePassLayer();
+    ensureBattlePassPopup();
+    ensureNativeQuestPopupCloseButton();
     ensureSquadLayer();
+    updateBattlePassFloorOpacity();
   };
 
   const scheduleWtfEnhancementHydration = () => {
@@ -1215,6 +1724,11 @@
     });
     window.addEventListener('resize', scheduleBattlePassPositionUpdate, { passive: true });
     window.addEventListener('resize', applyQuestRequirementsPanelLayout, { passive: true });
+    window.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && wtfOverlayState.battlePassPopup && !wtfOverlayState.battlePassPopup.hidden) {
+        closeBattlePassPopup();
+      }
+    });
     scheduleWtfEnhancementHydration();
   };
 
@@ -1226,8 +1740,10 @@
       };
       wtfOverlayState.battlePassVisible = Boolean(visible);
       installWtfOverlayStyles();
+      installFloorEvents();
       ensureBattlePassControl();
       ensureBattlePassLayer();
+      ensureBattlePassPopup();
       renderBattlePassMarkers();
       setBattlePassVisible(visible, false);
       startWtfEnhancementObserver();

@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 using Newtonsoft.Json.Linq;
 
 namespace eft_where_am_i.Classes
@@ -14,8 +15,11 @@ namespace eft_where_am_i.Classes
         public double left { get; set; }
         public double top { get; set; }
         public double elevation { get; set; }
+        public int floor { get; set; }
         public string title { get; set; } = string.Empty;
         public string details { get; set; } = string.Empty;
+        public List<BattlePassOverlayPhoto> photos { get; set; } = new();
+        public string photoSourceUrl { get; set; } = string.Empty;
     }
 
     internal sealed class BattlePassOverlayDataService
@@ -65,13 +69,18 @@ namespace eft_where_am_i.Classes
                         location["coordinateNote"]?.ToString()
                     }.Where(value => !string.IsNullOrWhiteSpace(value)));
 
+                    string title = location["title"]?.ToString() ?? "Battle Pass document";
+                    int floor = InferFloorLevel(mapSlug, title, elevation);
                     snapshot.markers.Add(new BattlePassOverlayMarker
                     {
                         left = left,
                         top = top,
                         elevation = elevation,
-                        title = location["title"]?.ToString() ?? "Battle Pass document",
-                        details = details
+                        floor = floor,
+                        title = title,
+                        details = details,
+                        photos = BattlePassPhotoCatalog.GetPhotos(mapSlug, title, floor),
+                        photoSourceUrl = BattlePassPhotoCatalog.SourceUrl
                     });
                 }
             }
@@ -97,6 +106,62 @@ namespace eft_where_am_i.Classes
         {
             value = 0;
             return token != null && double.TryParse(token.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out value);
+        }
+
+        private static int InferFloorLevel(string mapSlug, string title, double elevation)
+        {
+            string normalizedTitle = title ?? string.Empty;
+
+            Match explicitFloor = Regex.Match(
+                normalizedTitle,
+                @"\b(?:level\s*|floor\s*|)([1-5])\s*f\b|\blevel\s*([1-5])\b",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            if (explicitFloor.Success)
+            {
+                string value = explicitFloor.Groups[1].Success
+                    ? explicitFloor.Groups[1].Value
+                    : explicitFloor.Groups[2].Value;
+                if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int floor))
+                {
+                    return floor;
+                }
+            }
+
+            Match roomNumber = Regex.Match(
+                normalizedTitle,
+                @"\b([2-5])\d{2}\b",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            if (roomNumber.Success
+                && int.TryParse(roomNumber.Groups[1].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int roomFloor))
+            {
+                return roomFloor;
+            }
+
+            if (Regex.IsMatch(normalizedTitle, @"\b(?:basement|bunker|underground|d2)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+            {
+                return 0;
+            }
+
+            if (Regex.IsMatch(normalizedTitle, @"\b(?:upstairs|upper|above)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+            {
+                return 2;
+            }
+
+            return mapSlug.ToLowerInvariant() switch
+            {
+                "factory" when elevation < 0 => 0,
+                "factory" when elevation < 3 => 1,
+                "factory" when elevation < 7 => 2,
+                "factory" => 3,
+                "customs" when Regex.IsMatch(normalizedTitle, @"\bBig Red\b.*\bdirector office\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant) => 2,
+                "customs" when elevation >= 6 => 2,
+                "ground-zero" when elevation >= 27 => 2,
+                "streets" when elevation >= 5 => 2,
+                "lab" when elevation >= 3.5 => 2,
+                "icebreaker" when elevation >= 6 => 3,
+                "icebreaker" when elevation >= 2 => 2,
+                _ => 1
+            };
         }
 
     }

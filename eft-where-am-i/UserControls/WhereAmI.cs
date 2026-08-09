@@ -19,6 +19,7 @@ namespace eft_where_am_i
         private JavaScriptExecutor jsExecutor;
         private QuestRepository questRepository;
         private BattlePassOverlayDataService battlePassOverlayDataService;
+        private readonly QuestTranslationService questTranslationService = new();
         private FloorManager floorManager;
         private readonly Dictionary<string, string> mapDisplayNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -149,7 +150,8 @@ namespace eft_where_am_i
                     await webView2_panel_ui.ExecuteScriptAsync($"setTheme('{appSettings.theme_mode}')");
                     await webView2_panel_ui.ExecuteScriptAsync(
                         $"setScaleControls({appSettings.font_scale.ToString(System.Globalization.CultureInfo.InvariantCulture)}, " +
-                        $"{appSettings.icon_scale.ToString(System.Globalization.CultureInfo.InvariantCulture)})");
+                        $"{appSettings.icon_scale.ToString(System.Globalization.CultureInfo.InvariantCulture)}, " +
+                        $"{appSettings.popup_opacity.ToString(System.Globalization.CultureInfo.InvariantCulture)})");
                 }
                 catch (Exception ex)
                 {
@@ -375,7 +377,8 @@ namespace eft_where_am_i
 
                         await webView2_panel_ui.ExecuteScriptAsync(
                             $"setScaleControls({appSettings.font_scale.ToString(System.Globalization.CultureInfo.InvariantCulture)}, " +
-                            $"{appSettings.icon_scale.ToString(System.Globalization.CultureInfo.InvariantCulture)})");
+                            $"{appSettings.icon_scale.ToString(System.Globalization.CultureInfo.InvariantCulture)}, " +
+                            $"{appSettings.popup_opacity.ToString(System.Globalization.CultureInfo.InvariantCulture)})");
 
                         // 디버그 모드 플래그 전송
 #if DEBUG
@@ -519,6 +522,17 @@ namespace eft_where_am_i
                         await ApplyEnhancementSettingsAsync();
                         break;
 
+                    case "popup-opacity-preview":
+                        appSettings.popup_opacity = Math.Clamp(message["opacity"]?.Value<double>() ?? 1.0, 0.3, 1.0);
+                        await ApplyEnhancementSettingsAsync();
+                        break;
+
+                    case "popup-opacity-changed":
+                        appSettings.popup_opacity = Math.Clamp(message["opacity"]?.Value<double>() ?? 1.0, 0.3, 1.0);
+                        SaveSettings();
+                        await ApplyEnhancementSettingsAsync();
+                        break;
+
                     case "theme-updated":
                         if (!string.IsNullOrEmpty(theme))
                         {
@@ -629,9 +643,11 @@ namespace eft_where_am_i
 
             string settingsJson = Newtonsoft.Json.JsonConvert.SerializeObject(new
             {
+                language = appSettings.language,
                 uiScale = appSettings.ui_scale,
                 fontScale = appSettings.font_scale,
                 iconScale = appSettings.icon_scale,
+                popupOpacity = appSettings.popup_opacity,
                 questRequirementsPanel = new
                 {
                     mode = appSettings.quest_requirements_panel_mode,
@@ -643,6 +659,13 @@ namespace eft_where_am_i
                 }
             });
             await webView2.ExecuteScriptAsync($"window.__wtfSetEnhancementSettings?.({settingsJson});");
+
+            if (appSettings.language?.StartsWith("ko", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                Dictionary<string, string> translations = await questTranslationService.GetKoreanTranslationsAsync();
+                string translationsJson = Newtonsoft.Json.JsonConvert.SerializeObject(translations);
+                await webView2.ExecuteScriptAsync($"window.__wtfSetQuestTranslations?.({translationsJson});");
+            }
         }
 
         private async Task InjectBattlePassOverlayAsync()

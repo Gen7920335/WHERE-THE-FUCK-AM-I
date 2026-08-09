@@ -312,6 +312,7 @@ namespace eft_where_am_i.Classes
         public double ui_scale { get; set; } = 1.0;
         public double font_scale { get; set; } = 1.0;
         public double icon_scale { get; set; } = 1.0;
+        public double popup_opacity { get; set; } = 1.0;
         public string quest_requirements_panel_mode { get; set; } = "right";
         public double quest_requirements_panel_x { get; set; } = 0;
         public double quest_requirements_panel_y { get; set; } = 80;

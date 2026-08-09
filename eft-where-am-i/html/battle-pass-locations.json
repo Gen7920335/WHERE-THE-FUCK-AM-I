@@ -35,7 +35,7 @@
       "author": "Perofunyang",
       "license": "CC BY-NC 4.0",
       "url": "https://github.com/Perofunyang/battlepass_interactive_map",
-      "changes": "Location descriptions were cross-checked and transformed into Tarkov Market world coordinates; map images and source code were not copied."
+      "changes": "Location descriptions were cross-checked and transformed into Tarkov Market world coordinates. Verified community screenshots are linked from their original GitHub Pages host and attributed in the popup; images and source code are not redistributed."
     }
   },
   "maps": {
