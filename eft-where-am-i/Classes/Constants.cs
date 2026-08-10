@@ -2,11 +2,11 @@ namespace eft_where_am_i.Classes
 {
     public class Constants
     {   
-        public const string HIDE_SHOW_PANNE_BUTTON_SELECTOR = "#__nuxt > div > div > div.page-content > div > div > div.panel_top > div > div.mr-15 > button";
+        public const string HIDE_SHOW_PANNE_BUTTON_SELECTOR = "#__nuxt > div > div > div.page-content > div > div > div.panel_top > div > div.mr-15 > button, #terminalPanelToggle";
 
-        public const string FULL_SCREEN_BUTTON_SELECTOR = "#__nuxt > div > div > div.page-content > div > div > div.panel_top > div > button";
+        public const string FULL_SCREEN_BUTTON_SELECTOR = "#__nuxt > div > div > div.page-content > div > div > div.panel_top > div > button, #terminalFullScreen";
 
-        public const string WHERE_AM_I_BUTTON_SELECTOR = "#__nuxt > div > div > div.page-content > div > div > div.panel_top > div > div.d-flex.ml-15 > button";
+        public const string WHERE_AM_I_BUTTON_SELECTOR = "#__nuxt > div > div > div.page-content > div > div > div.panel_top > div > div.d-flex.ml-15 > button, #terminalWhereButton";
 
         /*
          * The following code (ADD_DIRECTION_INDICATORS_SCRIPT) is from 'Tarkov-Client' by 'byeong1'
@@ -72,6 +72,9 @@ namespace eft_where_am_i.Classes
     }
 
     function addTriangleToMarker(marker) {
+        if (marker.dataset && marker.dataset.terminalManaged === 'true') {
+            return;
+        }
         if (marker.querySelector('.triangle-indicator')) {
             return;
         }

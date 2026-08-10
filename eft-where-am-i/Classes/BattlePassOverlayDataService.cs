@@ -56,11 +56,15 @@ namespace eft_where_am_i.Classes
                         continue;
                     }
 
-                    string confidenceLabel = location["coordinateBasis"]?.ToString() == "reported-poi-center"
-                        ? "제보 POI 기준 추정 좌표"
-                        : location["confidence"]?.ToString() == "reported"
-                            ? "단일/추가 제보 좌표"
-                            : "복수 제보 확인 좌표";
+                    string confidenceLabel = location["coordinateBasis"]?.ToString() switch
+                    {
+                        "reported-poi-center" => "제보 POI 기준 추정 좌표",
+                        "reported-room-reference" => "방 내부 기준점 보정 좌표",
+                        "transit-anchor-affine" => "지도 가장자리 3곳 이상 정합 좌표",
+                        "reported-world-coordinate" => "제보 월드 좌표",
+                        _ when location["confidence"]?.ToString() == "reported" => "단일/추가 제보 좌표",
+                        _ => "복수 제보 확인 좌표"
+                    };
                     string details = string.Join(" · ", new[]
                     {
                         location["documents"]?.ToString(),
@@ -71,6 +75,18 @@ namespace eft_where_am_i.Classes
 
                     string title = location["title"]?.ToString() ?? "Battle Pass document";
                     int floor = InferFloorLevel(mapSlug, title, elevation);
+                    List<BattlePassOverlayPhoto> photos = ReadPhotos(location);
+                    if (photos.Count == 0 && location["photoIds"] is JArray photoIds)
+                    {
+                        photos = BattlePassPhotoCatalog.GetPhotosByIds(
+                            mapSlug,
+                            title,
+                            photoIds.Values<string>().Where(value => !string.IsNullOrWhiteSpace(value))!);
+                    }
+                    if (photos.Count == 0)
+                    {
+                        photos = BattlePassPhotoCatalog.GetPhotos(mapSlug, title, floor);
+                    }
                     snapshot.markers.Add(new BattlePassOverlayMarker
                     {
                         left = left,
@@ -79,8 +95,8 @@ namespace eft_where_am_i.Classes
                         floor = floor,
                         title = title,
                         details = details,
-                        photos = BattlePassPhotoCatalog.GetPhotos(mapSlug, title, floor),
-                        photoSourceUrl = BattlePassPhotoCatalog.SourceUrl
+                        photos = photos,
+                        photoSourceUrl = location["photoSourceUrl"]?.ToString() ?? BattlePassPhotoCatalog.SourceUrl
                     });
                 }
             }
@@ -106,6 +122,24 @@ namespace eft_where_am_i.Classes
         {
             value = 0;
             return token != null && double.TryParse(token.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out value);
+        }
+
+        private static List<BattlePassOverlayPhoto> ReadPhotos(JObject location)
+        {
+            if (location["photos"] is not JArray photos)
+            {
+                return new List<BattlePassOverlayPhoto>();
+            }
+
+            return photos
+                .OfType<JObject>()
+                .Select(photo => new BattlePassOverlayPhoto
+                {
+                    url = photo["url"]?.ToString() ?? string.Empty,
+                    caption = photo["caption"]?.ToString() ?? string.Empty
+                })
+                .Where(photo => !string.IsNullOrWhiteSpace(photo.url))
+                .ToList();
         }
 
         private static int InferFloorLevel(string mapSlug, string title, double elevation)

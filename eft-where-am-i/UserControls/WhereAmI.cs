@@ -71,6 +71,13 @@ namespace eft_where_am_i
         private readonly SquadNetworkService squadNetworkService;
         private SquadForm? squadForm;
 
+        private static bool IsLocalTerminalMap(string? mapName) =>
+            string.Equals(mapName, "terminal", StringComparison.OrdinalIgnoreCase);
+
+        private static string GetMapUrl(string? mapName) => IsLocalTerminalMap(mapName)
+            ? "https://appcontent/terminal-map.html"
+            : $"https://tarkov-market.com/maps/{mapName}";
+
         public WhereAmI()
         {
             InitializeComponent();
@@ -83,7 +90,7 @@ namespace eft_where_am_i
             appSettings ??= settingsHandler.GetSettings();
             ApplyTheme();
             ApplyTranslations();
-            siteUrl = $"https://tarkov-market.com/maps/{appSettings.latest_map}";
+            siteUrl = GetMapUrl(appSettings.latest_map);
 
             // Load 이벤트 핸들러 등록
             this.Load += WhereAmI_Load;
@@ -106,7 +113,10 @@ namespace eft_where_am_i
                 floorManager = new FloorManager();
 
                 // 4. 앱 시작 시 패널을 강제로 열어둠
-                await RestorePanelVisibilityAsync(appSettings.latest_map, forceOpen: true);
+                if (!IsLocalTerminalMap(appSettings.latest_map))
+                {
+                    await RestorePanelVisibilityAsync(appSettings.latest_map, forceOpen: true);
+                }
 
                 // 5. LogWatcher 초기화
                 InitializeLogWatcher();
@@ -261,6 +271,11 @@ namespace eft_where_am_i
                 // 사용자 데이터 폴더를 지정하여 새로운 WebView2 환경 생성
                 env = await CoreWebView2Environment.CreateAsync(null, userDataFolder);
                 await webView2.EnsureCoreWebView2Async(env);
+                string htmlFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "html");
+                webView2.CoreWebView2.SetVirtualHostNameToFolderMapping(
+                    "appcontent",
+                    htmlFolder,
+                    CoreWebView2HostResourceAccessKind.Allow);
             }
             catch (COMException comEx) when (comEx.ErrorCode == unchecked((int)0x8007139F))
             {
@@ -579,7 +594,7 @@ namespace eft_where_am_i
 
                 appSettings.latest_map = selectedMap;
                 SaveSettings();  // 설정 저장
-                siteUrl = $"https://tarkov-market.com/maps/{selectedMap}";
+                siteUrl = GetMapUrl(selectedMap);
                 webView2.Source = new Uri(siteUrl);
                 whereAmIClick = false;
                 WmiInitialize();
@@ -598,6 +613,14 @@ namespace eft_where_am_i
             // 데드존 auto-pan 스크립트 재주입 (새 페이지 로드 시)
             await jsExecutor.ExecuteScriptAsync(Constants.DEAD_ZONE_AUTO_PAN_SCRIPT);
             await ApplyEnhancementSettingsAsync();
+
+            if (IsLocalTerminalMap(appSettings.latest_map))
+            {
+                await InjectBattlePassOverlayAsync();
+                await InjectSquadOverlayAsync();
+                await jsExecutor.ExecuteScriptAsync(Constants.ADD_DIRECTION_INDICATORS_SCRIPT);
+                return;
+            }
 
             // 퀘스트 컨테이너 로드 대기 (DOM 준비 완료까지 대기)
             bool containerReady = await jsExecutor.WaitForQuestContainerAsync(15000);
@@ -917,6 +940,17 @@ namespace eft_where_am_i
 
         private async void WmiInitialize()
         {
+            if (IsLocalTerminalMap(appSettings.latest_map))
+            {
+                await Task.Delay(750);
+                await ApplyEnhancementSettingsAsync();
+                await InjectBattlePassOverlayAsync();
+                await InjectSquadOverlayAsync();
+                await jsExecutor.ExecuteScriptAsync(Constants.ADD_DIRECTION_INDICATORS_SCRIPT);
+                await jsExecutor.ExecuteScriptAsync(Constants.DEAD_ZONE_AUTO_PAN_SCRIPT);
+                return;
+            }
+
             await Task.Delay(4000);
             await jsExecutor.ClickButtonAsync(Constants.FULL_SCREEN_BUTTON_SELECTOR);
             if (!whereAmIClick)

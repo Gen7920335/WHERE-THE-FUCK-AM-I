@@ -1142,9 +1142,66 @@
     }
   };
 
+  const ensureTerminalBattlePassControl = (lootItems) => {
+    let control = document.getElementById('wtf-battle-pass-control');
+    if (!control || control.parentElement !== lootItems || control.tagName !== 'DIV') {
+      control?.remove();
+      control = document.createElement('div');
+      control.id = 'wtf-battle-pass-control';
+      control.className = 'terminal-filter-row';
+      control.tabIndex = 0;
+      control.setAttribute('role', 'checkbox');
+      control.title = 'Toggle Battle Pass document spawns';
+
+      const toggle = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setBattlePassVisible(!wtfOverlayState.battlePassVisible, true);
+      };
+      control.addEventListener('click', toggle);
+      control.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') toggle(event);
+      });
+
+      const main = document.createElement('span');
+      main.className = 'terminal-filter-main';
+      const iconWrap = document.createElement('span');
+      iconWrap.className = 'terminal-filter-icon wtf-battle-pass-icon-wrap';
+      const icon = document.createElement('span');
+      icon.className = 'wtf-blue-cross';
+      icon.setAttribute('aria-hidden', 'true');
+      iconWrap.appendChild(icon);
+      const name = document.createElement('span');
+      name.className = 'terminal-filter-name';
+      name.textContent = 'Battle Pass';
+      main.append(iconWrap, name);
+
+      const count = document.createElement('span');
+      count.className = 'terminal-filter-count';
+      count.dataset.wtfBattlePassCount = '';
+      control.append(main, count);
+      lootItems.appendChild(control);
+    }
+
+    const count = control.querySelector('[data-wtf-battle-pass-count]');
+    const countText = String(wtfOverlayState.battlePass.markers?.length || 0);
+    if (count && count.textContent !== countText) count.textContent = countText;
+    if (control !== lootItems.lastElementChild) lootItems.appendChild(control);
+    control.classList.toggle('selected', wtfOverlayState.battlePassVisible);
+    control.classList.toggle('active', wtfOverlayState.battlePassVisible);
+    control.classList.toggle('inactive', !wtfOverlayState.battlePassVisible);
+    control.setAttribute('aria-checked', wtfOverlayState.battlePassVisible ? 'true' : 'false');
+  };
+
   const ensureBattlePassControl = () => {
     const leftPanel = document.querySelector('.panel_left');
     if (!leftPanel) return;
+
+    const terminalLootItems = leftPanel.querySelector('.terminal-filter-section[data-section="loot"] .terminal-filter-items');
+    if (terminalLootItems) {
+      ensureTerminalBattlePassControl(terminalLootItems);
+      return;
+    }
 
     const lootTitle = [...leftPanel.querySelectorAll('.two-columns > .mb-5 > div:first-child > .bold')]
       .find((element) => element.textContent.trim().toLowerCase() === 'loot');
@@ -1631,6 +1688,7 @@
     if (control) {
       control.classList.toggle('active', wtfOverlayState.battlePassVisible);
       control.classList.toggle('inactive', !wtfOverlayState.battlePassVisible);
+      control.classList.toggle('selected', wtfOverlayState.battlePassVisible);
       control.setAttribute('aria-checked', wtfOverlayState.battlePassVisible ? 'true' : 'false');
     }
     if (notifyHost) {

@@ -2,6 +2,8 @@ namespace eft_where_am_i.Classes
 {
     internal static class TarkovMarketMapProjection
     {
+        private const double TerminalMapRotationDegrees = -75.3;
+
         private sealed record MapDefinition(
             double Width,
             double Height,
@@ -30,6 +32,16 @@ namespace eft_where_am_i.Classes
         {
             left = 0;
             top = 0;
+            if (string.Equals(mapSlug, "terminal", StringComparison.OrdinalIgnoreCase))
+            {
+                // Tarkov.dev Terminal interactive map bounds are
+                // [[463, -580], [-433, 475]] with a 180-degree CRS rotation.
+                // That makes SVG X decrease with EFT world X and SVG Y increase with world Z.
+                left = ((463.0 - worldX) / 896.0) * 100.0;
+                top = ((worldZ + 580.0) / 1055.0) * 100.0;
+                return double.IsFinite(left) && double.IsFinite(top);
+            }
+
             if (string.IsNullOrWhiteSpace(mapSlug) || !Maps.TryGetValue(mapSlug, out MapDefinition? map))
             {
                 return false;
@@ -74,6 +86,12 @@ namespace eft_where_am_i.Classes
             }
 
             degrees = (Math.Atan2(deltaY, deltaX) * 180.0 / Math.PI) + 90.0;
+            if (string.Equals(mapSlug, "terminal", StringComparison.OrdinalIgnoreCase))
+            {
+                // Terminal's local SVG is displayed in the photographed wall-map orientation.
+                // Squad markers live outside the rotated SVG, so their heading needs the same rotation.
+                degrees += TerminalMapRotationDegrees;
+            }
             return double.IsFinite(degrees);
         }
     }

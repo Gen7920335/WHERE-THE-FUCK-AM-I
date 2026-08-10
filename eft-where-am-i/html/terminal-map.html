@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Terminal map</title>
+  <link rel="stylesheet" href="terminal-map.css">
+  <script defer src="terminal-map-data.js"></script>
+  <script defer src="terminal-map.js"></script>
+</head>
+<body>
+  <main class="terminal-page page-content">
+    <section class="map-cont terminal-map-viewport bg-grid" aria-label="Terminal map">
+      <div id="terminalMapStage" class="terminal-map-stage">
+        <div class="terminal-sea-tiles" aria-hidden="true">
+          <span class="terminal-sea-tile terminal-sea-tile-main"></span>
+          <span class="terminal-sea-tile terminal-sea-tile-quay"></span>
+        </div>
+        <div id="map" class="map-wrap" aria-label="Pan and zoom map">
+          <div id="terminalMapSurface" class="terminal-map-surface"></div>
+          <div id="terminalPlayerMarker" class="marker terminal-player-marker" data-terminal-managed="true" hidden>
+            <span class="terminal-player-direction" aria-hidden="true">
+              <span class="terminal-player-arrow"></span>
+              <span class="terminal-player-circle"></span>
+            </span>
+          </div>
+          <div id="terminalMarkerLayer" class="terminal-marker-layer" aria-label="Terminal map markers"></div>
+        </div>
+      </div>
+
+      <header class="panel_top terminal-toolbar" aria-label="Map controls">
+        <div class="terminal-search-wrap">
+          <input id="terminalLocationInput" type="text" autocomplete="off" spellcheck="false" placeholder="Screenshot position filename">
+        </div>
+        <div class="mr-15">
+          <button id="terminalPanelToggle" type="button">Hide panels</button>
+        </div>
+        <button id="terminalFullScreen" type="button">Full screen</button>
+        <div class="d-flex ml-15 terminal-location-control">
+          <button id="terminalWhereButton" type="button">Where am i?</button>
+        </div>
+        <span id="terminalStatus" class="terminal-status" role="status">Loading Terminal vector map...</span>
+      </header>
+
+      <aside class="panel_left scroll terminal-side-panel" aria-label="Map filters">
+        <div class="tools terminal-left-tools">
+          <button id="terminalLeftCollapse" class="terminal-panel-heading" type="button" aria-expanded="true">
+            <h1>Terminal</h1>
+            <span aria-hidden="true">-/+</span>
+          </button>
+          <div id="terminalLayerList" class="two-columns terminal-layer-list" aria-live="polite"></div>
+        </div>
+      </aside>
+
+      <aside class="panel_right terminal-right-panel" aria-label="Map options">
+        <section class="d-flex h-space-between layers mb-5 terminal-levels-panel">
+          <div>
+            <div class="d-flex ai-center caption-row mb-5">
+              <strong>Levels</strong>
+              <span class="terminal-settings-glyph" title="Nearby levels" aria-hidden="true">&#9881;</span>
+            </div>
+            <div class="levels-list scroll" role="radiogroup" aria-label="Floor">
+              <label class="pointer no-wrap"><input type="radio" name="layers" value="Level 2"> Level 2</label>
+              <label class="pointer no-wrap story"><input type="radio" name="layers" value="Ground" checked> Main</label>
+            </div>
+          </div>
+          <div class="terminal-level-hint" title="Alt + Wheel">
+            <div class="terminal-mouse-glyph" aria-hidden="true"><span></span></div>
+            <strong>Switch<br>Level</strong>
+          </div>
+        </section>
+
+        <section class="tools tools_quests terminal-accordion mb-5" data-terminal-accordion="quests">
+          <button class="accordion-header d-flex h-space-between v-center pointer" type="button" aria-expanded="true">
+            <span class="bold big d-flex v-center"><span class="accordion-arrow">&#9662;</span>Quests&nbsp; <span class="alt">(1)</span></span>
+          </button>
+          <div class="terminal-accordion-body quests-content">
+            <div class="terminal-quest-help sub alt">Click - Details &nbsp;&nbsp; Check - Selection</div>
+            <div id="terminalQuestList" class="items scroll terminal-quest-list"></div>
+          </div>
+        </section>
+
+        <section class="terminal-accordion mb-5 collapsed" data-terminal-accordion="squad">
+          <button class="accordion-header d-flex h-space-between v-center pointer" type="button" aria-expanded="false">
+            <span class="bold big d-flex v-center"><span class="accordion-arrow">&#9662;</span>Squad</span>
+          </button>
+          <div class="terminal-accordion-body">
+            <p>Squad positions appear here after a multiplayer session is connected.</p>
+          </div>
+        </section>
+
+        <section class="terminal-accordion collapsed" data-terminal-accordion="layers">
+          <button class="accordion-header d-flex h-space-between v-center pointer" type="button" aria-expanded="false">
+            <span class="bold big d-flex v-center"><span class="accordion-arrow">&#9662;</span>Layers</span>
+          </button>
+          <div id="terminalRightLayersList" class="terminal-accordion-body items"></div>
+        </section>
+      </aside>
+
+      <section id="terminalPopup" class="map-popup terminal-popup" hidden aria-live="polite"></section>
+    </section>
+  </main>
+</body>
+</html>

@@ -113,7 +113,15 @@ namespace eft_where_am_i.Classes
                 ids = FactoryFloorPhotos(level);
             }
 
-            return ids
+            return GetPhotosByIds(mapSlug, title, ids);
+        }
+
+        public static List<BattlePassOverlayPhoto> GetPhotosByIds(
+            string mapSlug,
+            string title,
+            IEnumerable<string> photoIds)
+        {
+            return photoIds
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Select((id, index) => new BattlePassOverlayPhoto
                 {
@@ -153,6 +161,10 @@ namespace eft_where_am_i.Classes
                 "streets" => "streets_of_tarkov",
                 _ => mapSlug
             };
+            if (id.StartsWith('@'))
+            {
+                return $"{ImageBaseUrl}/{sourceMap}/{id[1..]}.webp";
+            }
             int separator = id.IndexOf('-');
             string category = separator > 0 ? id[..separator] : string.Empty;
             if (string.Equals(category, "blueprint", StringComparison.OrdinalIgnoreCase))
