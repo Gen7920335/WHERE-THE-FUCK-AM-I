@@ -1489,8 +1489,10 @@
       const localY = (Number(marker.dataset.top) / 100) * height;
       const relativeX = localX - originX;
       const relativeY = localY - originY;
-      marker.style.left = (layout.left + originX + (matrix.a * relativeX) + (matrix.c * relativeY) + matrix.e) + 'px';
-      marker.style.top = (layout.top + originY + (matrix.b * relativeX) + (matrix.d * relativeY) + matrix.f) + 'px';
+      const spreadX = Number(marker.dataset.spreadX) || 0;
+      const spreadY = Number(marker.dataset.spreadY) || 0;
+      marker.style.left = (layout.left + originX + (matrix.a * relativeX) + (matrix.c * relativeY) + matrix.e + spreadX) + 'px';
+      marker.style.top = (layout.top + originY + (matrix.b * relativeX) + (matrix.d * relativeY) + matrix.f + spreadY) + 'px';
     }
     updateBattlePassPopupPosition();
   };
@@ -1571,13 +1573,37 @@
     overlay.replaceChildren();
     overlay.hidden = !wtfOverlayState.battlePassVisible;
 
-    for (const markerData of wtfOverlayState.battlePass.markers || []) {
+    const markerDataList = wtfOverlayState.battlePass.markers || [];
+    const collisionGroups = new Map();
+    for (const markerData of markerDataList) {
+      const key = `${Number(markerData.left).toFixed(6)}|${Number(markerData.top).toFixed(6)}|${markerData.floor ?? ''}`;
+      const group = collisionGroups.get(key) || [];
+      group.push(markerData);
+      collisionGroups.set(key, group);
+    }
+    const collisionOffsets = new Map();
+    for (const group of collisionGroups.values()) {
+      if (group.length < 2) continue;
+      const radius = Math.max(9, Math.min(16, 7 + group.length));
+      group.forEach((markerData, index) => {
+        const angle = (-Math.PI / 2) + ((Math.PI * 2 * index) / group.length);
+        collisionOffsets.set(markerData, {
+          x: Math.cos(angle) * radius,
+          y: Math.sin(angle) * radius
+        });
+      });
+    }
+
+    for (const markerData of markerDataList) {
       const marker = document.createElement('div');
       marker.className = 'wtf-battle-pass-marker';
       marker.dataset.left = String(markerData.left);
       marker.dataset.top = String(markerData.top);
       marker.dataset.elevation = String(markerData.elevation ?? '');
       marker.dataset.floor = String(markerData.floor ?? '');
+      const collisionOffset = collisionOffsets.get(markerData);
+      marker.dataset.spreadX = String(collisionOffset?.x || 0);
+      marker.dataset.spreadY = String(collisionOffset?.y || 0);
       marker.title = [markerData.title, markerData.details].filter(Boolean).join(' · ');
       marker.setAttribute('role', 'button');
       marker.setAttribute('aria-label', marker.title);

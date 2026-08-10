@@ -4,6 +4,8 @@ const path = require('path');
 const root = path.resolve(__dirname, '..');
 const file = path.join(root, 'eft-where-am-i', 'html', 'battle-pass-locations.json');
 const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+const overlayServiceFile = path.join(root, 'eft-where-am-i', 'Classes', 'BattlePassOverlayDataService.cs');
+const overlayServiceSource = fs.readFileSync(overlayServiceFile, 'utf8');
 
 const maps = {
   factory: [3600, 3600, 0, 1800, 1850, 10],
@@ -47,6 +49,10 @@ let markerCount = 0;
 let explicitPhotoCount = 0;
 const communityRoot = process.env.COMMUNITY_MAP_DIR;
 
+if (/BattlePassPhotoCatalog\.GetPhotos\(/.test(overlayServiceSource)) {
+  failures.push('implicit title/floor photo fallback is enabled; marker photos must be assigned explicitly');
+}
+
 for (const [map, markers] of Object.entries(data.maps)) {
   if (!maps[map]) {
     if (markers.length) failures.push(`${map}: no projection definition`);
@@ -54,6 +60,8 @@ for (const [map, markers] of Object.entries(data.maps)) {
   }
 
   const titles = new Set();
+  const assignedPhotos = new Set();
+  const explicitPhotoPositions = new Map();
   for (const marker of markers) {
     markerCount += 1;
     if (!marker.title || titles.has(marker.title)) failures.push(`${map}: missing or duplicate title: ${marker.title || '<empty>'}`);
@@ -65,17 +73,37 @@ for (const [map, markers] of Object.entries(data.maps)) {
     const [left, top] = project(map, marker.position.map(Number));
     if (left < -5 || left > 105 || top < -5 || top > 105) failures.push(`${map}/${marker.title}: projected outside map (${left.toFixed(2)}, ${top.toFixed(2)})`);
 
-    for (const id of marker.photoIds || []) {
+    const photoIds = marker.photoIds || [];
+    const directPhotos = marker.photos || [];
+    if (photoIds.length + directPhotos.length > 1) {
+      failures.push(`${map}/${marker.title}: multiple photos merged into one marker`);
+    }
+    if (photoIds.length + directPhotos.length > 0) {
+      const positionKey = marker.position.map(value => Number(value).toFixed(4)).join('|');
+      const existingTitle = explicitPhotoPositions.get(positionKey);
+      if (existingTitle) {
+        failures.push(`${map}/${marker.title}: exact coordinate collision with photo-backed marker ${existingTitle}`);
+      }
+      explicitPhotoPositions.set(positionKey, marker.title);
+    }
+
+    for (const id of photoIds) {
       explicitPhotoCount += 1;
       if (!id.startsWith('@') && !id.includes('-')) failures.push(`${map}/${marker.title}: invalid photo ID ${id}`);
+      const photoKey = `id:${id}`;
+      if (assignedPhotos.has(photoKey)) failures.push(`${map}/${marker.title}: photo ID assigned to multiple markers: ${id}`);
+      assignedPhotos.add(photoKey);
       if (communityRoot) {
         const localPhoto = path.join(communityRoot, 'assets', 'previews', ...photoPath(map, id).split('/'));
         if (!fs.existsSync(localPhoto)) failures.push(`${map}/${marker.title}: missing source photo ${photoPath(map, id)}`);
       }
     }
-    for (const photo of marker.photos || []) {
+    for (const photo of directPhotos) {
       explicitPhotoCount += 1;
       if (!/^https:\/\//i.test(photo.url || '')) failures.push(`${map}/${marker.title}: direct photo must use HTTPS`);
+      const photoKey = `url:${photo.url}`;
+      if (assignedPhotos.has(photoKey)) failures.push(`${map}/${marker.title}: direct photo assigned to multiple markers: ${photo.url}`);
+      assignedPhotos.add(photoKey);
     }
   }
 }
