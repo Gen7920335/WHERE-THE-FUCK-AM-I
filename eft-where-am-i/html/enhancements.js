@@ -512,6 +512,10 @@
         top: 5px;
         width: 14px;
       }
+      .wtf-battle-pass-marker.wtf-coordinate-uncertain .wtf-blue-cross::before,
+      .wtf-battle-pass-marker.wtf-coordinate-uncertain .wtf-blue-cross::after {
+        background: #7b3fc6;
+      }
       #wtf-battle-pass-layer {
         inset: 0;
         overflow: hidden;
@@ -586,6 +590,25 @@
       }
       .wtf-battle-pass-details {
         white-space: normal;
+      }
+      .wtf-battle-pass-location {
+        color: #d7d0c4;
+        margin-top: 6px;
+        white-space: normal;
+      }
+      .wtf-battle-pass-location-label,
+      .wtf-battle-pass-certainty {
+        color: #a49d90;
+      }
+      .wtf-battle-pass-certainty {
+        font-size: 11px;
+        margin-top: 5px;
+      }
+      .wtf-battle-pass-certainty.wtf-coordinate-certain {
+        color: #4e91ec;
+      }
+      .wtf-battle-pass-certainty.wtf-coordinate-uncertain {
+        color: #a574e8;
       }
       .wtf-battle-pass-photo-frame {
         background: #111;
@@ -1390,7 +1413,24 @@
     const details = applyNativePopupScope(document.createElement('div'));
     details.className = 'wtf-battle-pass-details';
     details.textContent = String(markerData.details || '');
-    inner.append(header, details, createBattlePassPhotoView(markerData));
+    const location = applyNativePopupScope(document.createElement('div'));
+    location.className = 'wtf-battle-pass-location';
+    const locationLabel = applyNativePopupScope(document.createElement('span'));
+    locationLabel.className = 'wtf-battle-pass-location-label';
+    locationLabel.textContent = state.language === 'ko'
+      ? '\uC704\uCE58 \uC124\uBA85: '
+      : 'Location: ';
+    location.append(locationLabel, String(markerData.locationDescription || ''));
+
+    const certainty = applyNativePopupScope(document.createElement('div'));
+    const coordinateCertain = Boolean(markerData.coordinateCertain);
+    certainty.className = 'wtf-battle-pass-certainty ' + (coordinateCertain
+      ? 'wtf-coordinate-certain'
+      : 'wtf-coordinate-uncertain');
+    certainty.textContent = state.language === 'ko'
+      ? (coordinateCertain ? '\uC88C\uD45C \uD655\uC2E4' : '\uC88C\uD45C \uBD88\uD655\uC2E4')
+      : (coordinateCertain ? 'Coordinate verified' : 'Coordinate uncertain');
+    inner.append(header, location, certainty, details, createBattlePassPhotoView(markerData));
 
     const photos = Array.isArray(markerData.photos) ? markerData.photos : [];
     const meta = applyNativePopupScope(document.createElement('div'));
@@ -1596,7 +1636,10 @@
 
     for (const markerData of markerDataList) {
       const marker = document.createElement('div');
-      marker.className = 'wtf-battle-pass-marker';
+      const coordinateCertain = Boolean(markerData.coordinateCertain);
+      marker.className = 'wtf-battle-pass-marker ' + (coordinateCertain
+        ? 'wtf-coordinate-certain'
+        : 'wtf-coordinate-uncertain');
       marker.dataset.left = String(markerData.left);
       marker.dataset.top = String(markerData.top);
       marker.dataset.elevation = String(markerData.elevation ?? '');
@@ -1604,7 +1647,9 @@
       const collisionOffset = collisionOffsets.get(markerData);
       marker.dataset.spreadX = String(collisionOffset?.x || 0);
       marker.dataset.spreadY = String(collisionOffset?.y || 0);
-      marker.title = [markerData.title, markerData.details].filter(Boolean).join(' · ');
+      marker.title = [markerData.title, markerData.locationDescription, markerData.details]
+        .filter(Boolean)
+        .join(' · ');
       marker.setAttribute('role', 'button');
       marker.setAttribute('aria-label', marker.title);
       marker.tabIndex = 0;

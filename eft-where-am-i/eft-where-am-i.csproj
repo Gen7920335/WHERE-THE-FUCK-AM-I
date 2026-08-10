@@ -9,7 +9,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
 
     <!-- 버전을 여기서만 관리 -->
-    <Version>1.0.6</Version>
+    <Version>1.0.7</Version>
     <AssemblyName>WHERE THE FUCK AM I</AssemblyName>
     <AssemblyTitle>WHERE THE FUCK AM I</AssemblyTitle>
     <Product>WHERE THE FUCK AM I</Product>

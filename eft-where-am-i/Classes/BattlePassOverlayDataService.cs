@@ -17,7 +17,9 @@ namespace eft_where_am_i.Classes
         public double elevation { get; set; }
         public int floor { get; set; }
         public string title { get; set; } = string.Empty;
+        public string locationDescription { get; set; } = string.Empty;
         public string details { get; set; } = string.Empty;
+        public bool coordinateCertain { get; set; }
         public List<BattlePassOverlayPhoto> photos { get; set; } = new();
         public string photoSourceUrl { get; set; } = string.Empty;
     }
@@ -69,12 +71,12 @@ namespace eft_where_am_i.Classes
                     string details = string.Join(" · ", new[]
                     {
                         location["documents"]?.ToString(),
-                        location["detail"]?.ToString(),
                         confidenceLabel,
                         location["coordinateNote"]?.ToString()
                     }.Where(value => !string.IsNullOrWhiteSpace(value)));
 
                     string title = location["title"]?.ToString() ?? "Battle Pass document";
+                    string locationDescription = location["detail"]?.ToString() ?? string.Empty;
                     int floor = InferFloorLevel(mapSlug, title, elevation);
                     List<BattlePassOverlayPhoto> photos = ReadPhotos(location);
                     if (photos.Count == 0 && location["photoIds"] is JArray photoIds)
@@ -91,7 +93,9 @@ namespace eft_where_am_i.Classes
                         elevation = elevation,
                         floor = floor,
                         title = title,
+                        locationDescription = locationDescription,
                         details = details,
+                        coordinateCertain = IsCoordinateCertain(location),
                         photos = photos,
                         photoSourceUrl = location["photoSourceUrl"]?.ToString() ?? BattlePassPhotoCatalog.SourceUrl
                     });
@@ -137,6 +141,30 @@ namespace eft_where_am_i.Classes
                 })
                 .Where(photo => !string.IsNullOrWhiteSpace(photo.url))
                 .ToList();
+        }
+
+        private static bool IsCoordinateCertain(JObject location)
+        {
+            if (location["coordinateCertain"]?.Type == JTokenType.Boolean)
+            {
+                return location["coordinateCertain"]!.Value<bool>();
+            }
+
+            if (string.Equals(
+                location["coordinateBasis"]?.ToString(),
+                "reported-world-coordinate",
+                StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            // Non-prefixed photo IDs are coordinates imported from the checked
+            // interactive-map dataset. '@' IDs are unresolved references and do
+            // not qualify as coordinate evidence.
+            return location["photoIds"] is JArray photoIds
+                && photoIds.Values<string>().Any(id =>
+                    !string.IsNullOrWhiteSpace(id)
+                    && !id.StartsWith('@'));
         }
 
         private static int InferFloorLevel(string mapSlug, string title, double elevation)
