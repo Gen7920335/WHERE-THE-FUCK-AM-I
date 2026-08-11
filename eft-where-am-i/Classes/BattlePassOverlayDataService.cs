@@ -145,6 +145,17 @@ namespace eft_where_am_i.Classes
 
         private static bool IsCoordinateCertain(JObject location)
         {
+            string roomAuditStatus = location["exactRoomAudit"]?["status"]?.ToString() ?? string.Empty;
+            if (string.Equals(roomAuditStatus, "manual-room-audit-required", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(roomAuditStatus, "map-room-missing", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(roomAuditStatus, "source-room-verified-map-missing", StringComparison.OrdinalIgnoreCase))
+            {
+                // A source coordinate or photo does not make an indoor marker
+                // certain when its center has not been proven inside the exact
+                // named room on the production floor plan.
+                return false;
+            }
+
             if (location["coordinateCertain"]?.Type == JTokenType.Boolean)
             {
                 return location["coordinateCertain"]!.Value<bool>();
