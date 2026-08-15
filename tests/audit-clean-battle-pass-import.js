@@ -31,18 +31,6 @@ const sourceNames = {
 };
 
 const mapsWithoutFloorControls = new Set(['labyrinth', 'lighthouse']);
-const multiPanelSourceMaps = new Set([
-  'customs',
-  'factory',
-  'ground-zero',
-  'interchange',
-  'icebreaker',
-  'lab',
-  'reserve',
-  'shoreline',
-  'streets'
-]);
-
 function readSource(map) {
   const sourceName = sourceNames[map];
   const sourcePath = path.join(upstreamRoot, 'data', `${sourceName}.js`);
@@ -206,6 +194,14 @@ async function main() {
       const floorStatus = floor.status === 'derived'
         ? (generatedMarker.floor === floor.expected ? 'verified' : 'mismatch')
         : floor.status;
+      const coordinateValidation = generatedMarker.coordinateValidation || {};
+      const calibration = coordinateValidation.calibration || {};
+      const targetPlacementVerified = coordinateValidation.targetPlacementVerified === true
+        && Number(calibration.controlPointCount) >= 2
+        && !String(calibration.id || '').endsWith('-full-canvas')
+        && Array.isArray(generatedMarker.mapPosition)
+        && generatedMarker.mapPosition.length === 2
+        && generatedMarker.mapPosition.every(value => Number.isFinite(value) && value >= 0 && value <= 100);
       rows.push({
         map,
         id: generatedMarker.id,
@@ -215,10 +211,13 @@ async function main() {
           generated: generatedMarker.sourcePosition
         },
         targetPlacement: {
-          status: 'unverified',
-          reason: multiPanelSourceMaps.has(map)
-            ? 'whole-canvas projection cannot relocate detached floor panels to target buildings'
-            : 'no independent target-map control-point validation exists'
+          status: targetPlacementVerified ? 'verified' : 'failed',
+          calibrationId: calibration.id || null,
+          method: calibration.method || null,
+          controlPointCount: calibration.controlPointCount || 0,
+          reason: targetPlacementVerified
+            ? 'independently calibrated source region or official world-coordinate fit'
+            : 'missing independent target-map calibration'
         },
         photo,
         floor: {
@@ -252,6 +251,13 @@ async function main() {
     console.log(`FLOOR ${row.map}/${row.id}: ${row.floor.current} -> ${row.floor.expected} (${row.floor.evidence})`);
   }
   console.log(`Audit report: ${outputPath}`);
+  if (summary.sourceCoordinatesVerified !== summary.markerCount
+    || summary.targetPlacementsVerified !== summary.markerCount
+    || summary.photosVerified !== summary.markerCount
+    || summary.floorsMismatched !== 0
+    || summary.floorsUnverified !== 0) {
+    throw new Error('Battle Pass import validation failed; refusing a release with unverified coordinates, target scale, photos, or floors.');
+  }
 }
 
 main().catch(error => {
