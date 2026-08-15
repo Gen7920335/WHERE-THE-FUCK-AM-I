@@ -1,5 +1,5 @@
 {
-  "version": 8,
+  "version": 9,
   "updatedAt": "2026-08-15",
   "source": {
     "name": "Perofunyang battlepass_interactive_map",
@@ -7372,8 +7372,8 @@
           2189
         ],
         "mapPosition": [
-          38.740509,
-          60.260785
+          37.944665,
+          64.330074
         ],
         "floor": 1,
         "elevation": 0,
@@ -7383,22 +7383,30 @@
           "exactSourceValuePreserved": true,
           "insideSourceCanvas": true,
           "targetPlacementVerified": true,
-          "projection": "independent-region-four-corner-fit",
+          "projection": "floor-panel-room-control-idw-registration",
           "calibration": {
-            "id": "lab-first",
-            "method": "independent-region-four-corner-fit",
-            "controlPointCount": 4,
+            "id": "lab-main-room-control-fit",
+            "method": "floor-panel-room-control-idw-registration",
+            "controlPointCount": 8,
             "sourceBounds": [
-              1100,
-              700,
-              2600,
-              2189
+              1120,
+              844,
+              2580,
+              2080
             ],
             "targetBounds": [
-              1518,
-              1201,
+              1516,
+              1200,
               3924,
-              3133
+              3132
+            ],
+            "sourcePixel": [
+              1482,
+              1725
+            ],
+            "targetPixel": [
+              2086.957,
+              2701.863
             ]
           }
         },
@@ -7433,8 +7441,8 @@
           2189
         ],
         "mapPosition": [
-          38.682182,
-          61.805446
+          37.602381,
+          66.186625
         ],
         "floor": 1,
         "elevation": 0,
@@ -7444,22 +7452,30 @@
           "exactSourceValuePreserved": true,
           "insideSourceCanvas": true,
           "targetPlacementVerified": true,
-          "projection": "independent-region-four-corner-fit",
+          "projection": "floor-panel-room-control-idw-registration",
           "calibration": {
-            "id": "lab-first",
-            "method": "independent-region-four-corner-fit",
-            "controlPointCount": 4,
+            "id": "lab-main-room-control-fit",
+            "method": "floor-panel-room-control-idw-registration",
+            "controlPointCount": 8,
             "sourceBounds": [
-              1100,
-              700,
-              2600,
-              2189
+              1120,
+              844,
+              2580,
+              2080
             ],
             "targetBounds": [
-              1518,
-              1201,
+              1516,
+              1200,
               3924,
-              3133
+              3132
+            ],
+            "sourcePixel": [
+              1480,
+              1775
+            ],
+            "targetPixel": [
+              2068.131,
+              2779.838
             ]
           }
         },
@@ -7494,8 +7510,8 @@
           2189
         ],
         "mapPosition": [
-          68.283273,
-          71.716298
+          29.824529,
+          76.677389
         ],
         "floor": 0,
         "elevation": 0,
@@ -7505,22 +7521,30 @@
           "exactSourceValuePreserved": true,
           "insideSourceCanvas": true,
           "targetPlacementVerified": true,
-          "projection": "independent-region-four-corner-fit",
+          "projection": "floor-panel-room-control-idw-registration",
           "calibration": {
-            "id": "lab-technical",
-            "method": "independent-region-four-corner-fit",
-            "controlPointCount": 4,
+            "id": "lab-main-room-control-fit",
+            "method": "floor-panel-room-control-idw-registration",
+            "controlPointCount": 8,
             "sourceBounds": [
-              0,
-              0,
-              1300,
-              2189
+              1120,
+              844,
+              2580,
+              2080
             ],
             "targetBounds": [
-              1518,
-              1201,
+              1516,
+              1200,
               3924,
-              3133
+              3132
+            ],
+            "sourcePixel": [
+              1209,
+              2052
+            ],
+            "targetPixel": [
+              1640.349,
+              3220.45
             ]
           }
         },
@@ -7555,8 +7579,8 @@
           2189
         ],
         "mapPosition": [
-          65.725846,
-          68.669244
+          27.650838,
+          71.282619
         ],
         "floor": 0,
         "elevation": 0,
@@ -7566,22 +7590,30 @@
           "exactSourceValuePreserved": true,
           "insideSourceCanvas": true,
           "targetPlacementVerified": true,
-          "projection": "independent-region-four-corner-fit",
+          "projection": "floor-panel-room-control-idw-registration",
           "calibration": {
-            "id": "lab-technical",
-            "method": "independent-region-four-corner-fit",
-            "controlPointCount": 4,
+            "id": "lab-main-room-control-fit",
+            "method": "floor-panel-room-control-idw-registration",
+            "controlPointCount": 8,
             "sourceBounds": [
-              0,
-              0,
-              1300,
-              2189
+              1120,
+              844,
+              2580,
+              2080
             ],
             "targetBounds": [
-              1518,
-              1201,
+              1516,
+              1200,
               3924,
-              3133
+              3132
+            ],
+            "sourcePixel": [
+              1133,
+              1907
+            ],
+            "targetPixel": [
+              1520.796,
+              2993.87
             ]
           }
         },
@@ -7616,8 +7648,8 @@
           2189
         ],
         "mapPosition": [
-          37.136509,
-          60.137213
+          36.443007,
+          64.183027
         ],
         "floor": 1,
         "elevation": 0,
@@ -7627,22 +7659,30 @@
           "exactSourceValuePreserved": true,
           "insideSourceCanvas": true,
           "targetPlacementVerified": true,
-          "projection": "independent-region-four-corner-fit",
+          "projection": "floor-panel-room-control-idw-registration",
           "calibration": {
-            "id": "lab-first",
-            "method": "independent-region-four-corner-fit",
-            "controlPointCount": 4,
+            "id": "lab-main-room-control-fit",
+            "method": "floor-panel-room-control-idw-registration",
+            "controlPointCount": 8,
             "sourceBounds": [
-              1100,
-              700,
-              2600,
-              2189
+              1120,
+              844,
+              2580,
+              2080
             ],
             "targetBounds": [
-              1518,
-              1201,
+              1516,
+              1200,
               3924,
-              3133
+              3132
+            ],
+            "sourcePixel": [
+              1427,
+              1721
+            ],
+            "targetPixel": [
+              2004.365,
+              2695.687
             ]
           }
         },
@@ -7677,8 +7717,8 @@
           2189
         ],
         "mapPosition": [
-          46.2064,
-          62.237951
+          45.760851,
+          66.448599
         ],
         "floor": 1,
         "elevation": 0,
@@ -7688,22 +7728,30 @@
           "exactSourceValuePreserved": true,
           "insideSourceCanvas": true,
           "targetPlacementVerified": true,
-          "projection": "independent-region-four-corner-fit",
+          "projection": "floor-panel-room-control-idw-registration",
           "calibration": {
-            "id": "lab-first",
-            "method": "independent-region-four-corner-fit",
-            "controlPointCount": 4,
+            "id": "lab-main-room-control-fit",
+            "method": "floor-panel-room-control-idw-registration",
+            "controlPointCount": 8,
             "sourceBounds": [
-              1100,
-              700,
-              2600,
-              2189
+              1120,
+              844,
+              2580,
+              2080
             ],
             "targetBounds": [
-              1518,
-              1201,
+              1516,
+              1200,
               3924,
-              3133
+              3132
+            ],
+            "sourcePixel": [
+              1738,
+              1789
+            ],
+            "targetPixel": [
+              2516.847,
+              2790.841
             ]
           }
         },
@@ -7738,8 +7786,8 @@
           2189
         ],
         "mapPosition": [
-          37.778109,
-          60.847757
+          36.658198,
+          65.032118
         ],
         "floor": 1,
         "elevation": 0,
@@ -7749,22 +7797,30 @@
           "exactSourceValuePreserved": true,
           "insideSourceCanvas": true,
           "targetPlacementVerified": true,
-          "projection": "independent-region-four-corner-fit",
+          "projection": "floor-panel-room-control-idw-registration",
           "calibration": {
-            "id": "lab-first",
-            "method": "independent-region-four-corner-fit",
-            "controlPointCount": 4,
+            "id": "lab-main-room-control-fit",
+            "method": "floor-panel-room-control-idw-registration",
+            "controlPointCount": 8,
             "sourceBounds": [
-              1100,
-              700,
-              2600,
-              2189
+              1120,
+              844,
+              2580,
+              2080
             ],
             "targetBounds": [
-              1518,
-              1201,
+              1516,
+              1200,
               3924,
-              3133
+              3132
+            ],
+            "sourcePixel": [
+              1449,
+              1744
+            ],
+            "targetPixel": [
+              2016.201,
+              2731.349
             ]
           }
         },
@@ -7799,8 +7855,8 @@
           2189
         ],
         "mapPosition": [
-          44.427418,
-          52.259442
+          43.784564,
+          54.874014
         ],
         "floor": 1,
         "elevation": 0,
@@ -7810,22 +7866,30 @@
           "exactSourceValuePreserved": true,
           "insideSourceCanvas": true,
           "targetPlacementVerified": true,
-          "projection": "independent-region-four-corner-fit",
+          "projection": "floor-panel-room-control-idw-registration",
           "calibration": {
-            "id": "lab-first",
-            "method": "independent-region-four-corner-fit",
-            "controlPointCount": 4,
+            "id": "lab-main-room-control-fit",
+            "method": "floor-panel-room-control-idw-registration",
+            "controlPointCount": 8,
             "sourceBounds": [
-              1100,
-              700,
-              2600,
-              2189
+              1120,
+              844,
+              2580,
+              2080
             ],
             "targetBounds": [
-              1518,
-              1201,
+              1516,
+              1200,
               3924,
-              3133
+              3132
+            ],
+            "sourcePixel": [
+              1677,
+              1466
+            ],
+            "targetPixel": [
+              2408.151,
+              2304.709
             ]
           }
         },
@@ -7860,8 +7924,8 @@
           2189
         ],
         "mapPosition": [
-          35.153382,
-          59.982746
+          34.772385,
+          64.016011
         ],
         "floor": 1,
         "elevation": 0,
@@ -7871,22 +7935,30 @@
           "exactSourceValuePreserved": true,
           "insideSourceCanvas": true,
           "targetPlacementVerified": true,
-          "projection": "independent-region-four-corner-fit",
+          "projection": "floor-panel-room-control-idw-registration",
           "calibration": {
-            "id": "lab-first",
-            "method": "independent-region-four-corner-fit",
-            "controlPointCount": 4,
+            "id": "lab-main-room-control-fit",
+            "method": "floor-panel-room-control-idw-registration",
+            "controlPointCount": 8,
             "sourceBounds": [
-              1100,
-              700,
-              2600,
-              2189
+              1120,
+              844,
+              2580,
+              2080
             ],
             "targetBounds": [
-              1518,
-              1201,
+              1516,
+              1200,
               3924,
-              3133
+              3132
+            ],
+            "sourcePixel": [
+              1359,
+              1716
+            ],
+            "targetPixel": [
+              1912.481,
+              2688.672
             ]
           }
         },
@@ -7921,8 +7993,8 @@
           2189
         ],
         "mapPosition": [
-          39.364876,
-          60.89746
+          40.177958,
+          66.034348
         ],
         "floor": 2,
         "elevation": 0,
@@ -7932,22 +8004,30 @@
           "exactSourceValuePreserved": true,
           "insideSourceCanvas": true,
           "targetPlacementVerified": true,
-          "projection": "independent-region-four-corner-fit",
+          "projection": "floor-panel-room-control-idw-registration",
           "calibration": {
-            "id": "lab-second",
-            "method": "independent-region-four-corner-fit",
-            "controlPointCount": 4,
+            "id": "lab-level2-room-control-fit",
+            "method": "floor-panel-room-control-idw-registration",
+            "controlPointCount": 13,
             "sourceBounds": [
-              2500,
-              0,
-              3820,
-              1350
+              2456,
+              32,
+              3724,
+              1108
             ],
             "targetBounds": [
-              1518,
-              1201,
+              1516,
+              1200,
               3924,
-              3133
+              3132
+            ],
+            "sourcePixel": [
+              2855,
+              948
+            ],
+            "targetPixel": [
+              2209.788,
+              2773.443
             ]
           }
         },
@@ -7982,8 +8062,8 @@
           2189
         ],
         "mapPosition": [
-          36.117107,
-          62.669312
+          38.26328,
+          67.963536
         ],
         "floor": 2,
         "elevation": 0,
@@ -7993,22 +8073,30 @@
           "exactSourceValuePreserved": true,
           "insideSourceCanvas": true,
           "targetPlacementVerified": true,
-          "projection": "independent-region-four-corner-fit",
+          "projection": "floor-panel-room-control-idw-registration",
           "calibration": {
-            "id": "lab-second",
-            "method": "independent-region-four-corner-fit",
-            "controlPointCount": 4,
+            "id": "lab-level2-room-control-fit",
+            "method": "floor-panel-room-control-idw-registration",
+            "controlPointCount": 13,
             "sourceBounds": [
-              2500,
-              0,
-              3820,
-              1350
+              2456,
+              32,
+              3724,
+              1108
             ],
             "targetBounds": [
-              1518,
-              1201,
+              1516,
+              1200,
               3924,
-              3133
+              3132
+            ],
+            "sourcePixel": [
+              2757,
+              1000
+            ],
+            "targetPixel": [
+              2104.48,
+              2854.469
             ]
           }
         },
@@ -8043,8 +8131,8 @@
           2189
         ],
         "mapPosition": [
-          32.736777,
-          59.97746
+          35.200994,
+          64.550179
         ],
         "floor": 2,
         "elevation": 0,
@@ -8054,22 +8142,30 @@
           "exactSourceValuePreserved": true,
           "insideSourceCanvas": true,
           "targetPlacementVerified": true,
-          "projection": "independent-region-four-corner-fit",
+          "projection": "floor-panel-room-control-idw-registration",
           "calibration": {
-            "id": "lab-second",
-            "method": "independent-region-four-corner-fit",
-            "controlPointCount": 4,
+            "id": "lab-level2-room-control-fit",
+            "method": "floor-panel-room-control-idw-registration",
+            "controlPointCount": 13,
             "sourceBounds": [
-              2500,
-              0,
-              3820,
-              1350
+              2456,
+              32,
+              3724,
+              1108
             ],
             "targetBounds": [
-              1518,
-              1201,
+              1516,
+              1200,
               3924,
-              3133
+              3132
+            ],
+            "sourcePixel": [
+              2655,
+              921
+            ],
+            "targetPixel": [
+              1936.055,
+              2711.108
             ]
           }
         },
@@ -8104,8 +8200,8 @@
           2189
         ],
         "mapPosition": [
-          42.28124,
-          62.73746
+          41.574477,
+          68.006849
         ],
         "floor": 2,
         "elevation": 0,
@@ -8115,22 +8211,30 @@
           "exactSourceValuePreserved": true,
           "insideSourceCanvas": true,
           "targetPlacementVerified": true,
-          "projection": "independent-region-four-corner-fit",
+          "projection": "floor-panel-room-control-idw-registration",
           "calibration": {
-            "id": "lab-second",
-            "method": "independent-region-four-corner-fit",
-            "controlPointCount": 4,
+            "id": "lab-level2-room-control-fit",
+            "method": "floor-panel-room-control-idw-registration",
+            "controlPointCount": 13,
             "sourceBounds": [
-              2500,
-              0,
-              3820,
-              1350
+              2456,
+              32,
+              3724,
+              1108
             ],
             "targetBounds": [
-              1518,
-              1201,
+              1516,
+              1200,
               3924,
-              3133
+              3132
+            ],
+            "sourcePixel": [
+              2943,
+              1002
+            ],
+            "targetPixel": [
+              2286.596,
+              2856.288
             ]
           }
         },
@@ -8165,8 +8269,8 @@
           2189
         ],
         "mapPosition": [
-          46.490083,
-          40.418942
+          47.012389,
+          41.106141
         ],
         "floor": 2,
         "elevation": 0,
@@ -8176,22 +8280,30 @@
           "exactSourceValuePreserved": true,
           "insideSourceCanvas": true,
           "targetPlacementVerified": true,
-          "projection": "independent-region-four-corner-fit",
+          "projection": "floor-panel-room-control-idw-registration",
           "calibration": {
-            "id": "lab-second",
-            "method": "independent-region-four-corner-fit",
-            "controlPointCount": 4,
+            "id": "lab-level2-room-control-fit",
+            "method": "floor-panel-room-control-idw-registration",
+            "controlPointCount": 13,
             "sourceBounds": [
-              2500,
-              0,
-              3820,
-              1350
+              2456,
+              32,
+              3724,
+              1108
             ],
             "targetBounds": [
-              1518,
-              1201,
+              1516,
+              1200,
               3924,
-              3133
+              3132
+            ],
+            "sourcePixel": [
+              3070,
+              347
+            ],
+            "targetPixel": [
+              2585.681,
+              1726.458
             ]
           }
         },
@@ -8226,8 +8338,8 @@
           2189
         ],
         "mapPosition": [
-          53.747851,
-          40.044127
+          53.981372,
+          41.917749
         ],
         "floor": 2,
         "elevation": 0,
@@ -8237,22 +8349,30 @@
           "exactSourceValuePreserved": true,
           "insideSourceCanvas": true,
           "targetPlacementVerified": true,
-          "projection": "independent-region-four-corner-fit",
+          "projection": "floor-panel-room-control-idw-registration",
           "calibration": {
-            "id": "lab-second",
-            "method": "independent-region-four-corner-fit",
-            "controlPointCount": 4,
+            "id": "lab-level2-room-control-fit",
+            "method": "floor-panel-room-control-idw-registration",
+            "controlPointCount": 13,
             "sourceBounds": [
-              2500,
-              0,
-              3820,
-              1350
+              2456,
+              32,
+              3724,
+              1108
             ],
             "targetBounds": [
-              1518,
-              1201,
+              1516,
+              1200,
               3924,
-              3133
+              3132
+            ],
+            "sourcePixel": [
+              3289,
+              336
+            ],
+            "targetPixel": [
+              2968.975,
+              1760.545
             ]
           }
         },
@@ -8287,8 +8407,8 @@
           2189
         ],
         "mapPosition": [
-          42.546364,
-          64.611534
+          42.420348,
+          70.620617
         ],
         "floor": 2,
         "elevation": 0,
@@ -8298,22 +8418,30 @@
           "exactSourceValuePreserved": true,
           "insideSourceCanvas": true,
           "targetPlacementVerified": true,
-          "projection": "independent-region-four-corner-fit",
+          "projection": "floor-panel-room-control-idw-registration",
           "calibration": {
-            "id": "lab-second",
-            "method": "independent-region-four-corner-fit",
-            "controlPointCount": 4,
+            "id": "lab-level2-room-control-fit",
+            "method": "floor-panel-room-control-idw-registration",
+            "controlPointCount": 13,
             "sourceBounds": [
-              2500,
-              0,
-              3820,
-              1350
+              2456,
+              32,
+              3724,
+              1108
             ],
             "targetBounds": [
-              1518,
-              1201,
+              1516,
+              1200,
               3924,
-              3133
+              3132
+            ],
+            "sourcePixel": [
+              2951,
+              1057
+            ],
+            "targetPixel": [
+              2333.119,
+              2966.066
             ]
           }
         },
@@ -8348,8 +8476,8 @@
           2189
         ],
         "mapPosition": [
-          35.421157,
-          62.907831
+          37.643699,
+          68.205922
         ],
         "floor": 2,
         "elevation": 0,
@@ -8359,22 +8487,30 @@
           "exactSourceValuePreserved": true,
           "insideSourceCanvas": true,
           "targetPlacementVerified": true,
-          "projection": "independent-region-four-corner-fit",
+          "projection": "floor-panel-room-control-idw-registration",
           "calibration": {
-            "id": "lab-second",
-            "method": "independent-region-four-corner-fit",
-            "controlPointCount": 4,
+            "id": "lab-level2-room-control-fit",
+            "method": "floor-panel-room-control-idw-registration",
+            "controlPointCount": 13,
             "sourceBounds": [
-              2500,
-              0,
-              3820,
-              1350
+              2456,
+              32,
+              3724,
+              1108
             ],
             "targetBounds": [
-              1518,
-              1201,
+              1516,
+              1200,
               3924,
-              3133
+              3132
+            ],
+            "sourcePixel": [
+              2736,
+              1007
+            ],
+            "targetPixel": [
+              2070.403,
+              2864.649
             ]
           }
         },
@@ -8409,8 +8545,8 @@
           2189
         ],
         "mapPosition": [
-          36.846198,
-          59.330053
+          39.026926,
+          63.989611
         ],
         "floor": 2,
         "elevation": 0,
@@ -8420,22 +8556,30 @@
           "exactSourceValuePreserved": true,
           "insideSourceCanvas": true,
           "targetPlacementVerified": true,
-          "projection": "independent-region-four-corner-fit",
+          "projection": "floor-panel-room-control-idw-registration",
           "calibration": {
-            "id": "lab-second",
-            "method": "independent-region-four-corner-fit",
-            "controlPointCount": 4,
+            "id": "lab-level2-room-control-fit",
+            "method": "floor-panel-room-control-idw-registration",
+            "controlPointCount": 13,
             "sourceBounds": [
-              2500,
-              0,
-              3820,
-              1350
+              2456,
+              32,
+              3724,
+              1108
             ],
             "targetBounds": [
-              1518,
-              1201,
+              1516,
+              1200,
               3924,
-              3133
+              3132
+            ],
+            "sourcePixel": [
+              2779,
+              902
+            ],
+            "targetPixel": [
+              2146.481,
+              2687.564
             ]
           }
         },
@@ -8470,8 +8614,8 @@
           2189
         ],
         "mapPosition": [
-          48.306182,
-          36.751047
+          46.567294,
+          33.974749
         ],
         "floor": 1,
         "elevation": 0,
@@ -8481,22 +8625,30 @@
           "exactSourceValuePreserved": true,
           "insideSourceCanvas": true,
           "targetPlacementVerified": true,
-          "projection": "independent-region-four-corner-fit",
+          "projection": "floor-panel-room-control-idw-registration",
           "calibration": {
-            "id": "lab-first",
-            "method": "independent-region-four-corner-fit",
-            "controlPointCount": 4,
+            "id": "lab-main-room-control-fit",
+            "method": "floor-panel-room-control-idw-registration",
+            "controlPointCount": 8,
             "sourceBounds": [
-              1100,
-              700,
-              2600,
-              2189
+              1120,
+              844,
+              2580,
+              2080
             ],
             "targetBounds": [
-              1518,
-              1201,
+              1516,
+              1200,
               3924,
-              3133
+              3132
+            ],
+            "sourcePixel": [
+              1810,
+              964
+            ],
+            "targetPixel": [
+              2561.201,
+              1426.939
             ]
           }
         },
@@ -8531,8 +8683,8 @@
           2189
         ],
         "mapPosition": [
-          47.8104,
-          54.298395
+          47.000512,
+          57.340804
         ],
         "floor": 1,
         "elevation": 0,
@@ -8542,22 +8694,30 @@
           "exactSourceValuePreserved": true,
           "insideSourceCanvas": true,
           "targetPlacementVerified": true,
-          "projection": "independent-region-four-corner-fit",
+          "projection": "floor-panel-room-control-idw-registration",
           "calibration": {
-            "id": "lab-first",
-            "method": "independent-region-four-corner-fit",
-            "controlPointCount": 4,
+            "id": "lab-main-room-control-fit",
+            "method": "floor-panel-room-control-idw-registration",
+            "controlPointCount": 8,
             "sourceBounds": [
-              1100,
-              700,
-              2600,
-              2189
+              1120,
+              844,
+              2580,
+              2080
             ],
             "targetBounds": [
-              1518,
-              1201,
+              1516,
+              1200,
               3924,
-              3133
+              3132
+            ],
+            "sourcePixel": [
+              1793,
+              1532
+            ],
+            "targetPixel": [
+              2585.028,
+              2408.314
             ]
           }
         },
@@ -8592,8 +8752,8 @@
           2189
         ],
         "mapPosition": [
-          41.552149,
-          32.684127
+          42.760502,
+          34.288511
         ],
         "floor": 2,
         "elevation": 0,
@@ -8603,22 +8763,30 @@
           "exactSourceValuePreserved": true,
           "insideSourceCanvas": true,
           "targetPlacementVerified": true,
-          "projection": "independent-region-four-corner-fit",
+          "projection": "floor-panel-room-control-idw-registration",
           "calibration": {
-            "id": "lab-second",
-            "method": "independent-region-four-corner-fit",
-            "controlPointCount": 4,
+            "id": "lab-level2-room-control-fit",
+            "method": "floor-panel-room-control-idw-registration",
+            "controlPointCount": 13,
             "sourceBounds": [
-              2500,
-              0,
-              3820,
-              1350
+              2456,
+              32,
+              3724,
+              1108
             ],
             "targetBounds": [
-              1518,
-              1201,
+              1516,
+              1200,
               3924,
-              3133
+              3132
+            ],
+            "sourcePixel": [
+              2921,
+              120
+            ],
+            "targetPixel": [
+              2351.828,
+              1440.117
             ]
           }
         },
@@ -8653,8 +8821,8 @@
           2189
         ],
         "mapPosition": [
-          65.422993,
-          67.198253
+          27.438586,
+          68.678615
         ],
         "floor": 0,
         "elevation": 0,
@@ -8664,22 +8832,30 @@
           "exactSourceValuePreserved": true,
           "insideSourceCanvas": true,
           "targetPlacementVerified": true,
-          "projection": "independent-region-four-corner-fit",
+          "projection": "floor-panel-room-control-idw-registration",
           "calibration": {
-            "id": "lab-technical",
-            "method": "independent-region-four-corner-fit",
-            "controlPointCount": 4,
+            "id": "lab-main-room-control-fit",
+            "method": "floor-panel-room-control-idw-registration",
+            "controlPointCount": 8,
             "sourceBounds": [
-              0,
-              0,
-              1300,
-              2189
+              1120,
+              844,
+              2580,
+              2080
             ],
             "targetBounds": [
-              1518,
-              1201,
+              1516,
+              1200,
               3924,
-              3133
+              3132
+            ],
+            "sourcePixel": [
+              1124,
+              1837
+            ],
+            "targetPixel": [
+              1509.122,
+              2884.502
             ]
           }
         },
@@ -8714,8 +8890,8 @@
           2189
         ],
         "mapPosition": [
-          32.504793,
-          49.85746
+          35.748835,
+          53.153296
         ],
         "floor": 2,
         "elevation": 0,
@@ -8725,22 +8901,30 @@
           "exactSourceValuePreserved": true,
           "insideSourceCanvas": true,
           "targetPlacementVerified": true,
-          "projection": "independent-region-four-corner-fit",
+          "projection": "floor-panel-room-control-idw-registration",
           "calibration": {
-            "id": "lab-second",
-            "method": "independent-region-four-corner-fit",
-            "controlPointCount": 4,
+            "id": "lab-level2-room-control-fit",
+            "method": "floor-panel-room-control-idw-registration",
+            "controlPointCount": 13,
             "sourceBounds": [
-              2500,
-              0,
-              3820,
-              1350
+              2456,
+              32,
+              3724,
+              1108
             ],
             "targetBounds": [
-              1518,
-              1201,
+              1516,
+              1200,
               3924,
-              3133
+              3132
+            ],
+            "sourcePixel": [
+              2648,
+              624
+            ],
+            "targetPixel": [
+              1966.186,
+              2232.438
             ]
           }
         },
@@ -8775,8 +8959,8 @@
           2189
         ],
         "mapPosition": [
-          35.62,
-          57.660423
+          38.29921,
+          62.04007
         ],
         "floor": 2,
         "elevation": 0,
@@ -8786,22 +8970,30 @@
           "exactSourceValuePreserved": true,
           "insideSourceCanvas": true,
           "targetPlacementVerified": true,
-          "projection": "independent-region-four-corner-fit",
+          "projection": "floor-panel-room-control-idw-registration",
           "calibration": {
-            "id": "lab-second",
-            "method": "independent-region-four-corner-fit",
-            "controlPointCount": 4,
+            "id": "lab-level2-room-control-fit",
+            "method": "floor-panel-room-control-idw-registration",
+            "controlPointCount": 13,
             "sourceBounds": [
-              2500,
-              0,
-              3820,
-              1350
+              2456,
+              32,
+              3724,
+              1108
             ],
             "targetBounds": [
-              1518,
-              1201,
+              1516,
+              1200,
               3924,
-              3133
+              3132
+            ],
+            "sourcePixel": [
+              2742,
+              853
+            ],
+            "targetPixel": [
+              2106.457,
+              2605.683
             ]
           }
         },
@@ -8836,8 +9028,8 @@
           2189
         ],
         "mapPosition": [
-          50.234959,
-          32.275238
+          51.12943,
+          32.213011
         ],
         "floor": 2,
         "elevation": 0,
@@ -8847,22 +9039,30 @@
           "exactSourceValuePreserved": true,
           "insideSourceCanvas": true,
           "targetPlacementVerified": true,
-          "projection": "independent-region-four-corner-fit",
+          "projection": "floor-panel-room-control-idw-registration",
           "calibration": {
-            "id": "lab-second",
-            "method": "independent-region-four-corner-fit",
-            "controlPointCount": 4,
+            "id": "lab-level2-room-control-fit",
+            "method": "floor-panel-room-control-idw-registration",
+            "controlPointCount": 13,
             "sourceBounds": [
-              2500,
-              0,
-              3820,
-              1350
+              2456,
+              32,
+              3724,
+              1108
             ],
             "targetBounds": [
-              1518,
-              1201,
+              1516,
+              1200,
               3924,
-              3133
+              3132
+            ],
+            "sourcePixel": [
+              3183,
+              108
+            ],
+            "targetPixel": [
+              2812.119,
+              1352.946
             ]
           }
         },
@@ -8897,8 +9097,8 @@
           2189
         ],
         "mapPosition": [
-          45.860413,
-          54.593757
+          47.587246,
+          60.434179
         ],
         "floor": 2,
         "elevation": 0,
@@ -8908,22 +9108,30 @@
           "exactSourceValuePreserved": true,
           "insideSourceCanvas": true,
           "targetPlacementVerified": true,
-          "projection": "independent-region-four-corner-fit",
+          "projection": "floor-panel-room-control-idw-registration",
           "calibration": {
-            "id": "lab-second",
-            "method": "independent-region-four-corner-fit",
-            "controlPointCount": 4,
+            "id": "lab-level2-room-control-fit",
+            "method": "floor-panel-room-control-idw-registration",
+            "controlPointCount": 13,
             "sourceBounds": [
-              2500,
-              0,
-              3820,
-              1350
+              2456,
+              32,
+              3724,
+              1108
             ],
             "targetBounds": [
-              1518,
-              1201,
+              1516,
+              1200,
               3924,
-              3133
+              3132
+            ],
+            "sourcePixel": [
+              3051,
+              763
+            ],
+            "targetPixel": [
+              2617.299,
+              2538.236
             ]
           }
         },
@@ -8958,8 +9166,8 @@
           2189
         ],
         "mapPosition": [
-          38.30438,
-          37.624868
+          39.518847,
+          39.044568
         ],
         "floor": 2,
         "elevation": 0,
@@ -8969,22 +9177,30 @@
           "exactSourceValuePreserved": true,
           "insideSourceCanvas": true,
           "targetPlacementVerified": true,
-          "projection": "independent-region-four-corner-fit",
+          "projection": "floor-panel-room-control-idw-registration",
           "calibration": {
-            "id": "lab-second",
-            "method": "independent-region-four-corner-fit",
-            "controlPointCount": 4,
+            "id": "lab-level2-room-control-fit",
+            "method": "floor-panel-room-control-idw-registration",
+            "controlPointCount": 13,
             "sourceBounds": [
-              2500,
-              0,
-              3820,
-              1350
+              2456,
+              32,
+              3724,
+              1108
             ],
             "targetBounds": [
-              1518,
-              1201,
+              1516,
+              1200,
               3924,
-              3133
+              3132
+            ],
+            "sourcePixel": [
+              2823,
+              265
+            ],
+            "targetPixel": [
+              2173.537,
+              1639.872
             ]
           }
         },
@@ -9019,8 +9235,8 @@
           2189
         ],
         "mapPosition": [
-          54.775207,
-          41.57746
+          54.960508,
+          44.02811
         ],
         "floor": 2,
         "elevation": 0,
@@ -9030,22 +9246,30 @@
           "exactSourceValuePreserved": true,
           "insideSourceCanvas": true,
           "targetPlacementVerified": true,
-          "projection": "independent-region-four-corner-fit",
+          "projection": "floor-panel-room-control-idw-registration",
           "calibration": {
-            "id": "lab-second",
-            "method": "independent-region-four-corner-fit",
-            "controlPointCount": 4,
+            "id": "lab-level2-room-control-fit",
+            "method": "floor-panel-room-control-idw-registration",
+            "controlPointCount": 13,
             "sourceBounds": [
-              2500,
-              0,
-              3820,
-              1350
+              2456,
+              32,
+              3724,
+              1108
             ],
             "targetBounds": [
-              1518,
-              1201,
+              1516,
+              1200,
               3924,
-              3133
+              3132
+            ],
+            "sourcePixel": [
+              3320,
+              381
+            ],
+            "targetPixel": [
+              3022.828,
+              1849.181
             ]
           }
         },
@@ -9080,8 +9304,8 @@
           2189
         ],
         "mapPosition": [
-          32.339091,
-          58.546349
+          35.30057,
+          63.090812
         ],
         "floor": 2,
         "elevation": 0,
@@ -9091,22 +9315,30 @@
           "exactSourceValuePreserved": true,
           "insideSourceCanvas": true,
           "targetPlacementVerified": true,
-          "projection": "independent-region-four-corner-fit",
+          "projection": "floor-panel-room-control-idw-registration",
           "calibration": {
-            "id": "lab-second",
-            "method": "independent-region-four-corner-fit",
-            "controlPointCount": 4,
+            "id": "lab-level2-room-control-fit",
+            "method": "floor-panel-room-control-idw-registration",
+            "controlPointCount": 13,
             "sourceBounds": [
-              2500,
-              0,
-              3820,
-              1350
+              2456,
+              32,
+              3724,
+              1108
             ],
             "targetBounds": [
-              1518,
-              1201,
+              1516,
+              1200,
               3924,
-              3133
+              3132
+            ],
+            "sourcePixel": [
+              2643,
+              879
+            ],
+            "targetPixel": [
+              1941.531,
+              2649.814
             ]
           }
         },
@@ -9141,8 +9373,8 @@
           2189
         ],
         "mapPosition": [
-          46.854628,
-          52.310794
+          49.446279,
+          58.835182
         ],
         "floor": 2,
         "elevation": 0,
@@ -9152,22 +9384,30 @@
           "exactSourceValuePreserved": true,
           "insideSourceCanvas": true,
           "targetPlacementVerified": true,
-          "projection": "independent-region-four-corner-fit",
+          "projection": "floor-panel-room-control-idw-registration",
           "calibration": {
-            "id": "lab-second",
-            "method": "independent-region-four-corner-fit",
-            "controlPointCount": 4,
+            "id": "lab-level2-room-control-fit",
+            "method": "floor-panel-room-control-idw-registration",
+            "controlPointCount": 13,
             "sourceBounds": [
-              2500,
-              0,
-              3820,
-              1350
+              2456,
+              32,
+              3724,
+              1108
             ],
             "targetBounds": [
-              1518,
-              1201,
+              1516,
+              1200,
               3924,
-              3133
+              3132
+            ],
+            "sourcePixel": [
+              3081,
+              696
+            ],
+            "targetPixel": [
+              2719.545,
+              2471.078
             ]
           }
         },
@@ -9202,8 +9442,8 @@
           2189
         ],
         "mapPosition": [
-          41.949835,
-          36.432275
+          42.990578,
+          38.087112
         ],
         "floor": 2,
         "elevation": 0,
@@ -9213,22 +9453,30 @@
           "exactSourceValuePreserved": true,
           "insideSourceCanvas": true,
           "targetPlacementVerified": true,
-          "projection": "independent-region-four-corner-fit",
+          "projection": "floor-panel-room-control-idw-registration",
           "calibration": {
-            "id": "lab-second",
-            "method": "independent-region-four-corner-fit",
-            "controlPointCount": 4,
+            "id": "lab-level2-room-control-fit",
+            "method": "floor-panel-room-control-idw-registration",
+            "controlPointCount": 13,
             "sourceBounds": [
-              2500,
-              0,
-              3820,
-              1350
+              2456,
+              32,
+              3724,
+              1108
             ],
             "targetBounds": [
-              1518,
-              1201,
+              1516,
+              1200,
               3924,
-              3133
+              3132
+            ],
+            "sourcePixel": [
+              2933,
+              230
+            ],
+            "targetPixel": [
+              2364.482,
+              1599.659
             ]
           }
         },
@@ -9263,8 +9511,8 @@
           2189
         ],
         "mapPosition": [
-          47.186033,
-          40.350794
+          47.745909,
+          41.050446
         ],
         "floor": 2,
         "elevation": 0,
@@ -9274,22 +9522,30 @@
           "exactSourceValuePreserved": true,
           "insideSourceCanvas": true,
           "targetPlacementVerified": true,
-          "projection": "independent-region-four-corner-fit",
+          "projection": "floor-panel-room-control-idw-registration",
           "calibration": {
-            "id": "lab-second",
-            "method": "independent-region-four-corner-fit",
-            "controlPointCount": 4,
+            "id": "lab-level2-room-control-fit",
+            "method": "floor-panel-room-control-idw-registration",
+            "controlPointCount": 13,
             "sourceBounds": [
-              2500,
-              0,
-              3820,
-              1350
+              2456,
+              32,
+              3724,
+              1108
             ],
             "targetBounds": [
-              1518,
-              1201,
+              1516,
+              1200,
               3924,
-              3133
+              3132
+            ],
+            "sourcePixel": [
+              3091,
+              345
+            ],
+            "targetPixel": [
+              2626.025,
+              1724.119
             ]
           }
         },
@@ -9324,8 +9580,8 @@
           2189
         ],
         "mapPosition": [
-          38.370661,
-          43.928571
+          40.022354,
+          46.452682
         ],
         "floor": 2,
         "elevation": 0,
@@ -9335,22 +9591,30 @@
           "exactSourceValuePreserved": true,
           "insideSourceCanvas": true,
           "targetPlacementVerified": true,
-          "projection": "independent-region-four-corner-fit",
+          "projection": "floor-panel-room-control-idw-registration",
           "calibration": {
-            "id": "lab-second",
-            "method": "independent-region-four-corner-fit",
-            "controlPointCount": 4,
+            "id": "lab-level2-room-control-fit",
+            "method": "floor-panel-room-control-idw-registration",
+            "controlPointCount": 13,
             "sourceBounds": [
-              2500,
-              0,
-              3820,
-              1350
+              2456,
+              32,
+              3724,
+              1108
             ],
             "targetBounds": [
-              1518,
-              1201,
+              1516,
+              1200,
               3924,
-              3133
+              3132
+            ],
+            "sourcePixel": [
+              2825,
+              450
+            ],
+            "targetPixel": [
+              2201.229,
+              1951.013
             ]
           }
         },
@@ -9385,8 +9649,8 @@
           2189
         ],
         "mapPosition": [
-          34.493223,
-          48.801164
+          37.732859,
+          51.873241
         ],
         "floor": 2,
         "elevation": 0,
@@ -9396,22 +9660,30 @@
           "exactSourceValuePreserved": true,
           "insideSourceCanvas": true,
           "targetPlacementVerified": true,
-          "projection": "independent-region-four-corner-fit",
+          "projection": "floor-panel-room-control-idw-registration",
           "calibration": {
-            "id": "lab-second",
-            "method": "independent-region-four-corner-fit",
-            "controlPointCount": 4,
+            "id": "lab-level2-room-control-fit",
+            "method": "floor-panel-room-control-idw-registration",
+            "controlPointCount": 13,
             "sourceBounds": [
-              2500,
-              0,
-              3820,
-              1350
+              2456,
+              32,
+              3724,
+              1108
             ],
             "targetBounds": [
-              1518,
-              1201,
+              1516,
+              1200,
               3924,
-              3133
+              3132
+            ],
+            "sourcePixel": [
+              2708,
+              593
+            ],
+            "targetPixel": [
+              2075.307,
+              2178.676
             ]
           }
         },

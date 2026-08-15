@@ -47,11 +47,6 @@ const calibratedRegions = {
     second: { source: [8550, 1900, 9600, 3500], target: [1940, 1320, 2610, 2450], id: 'interchange-second-floor' },
     powerBasement: { source: [8700, 4100, 9450, 5400], target: [1240, 2180, 1450, 2390], id: 'interchange-power-basement' }
   },
-  lab: {
-    technical: { source: [0, 0, 1300, 2189], target: [1518, 1201, 3924, 3133], id: 'lab-technical' },
-    first: { source: [1100, 700, 2600, 2189], target: [1518, 1201, 3924, 3133], id: 'lab-first' },
-    second: { source: [2500, 0, 3820, 1350], target: [1518, 1201, 3924, 3133], id: 'lab-second' }
-  },
   labyrinth: {
     default: { source: [0, 0, 4145, 3840], target: [1125, 1091, 2235, 2112], id: 'labyrinth-main' }
   },
@@ -96,6 +91,48 @@ const targetProjection = {
   reserve: [3200, 3000, 105, 1600, 1520, 2],
   streets: [3260, 3500, 90, 1660, 1420, 2],
   woods: [4800, 4800, 90, 2200, 2840, 2]
+};
+
+// The Lab source image contains two independently drawn floor panels.  A
+// rectangular fit is not sufficient: the panels have different scale and
+// small non-uniform drafting distortions.  Keep room-label control points for
+// each panel and apply a local inverse-distance correction after the coarse
+// panel registration.  Source points and target points are image pixels.
+const labFloorRegistration = {
+  targetBounds: [1516, 1200, 3924, 3132],
+  panels: {
+    main: {
+      sourceBounds: [1120, 844, 2580, 2080],
+      controls: [
+        [[1810, 965], [2561.2, 1428.5]],
+        [[1360, 1040], [1978.9, 1749.7]],
+        [[2070, 1125], [3015.5, 1697.9]],
+        [[2345, 1325], [3325.4, 2359.1]],
+        [[1425, 1645], [2070.1, 2576.6]],
+        [[1450, 1765], [2013.8, 2764.1]],
+        [[1710, 1765], [2472.1, 2752.1]],
+        [[2035, 1780], [2927.4, 2794.7]]
+      ]
+    },
+    level2: {
+      sourceBounds: [2456, 32, 3724, 1108],
+      controls: [
+        [[3050, 120], [2554.8, 1380.5]],
+        [[2940, 140], [2390.2, 1482.1]],
+        [[2700, 350], [1964.3, 1786.6]],
+        [[3075, 345], [2595.1, 1722.7]],
+        [[3335, 365], [3052.5, 1827.6]],
+        [[3340, 450], [3031.0, 1903.9]],
+        [[2660, 580], [2001.9, 2153.3]],
+        [[3050, 655], [2681.9, 2421.0]],
+        [[3550, 695], [3384.7, 2359.7]],
+        [[2660, 825], [2001.9, 2556.5]],
+        [[2700, 950], [2014.7, 2751.1]],
+        [[2980, 950], [2322.3, 2751.1]],
+        [[3275, 965], [2935.6, 2812.9]]
+      ]
+    }
+  }
 };
 
 const categoryNames = {
@@ -169,6 +206,61 @@ function worldProjection(config, coords, calibration) {
   };
 }
 
+function labProjection(config, coords) {
+  const [sourceY, sourceX] = coords.map(Number);
+  const sourcePoint = [sourceX, config.height - sourceY];
+  const panelEntry = Object.entries(labFloorRegistration.panels).find(([, panel]) => {
+    const [left, top, right, bottom] = panel.sourceBounds;
+    return sourcePoint[0] >= left && sourcePoint[0] <= right
+      && sourcePoint[1] >= top && sourcePoint[1] <= bottom;
+  });
+  if (!panelEntry) throw new Error(`Lab source point ${sourcePoint.join(',')} is outside every registered floor panel`);
+
+  const [panelName, panel] = panelEntry;
+  const [sourceLeft, sourceTop, sourceRight, sourceBottom] = panel.sourceBounds;
+  const [targetLeft, targetTop, targetRight, targetBottom] = labFloorRegistration.targetBounds;
+  const coarse = [
+    targetLeft + ((sourcePoint[0] - sourceLeft) / (sourceRight - sourceLeft)) * (targetRight - targetLeft),
+    targetTop + ((sourcePoint[1] - sourceTop) / (sourceBottom - sourceTop)) * (targetBottom - targetTop)
+  ];
+
+  let correctionX = 0;
+  let correctionY = 0;
+  let totalWeight = 0;
+  for (const [controlSource, controlTarget] of panel.controls) {
+    const controlCoarse = [
+      targetLeft + ((controlSource[0] - sourceLeft) / (sourceRight - sourceLeft)) * (targetRight - targetLeft),
+      targetTop + ((controlSource[1] - sourceTop) / (sourceBottom - sourceTop)) * (targetBottom - targetTop)
+    ];
+    const distanceSquared = Math.max(1,
+      (sourcePoint[0] - controlSource[0]) ** 2 + (sourcePoint[1] - controlSource[1]) ** 2);
+    const weight = 1 / distanceSquared;
+    correctionX += (controlTarget[0] - controlCoarse[0]) * weight;
+    correctionY += (controlTarget[1] - controlCoarse[1]) * weight;
+    totalWeight += weight;
+  }
+
+  const targetPoint = [
+    coarse[0] + correctionX / totalWeight,
+    coarse[1] + correctionY / totalWeight
+  ];
+  return {
+    mapPosition: [
+      Number(((targetPoint[0] / config.targetSize[0]) * 100).toFixed(6)),
+      Number(((targetPoint[1] / config.targetSize[1]) * 100).toFixed(6))
+    ],
+    calibration: {
+      id: `lab-${panelName}-room-control-fit`,
+      method: 'floor-panel-room-control-idw-registration',
+      controlPointCount: panel.controls.length,
+      sourceBounds: panel.sourceBounds,
+      targetBounds: labFloorRegistration.targetBounds,
+      sourcePixel: sourcePoint.map(value => Number(value.toFixed(3))),
+      targetPixel: targetPoint.map(value => Number(value.toFixed(3)))
+    }
+  };
+}
+
 function icebreakerRegion(config, coords) {
   const sourceX = Number(coords[1]);
   const boundaries = [0, 575, 1125, 1650, 2175, 2750, 3300, 3850, 4435, 4985, 5510, 6060, 6600, 7160, 7680];
@@ -203,12 +295,6 @@ function selectRegion(sourceName, marker) {
     if (/^financial-4-1-/.test(id)) return calibratedRegions.interchange.default;
     return parts[0] === 2 ? calibratedRegions.interchange.second : calibratedRegions.interchange.first;
   }
-  if (sourceName === 'lab') {
-    const sourceX = Number(marker.coords[1]);
-    return sourceX < 1300
-      ? calibratedRegions.lab.technical
-      : sourceX < 2500 ? calibratedRegions.lab.first : calibratedRegions.lab.second;
-  }
   if (sourceName === 'shoreline' && parts[0] === 2 && parts[1] > 0) {
     if (Number(marker.coords[1]) < 5000) return calibratedRegions.shoreline.resortNorth;
     if (parts[1] === 1) return calibratedRegions.shoreline.resortWest;
@@ -236,6 +322,7 @@ function selectRegion(sourceName, marker) {
 
 function sourceToTargetPosition(sourceName, config, marker) {
   if (sourceName === 'icebreaker') return icebreakerRegion(config, marker.coords);
+  if (sourceName === 'lab') return labProjection(config, marker.coords);
   const region = selectRegion(sourceName, marker);
   if (region) return boundsProjection(config, marker.coords, region);
   const world = worldCalibrations[sourceName];
@@ -449,7 +536,7 @@ async function main() {
 
   const importedMarkerCount = validationRows.length;
   const output = {
-    version: 8,
+    version: 9,
     updatedAt: new Date().toISOString().slice(0, 10),
     source: {
       name: 'Perofunyang battlepass_interactive_map',

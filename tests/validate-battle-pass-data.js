@@ -28,6 +28,13 @@ const sourceNames = {
   woods: 'woods'
 };
 
+const labRegistrationAnchors = {
+  'user-1-1': [2561.201, 1426.939], // 1F Reception desk
+  'medical-1-1': [2086.957, 2701.863], // Blue/G11 outer office
+  'medical-2-1': [2209.788, 2773.443], // Green keycard room
+  'user-2-12': [2626.025, 1724.119] // central Roundtable room
+};
+
 function readSource(sourceName) {
   const sourcePath = path.join(upstreamRoot, 'data', `${sourceName}.js`);
   const context = { window: {} };
@@ -94,6 +101,22 @@ async function main() {
         || marker.mapPosition.length !== 2
         || marker.mapPosition.some(value => !Number.isFinite(value) || value < 0 || value > 100)) {
         fail(`${globalId}: invalid WTFMI display position`);
+      }
+      if (mapId === 'lab') {
+        const calibration = marker.coordinateValidation?.calibration;
+        if (calibration?.method !== 'floor-panel-room-control-idw-registration'
+          || !/^lab-(?:main|level2)-room-control-fit$/.test(String(calibration?.id || ''))
+          || !Array.isArray(calibration?.targetPixel)) {
+          fail(`${globalId}: Lab marker bypassed the room-control floor registration`);
+        }
+        const expectedAnchor = labRegistrationAnchors[marker.id];
+        if (expectedAnchor && expectedAnchor.some((value, index) => Math.abs(value - calibration.targetPixel[index]) > 0.75)) {
+          fail(`${globalId}: Lab registration anchor drifted from its verified room`);
+        }
+        const projectedPixel = [marker.mapPosition[0] * 55, marker.mapPosition[1] * 42];
+        if (projectedPixel.some((value, index) => Math.abs(value - calibration.targetPixel[index]) > 0.01)) {
+          fail(`${globalId}: Lab target pixel and map percentage disagree`);
+        }
       }
       sourceCoordinateChecks += 1;
 
