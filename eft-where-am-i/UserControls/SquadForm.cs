@@ -388,6 +388,7 @@ namespace eft_where_am_i
             nameBox.Text = string.IsNullOrWhiteSpace(settings.squad_name) ? Environment.UserName : settings.squad_name;
             addressBox.Text = string.IsNullOrWhiteSpace(settings.squad_host) ? "127.0.0.1" : settings.squad_host;
             portBox.Value = Math.Clamp(settings.squad_port, 1024, 65535);
+            passwordBox.Text = SquadPasswordProtector.Unprotect(settings.squad_password_protected);
             SetMode(!string.Equals(settings.squad_mode, "client", StringComparison.OrdinalIgnoreCase), false);
             RefreshState();
         }
@@ -399,6 +400,7 @@ namespace eft_where_am_i
             settings.squad_host = addressBox.Text.Trim();
             settings.squad_port = (int)portBox.Value;
             settings.squad_mode = hostMode ? "host" : "client";
+            settings.squad_password_protected = SquadPasswordProtector.Protect(passwordBox.Text);
             SettingsHandler.Instance.UpdateSettings(settings);
         }
 

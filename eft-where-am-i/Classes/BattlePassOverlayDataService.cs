@@ -1,5 +1,3 @@
-using System.Globalization;
-using System.Text.RegularExpressions;
 using Newtonsoft.Json.Linq;
 
 namespace eft_where_am_i.Classes
@@ -47,57 +45,42 @@ namespace eft_where_am_i.Classes
             {
                 foreach (JObject location in locations.OfType<JObject>())
                 {
-                    if (location["position"] is not JArray position
-                        || position.Count < 3
-                        || !TryReadDouble(position[0], out double worldX)
-                        || !TryReadDouble(position[1], out double elevation)
-                        || !TryReadDouble(position[2], out double worldZ)
-                        || !TarkovMarketMapProjection.TryProject(mapSlug, worldX, worldZ, out double left, out double top)
-                        || left < -5 || left > 105 || top < -5 || top > 105)
+                    if (location["mapPosition"] is not JArray mapPosition
+                        || mapPosition.Count < 2
+                        || !TryReadDouble(mapPosition[0], out double left)
+                        || !TryReadDouble(mapPosition[1], out double top)
+                        || left < 0 || left > 100 || top < 0 || top > 100)
                     {
                         continue;
                     }
 
-                    string confidenceLabel = location["coordinateBasis"]?.ToString() switch
-                    {
-                        "reported-poi-center" => "제보 POI 기준 추정 좌표",
-                        "reported-room-reference" => "방 내부 기준점 보정 좌표",
-                        "photo-topdown-room-alignment" => "제보 사진·실제 상면도 구역 정합 좌표",
-                        "transit-anchor-affine" => "지도 가장자리 3곳 이상 정합 좌표",
-                        "reported-world-coordinate" => "제보 월드 좌표",
-                        _ when location["confidence"]?.ToString() == "reported" => "단일/추가 제보 좌표",
-                        _ => "복수 제보 확인 좌표"
-                    };
+                    double elevation = TryReadDouble(location["elevation"], out double parsedElevation)
+                        ? parsedElevation
+                        : 0;
+                    int floor = location["floor"]?.Value<int?>() ?? 1;
+                    string sourceCoordinate = location["sourcePosition"] is JArray sourcePosition
+                        ? $"원본 좌표 [{string.Join(", ", sourcePosition.Values<string>())}]"
+                        : string.Empty;
                     string details = string.Join(" · ", new[]
                     {
                         location["documents"]?.ToString(),
-                        confidenceLabel,
-                        location["coordinateNote"]?.ToString()
+                        sourceCoordinate,
+                        location["coordinateValidation"]?["checked"]?.Value<bool>() == true ? "좌표 검증 완료" : string.Empty,
+                        location["photoValidation"]?["checked"]?.Value<bool>() == true ? "사진 검증 완료" : string.Empty
                     }.Where(value => !string.IsNullOrWhiteSpace(value)));
 
-                    string title = location["title"]?.ToString() ?? "Battle Pass document";
-                    string locationDescription = location["detail"]?.ToString() ?? string.Empty;
-                    int floor = InferFloorLevel(mapSlug, title, elevation);
-                    List<BattlePassOverlayPhoto> photos = ReadPhotos(location);
-                    if (photos.Count == 0 && location["photoIds"] is JArray photoIds)
-                    {
-                        photos = BattlePassPhotoCatalog.GetPhotosByIds(
-                            mapSlug,
-                            title,
-                            photoIds.Values<string>().Where(value => !string.IsNullOrWhiteSpace(value))!);
-                    }
                     snapshot.markers.Add(new BattlePassOverlayMarker
                     {
                         left = left,
                         top = top,
                         elevation = elevation,
                         floor = floor,
-                        title = title,
-                        locationDescription = locationDescription,
+                        title = location["title"]?.ToString() ?? "Battle Pass document",
+                        locationDescription = location["detail"]?.ToString() ?? string.Empty,
                         details = details,
-                        coordinateCertain = IsCoordinateCertain(location),
-                        photos = photos,
-                        photoSourceUrl = location["photoSourceUrl"]?.ToString() ?? BattlePassPhotoCatalog.SourceUrl
+                        coordinateCertain = location["coordinateCertain"]?.Value<bool?>() ?? false,
+                        photos = ReadPhotos(location),
+                        photoSourceUrl = location["photoSourceUrl"]?.ToString() ?? string.Empty
                     });
                 }
             }
@@ -121,8 +104,8 @@ namespace eft_where_am_i.Classes
 
         private static bool TryReadDouble(JToken? token, out double value)
         {
-            value = 0;
-            return token != null && double.TryParse(token.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out value);
+            value = token?.Value<double?>() ?? 0;
+            return token != null && double.IsFinite(value);
         }
 
         private static List<BattlePassOverlayPhoto> ReadPhotos(JObject location)
@@ -142,97 +125,5 @@ namespace eft_where_am_i.Classes
                 .Where(photo => !string.IsNullOrWhiteSpace(photo.url))
                 .ToList();
         }
-
-        private static bool IsCoordinateCertain(JObject location)
-        {
-            string roomAuditStatus = location["exactRoomAudit"]?["status"]?.ToString() ?? string.Empty;
-            if (string.Equals(roomAuditStatus, "manual-room-audit-required", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(roomAuditStatus, "map-room-missing", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(roomAuditStatus, "source-room-verified-map-missing", StringComparison.OrdinalIgnoreCase))
-            {
-                // A source coordinate or photo does not make an indoor marker
-                // certain when its center has not been proven inside the exact
-                // named room on the production floor plan.
-                return false;
-            }
-
-            if (location["coordinateCertain"]?.Type == JTokenType.Boolean)
-            {
-                return location["coordinateCertain"]!.Value<bool>();
-            }
-
-            if (string.Equals(
-                location["coordinateBasis"]?.ToString(),
-                "reported-world-coordinate",
-                StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-
-            // Non-prefixed photo IDs are coordinates imported from the checked
-            // interactive-map dataset. '@' IDs are unresolved references and do
-            // not qualify as coordinate evidence.
-            return location["photoIds"] is JArray photoIds
-                && photoIds.Values<string>().Any(id =>
-                    !string.IsNullOrWhiteSpace(id)
-                    && !id.StartsWith('@'));
-        }
-
-        private static int InferFloorLevel(string mapSlug, string title, double elevation)
-        {
-            string normalizedTitle = title ?? string.Empty;
-
-            Match explicitFloor = Regex.Match(
-                normalizedTitle,
-                @"\b(?:level\s*|floor\s*|)([1-5])\s*f\b|\blevel\s*([1-5])\b",
-                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-            if (explicitFloor.Success)
-            {
-                string value = explicitFloor.Groups[1].Success
-                    ? explicitFloor.Groups[1].Value
-                    : explicitFloor.Groups[2].Value;
-                if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int floor))
-                {
-                    return floor;
-                }
-            }
-
-            Match roomNumber = Regex.Match(
-                normalizedTitle,
-                @"\b([2-5])\d{2}\b",
-                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-            if (roomNumber.Success
-                && int.TryParse(roomNumber.Groups[1].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int roomFloor))
-            {
-                return roomFloor;
-            }
-
-            if (Regex.IsMatch(normalizedTitle, @"\b(?:basement|bunker|underground|d2)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
-            {
-                return 0;
-            }
-
-            if (Regex.IsMatch(normalizedTitle, @"\b(?:upstairs|upper|above)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
-            {
-                return 2;
-            }
-
-            return mapSlug.ToLowerInvariant() switch
-            {
-                "factory" when elevation < 0 => 0,
-                "factory" when elevation < 3 => 1,
-                "factory" when elevation < 7 => 2,
-                "factory" => 3,
-                "customs" when Regex.IsMatch(normalizedTitle, @"\bBig Red\b.*\bdirector office\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant) => 2,
-                "customs" when elevation >= 6 => 2,
-                "ground-zero" when elevation >= 27 => 2,
-                "streets" when elevation >= 5 => 2,
-                "lab" when elevation >= 3.5 => 2,
-                "icebreaker" when elevation >= 6 => 3,
-                "icebreaker" when elevation >= 2 => 2,
-                _ => 1
-            };
-        }
-
     }
 }

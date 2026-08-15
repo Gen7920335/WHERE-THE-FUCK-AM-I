@@ -1551,11 +1551,13 @@
       input.parentElement?.textContent
     ].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
 
+    const numberedDeckMatch = text.match(/\(\s*(-?\d{1,2})\s*\)/);
+    if (numberedDeckMatch) return Number(numberedDeckMatch[1]);
     if (/\b(?:basement|bunker|underground)\b/i.test(text)) return 0;
     if (/\b(?:main|ground)\b/i.test(text)) return 1;
-    const levelMatch = text.match(/\blevel\s*([1-5])\b/i);
+    const levelMatch = text.match(/\blevel\s*(-?\d{1,2})\b/i);
     if (levelMatch) return Number(levelMatch[1]);
-    const shortMatch = text.match(/\b([1-5])\s*(?:f|층)\b/i);
+    const shortMatch = text.match(/\b(-?\d{1,2})\s*(?:f|층)\b/i);
     return shortMatch ? Number(shortMatch[1]) : null;
   };
 

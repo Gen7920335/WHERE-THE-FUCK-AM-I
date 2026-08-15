@@ -324,5 +324,6 @@ namespace eft_where_am_i.Classes
         public string squad_host { get; set; } = "127.0.0.1";
         public int squad_port { get; set; } = 16243;
         public string squad_mode { get; set; } = "host";
+        public string squad_password_protected { get; set; } = string.Empty;
     }
 }

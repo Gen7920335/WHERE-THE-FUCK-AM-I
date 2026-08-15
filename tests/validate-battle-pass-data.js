@@ -1,261 +1,134 @@
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
+const sharp = require('../.tools/image-utils/node_modules/sharp');
 
 const root = path.resolve(__dirname, '..');
-const file = path.join(root, 'eft-where-am-i', 'html', 'battle-pass-locations.json');
-const data = JSON.parse(fs.readFileSync(file, 'utf8'));
-const overlayServiceFile = path.join(root, 'eft-where-am-i', 'Classes', 'BattlePassOverlayDataService.cs');
-const overlayServiceSource = fs.readFileSync(overlayServiceFile, 'utf8');
+const upstreamRoot = path.resolve(
+  process.env.PEROFUNYANG_BATTLE_PASS_DIR
+    || path.join(root, '.tools', 'battlepass_interactive_map')
+);
+const dataPath = path.join(root, 'eft-where-am-i', 'html', 'battle-pass-locations.json');
+const data = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
+const importerSource = fs.readFileSync(path.join(root, 'tools', 'import-perofunyang-battle-pass.js'), 'utf8');
+const serviceSource = fs.readFileSync(path.join(root, 'eft-where-am-i', 'Classes', 'BattlePassOverlayDataService.cs'), 'utf8');
 
-const maps = {
-  factory: [3600, 3600, 0, 1800, 1850, 10],
-  customs: [4400, 3200, 90, 2600, 1600, 2],
-  interchange: [4000, 3900, 90, 2166, 2004, 2],
-  woods: [4800, 4800, 90, 2200, 2840, 2],
-  shoreline: [3700, 3100, 90, 1570, 1450, 1],
-  reserve: [3200, 3000, 105, 1600, 1520, 2],
-  lighthouse: [3100, 3700, 90, 1550, 2050, 1],
-  streets: [3260, 3500, 90, 1660, 1420, 2],
-  lab: [5500, 4200, 180, 6100, 4050, 10],
-  'ground-zero': [2800, 3100, 90, 1600, 1300, 2],
-  labyrinth: [3300, 3200, 180, 1485, 1602, 10],
-  icebreaker: [5000, 8400, 90, 2500, 4200, 25]
+const sourceNames = {
+  customs: 'customs',
+  factory: 'factory',
+  'ground-zero': 'ground_zero',
+  interchange: 'interchange',
+  icebreaker: 'icebreaker',
+  lab: 'lab',
+  labyrinth: 'labyrinth',
+  lighthouse: 'lighthouse',
+  reserve: 'reserve',
+  shoreline: 'shoreline',
+  streets: 'streets_of_tarkov',
+  woods: 'woods'
 };
 
-function project(map, position) {
-  const [width, height, rotation, xOffset, yOffset, ratio] = maps[map];
-  const radians = -rotation * Math.PI / 180;
-  const gameX = position[2];
-  const gameY = position[0];
-  const rotatedX = gameX * Math.cos(radians) - gameY * Math.sin(radians);
-  const rotatedY = gameX * Math.sin(radians) + gameY * Math.cos(radians);
-  return [
-    ((xOffset - rotatedX * ratio) / width) * 100,
-    ((yOffset - rotatedY * ratio) / height) * 100
-  ];
+function readSource(sourceName) {
+  const sourcePath = path.join(upstreamRoot, 'data', `${sourceName}.js`);
+  const context = { window: {} };
+  vm.runInNewContext(fs.readFileSync(sourcePath, 'utf8'), context, { filename: sourcePath });
+  return context.window[`MAP_DATA_${sourceName}`] || [];
 }
 
-function photoPath(map, id) {
-  const sourceMap = map === 'ground-zero' ? 'ground_zero' : map === 'streets' ? 'streets_of_tarkov' : map;
-  if (id.startsWith('@')) return `${sourceMap}/${id.slice(1)}.webp`;
-  const separator = id.indexOf('-');
-  const rawCategory = id.slice(0, separator);
-  const category = rawCategory === 'blueprint' ? 'blueprints' : rawCategory;
-  return `${sourceMap}/${category}/${id.slice(separator + 1)}.webp`;
+function fail(message) {
+  throw new Error(message);
 }
 
-const failures = [];
-let markerCount = 0;
-let explicitPhotoCount = 0;
-const communityRoot = process.env.COMMUNITY_MAP_DIR;
-const coordinateChecks = new Map([
-  ['factory/Forklift room - blue locker', [[60.08, 1.09, -48.39], 0.02]],
-  ['streets/Pinewood Hotel room 208', [[-67.94217, 5.395488, 53.497696], 0.01]],
-  ['streets/Pinewood Hotel Room 212 Window Table', [[-58.2, 5.4, 54.2], 0.01]],
-  ['streets/Concordia 2F Computer Desk', [[230, 5.8, 390], 0.01]],
-  ['reserve/White Knight 3F interior · PMC 인사 파일', [[82.2, 6.4, -30.2], 0.01]],
-  ['reserve/White Knight 3F window table · 프로젝트 문서', [[84, 6.4, -31.5], 0.01]],
-  ['reserve/Black Knight 3F', [[14.5, 6.4, -10.8], 0.01]],
-  ['reserve/Black Pawn 3F end room', [[-166, 6.4, 35], 0.01]],
-  ['woods/Village brick house upstairs', [[-520.3, 19, -338.3], 0.01]],
-  ['woods/Medical camp corpse trailer', [[-191.075, -13.19, 237.38], 0.01]],
-  ['woods/Medical camp uncovered corpse', [[-184.925, -13, 232.62], 0.01]],
-  ['reserve/K Buildings K4 front desk', [[60, 0.5, -112], 0.01]],
-  ['icebreaker/Medical Office - deck 1 · PMC 인사 파일', [[10.8114, 19.2, 41.4893], 0.01]],
-  ['icebreaker/Drone room before helipad - deck 2 · 시험 문서', [[-1.5864, 20.8, -52.1048], 0.01]],
-  ['icebreaker/Engine room password shelf - deck -2', [[8, 4.6, -58], 0.01]],
-  ['icebreaker/Upper password room table - accommodation deck 5', [[1, 29.8, 18], 0.01]]
-]);
-const checkedCoordinates = new Set();
-let exactNumberedRoomCount = 0;
-let exactLabRoomAuditCount = 0;
-const labRoomAuditStatuses = new Map();
-let labSourcePinAuditCount = 0;
-let labSourceTransferIssueCount = 0;
-let globallyClassifiedRoomAuditCount = 0;
-const globalRoomAuditStatuses = new Map();
-const acceptedGlobalRoomStatuses = new Set([
-  'inside-exact-room',
-  'inside-named-area',
-  'manual-room-audit-required',
-  'map-room-missing',
-  'source-room-verified-map-missing',
-  'not-room-scoped'
-]);
-const acceptedLabRoomStatuses = new Set([
-  'inside-exact-room',
-  'inside-named-area',
-  'manual-room-audit-required',
-  'map-room-missing',
-  'source-room-verified-map-missing'
-]);
-
-if (/BattlePassPhotoCatalog\.GetPhotos\(/.test(overlayServiceSource)) {
-  failures.push('implicit title/floor photo fallback is enabled; marker photos must be assigned explicitly');
-}
-if (!/manual-room-audit-required/.test(overlayServiceSource) || !/map-room-missing/.test(overlayServiceSource)) {
-  failures.push('runtime certainty does not downgrade failed exact-room audits');
-}
-
-for (const [map, markers] of Object.entries(data.maps)) {
-  if (!maps[map]) {
-    if (markers.length) failures.push(`${map}: no projection definition`);
-    continue;
+async function main() {
+  if (!data.source?.importedWithoutUsingPreviousWtfmiBattlePassData) {
+    fail('clean-import declaration is missing');
+  }
+  if (data.verification?.previousWtfmiDataRead !== false) {
+    fail('verification does not state that previous WTFMI data was excluded');
+  }
+  if (/readFileSync\s*\(\s*outputPath/.test(importerSource)
+    || /battle-pass-locations\.json[^\n]+read/i.test(importerSource)) {
+    fail('importer reads the previous generated battle-pass JSON');
+  }
+  if (!/location\["mapPosition"\]/.test(serviceSource)
+    || /location\["position"\]/.test(serviceSource)
+    || /photoIds/.test(serviceSource)) {
+    fail('runtime service still accepts legacy coordinates or photo IDs');
   }
 
-  const titles = new Set();
-  const assignedPhotos = new Set();
-  const explicitPhotoPositions = new Map();
-  for (const marker of markers) {
-    markerCount += 1;
-    if (!marker.title || titles.has(marker.title)) failures.push(`${map}: missing or duplicate title: ${marker.title || '<empty>'}`);
-    titles.add(marker.title);
-    if (!Array.isArray(marker.position) || marker.position.length < 3 || marker.position.some(value => !Number.isFinite(Number(value)))) {
-      failures.push(`${map}/${marker.title}: invalid position`);
-      continue;
-    }
-    const [left, top] = project(map, marker.position.map(Number));
-    if (left < -5 || left > 105 || top < -5 || top > 105) failures.push(`${map}/${marker.title}: projected outside map (${left.toFixed(2)}, ${top.toFixed(2)})`);
+  let importedCount = 0;
+  let sourceCoordinateChecks = 0;
+  let photoChecks = 0;
+  const globalIds = new Set();
 
-    const globalRoomAudit = marker.exactRoomAudit;
-    if (!globalRoomAudit || !acceptedGlobalRoomStatuses.has(globalRoomAudit.status)) {
-      failures.push(`${map}/${marker.title}: missing strict global exact-room classification`);
-    } else {
-      globallyClassifiedRoomAuditCount += 1;
-      globalRoomAuditStatuses.set(globalRoomAudit.status, (globalRoomAuditStatuses.get(globalRoomAudit.status) || 0) + 1);
+  for (const [mapId, sourceName] of Object.entries(sourceNames)) {
+    const sourceMarkers = readSource(sourceName)
+      .filter(marker => marker.category !== 'transit' && marker.category !== 'temporary');
+    const generated = data.maps?.[mapId];
+    if (!Array.isArray(generated)) fail(`${mapId}: generated marker list is missing`);
+    if (generated.length !== sourceMarkers.length) {
+      fail(`${mapId}: expected ${sourceMarkers.length} source markers, found ${generated.length}`);
     }
 
-    const isAuditedNumberedRoom = (map === 'customs' && /(?:Dorms).*\b(?:207|212|216|304|314)\b/i.test(marker.title))
-      || (map === 'shoreline' && /Resort (?:West|East) Wing \d{3}\b/i.test(marker.title));
-    if (isAuditedNumberedRoom) {
-      exactNumberedRoomCount += 1;
-      const audit = marker.exactRoomAudit;
-      if (!audit || audit.status !== 'inside-exact-room' || !Array.isArray(audit.anchorPixel)) {
-        failures.push(`${map}/${marker.title}: missing strict exact-room audit`);
-      } else {
-        const [width, height] = maps[map];
-        const pixel = [(left / 100) * width, (top / 100) * height];
-        const anchorDistance = Math.hypot(pixel[0] - Number(audit.anchorPixel[0]), pixel[1] - Number(audit.anchorPixel[1]));
-        if (anchorDistance > 1.1) failures.push(`${map}/${marker.title}: marker center left exact room anchor by ${anchorDistance.toFixed(2)} px`);
-        const room = marker.title.match(/\b([1-5]\d{2})\b/)?.[1];
-        if (audit.room !== room) failures.push(`${map}/${marker.title}: audited room ${audit.room} does not match title room ${room}`);
-        if (marker.coordinateCertain !== false) failures.push(`${map}/${marker.title}: exact-room containment must not claim furniture-level coordinate certainty`);
+    const sourceById = new Map(sourceMarkers.map(marker => [marker.id, marker]));
+    for (const marker of generated) {
+      importedCount += 1;
+      const source = sourceById.get(marker.id);
+      if (!source) fail(`${mapId}/${marker.id}: not present in upstream source`);
+      const globalId = `${mapId}/${marker.id}`;
+      if (globalIds.has(globalId)) fail(`${globalId}: duplicate generated ID`);
+      globalIds.add(globalId);
+
+      if ('position' in marker || 'photoIds' in marker || 'coordinateBasis' in marker) {
+        fail(`${globalId}: contains legacy WTFMI battle-pass fields`);
       }
-    }
-
-    if (map === 'lab') {
-      exactLabRoomAuditCount += 1;
-      const audit = marker.exactRoomAudit;
-      if (!audit || !acceptedLabRoomStatuses.has(audit.status)) {
-        failures.push(`${map}/${marker.title}: missing explicit exact-room classification`);
-      } else {
-        labRoomAuditStatuses.set(audit.status, (labRoomAuditStatuses.get(audit.status) || 0) + 1);
-        if (Array.isArray(audit.sourcePixel)) labSourcePinAuditCount += 1;
-        if (audit.sourceTransferIssue) labSourceTransferIssueCount += 1;
-        if (!audit.room || !audit.floorGroup || !audit.criterion) {
-          failures.push(`${map}/${marker.title}: incomplete exact-room audit metadata`);
-        }
-        const isPassingRoomStatus = audit.status === 'inside-exact-room' || audit.status === 'inside-named-area';
-        if (isPassingRoomStatus) {
-          if (!Array.isArray(audit.anchorPixel)) {
-            failures.push(`${map}/${marker.title}: passing room audit has no map-pixel anchor`);
-          } else {
-            const [width, height] = maps[map];
-            const pixel = [(left / 100) * width, (top / 100) * height];
-            const anchorDistance = Math.hypot(pixel[0] - Number(audit.anchorPixel[0]), pixel[1] - Number(audit.anchorPixel[1]));
-            if (anchorDistance > 1.1) failures.push(`${map}/${marker.title}: marker center left audited room anchor by ${anchorDistance.toFixed(2)} px`);
-          }
-          if (marker.coordinateBasis !== 'wtfmi-exact-room-anchor') {
-            failures.push(`${map}/${marker.title}: passing room audit is not bound to the WTFMI room anchor`);
-          }
-        } else if (marker.coordinateBasis !== 'room-audit-unresolved') {
-          failures.push(`${map}/${marker.title}: unresolved room audit is incorrectly represented as a passing coordinate`);
-        }
-        if (marker.coordinateCertain !== false) failures.push(`${map}/${marker.title}: room-level audit must not claim furniture-level coordinate certainty`);
+      if (JSON.stringify(marker.sourcePosition) !== JSON.stringify(source.coords)) {
+        fail(`${globalId}: source coordinate changed during import`);
       }
-    }
-
-    const coordinateKey = `${map}/${marker.title}`;
-    const coordinateCheck = coordinateChecks.get(coordinateKey);
-    if (coordinateCheck) {
-      checkedCoordinates.add(coordinateKey);
-      const [expected, tolerance] = coordinateCheck;
-      const maximumDelta = Math.max(...expected.map((value, index) => Math.abs(Number(marker.position[index]) - value)));
-      if (maximumDelta > tolerance) failures.push(`${coordinateKey}: room/floor coordinate drifted by ${maximumDelta.toFixed(4)} m`);
-    }
-
-    const photoIds = marker.photoIds || [];
-    const directPhotos = marker.photos || [];
-    if (photoIds.length + directPhotos.length > 1) {
-      failures.push(`${map}/${marker.title}: multiple photos merged into one marker`);
-    }
-    if (photoIds.length + directPhotos.length > 0) {
-      const positionKey = marker.position.map(value => Number(value).toFixed(4)).join('|');
-      const existingTitle = explicitPhotoPositions.get(positionKey);
-      if (existingTitle) {
-        failures.push(`${map}/${marker.title}: exact coordinate collision with photo-backed marker ${existingTitle}`);
+      if (!marker.coordinateValidation?.checked
+        || !marker.coordinateValidation?.exactSourceValuePreserved
+        || !marker.coordinateValidation?.insideSourceCanvas) {
+        fail(`${globalId}: coordinate validation record is incomplete`);
       }
-      explicitPhotoPositions.set(positionKey, marker.title);
-    }
-
-    for (const id of photoIds) {
-      explicitPhotoCount += 1;
-      if (!id.startsWith('@') && !id.includes('-')) failures.push(`${map}/${marker.title}: invalid photo ID ${id}`);
-      const photoKey = `id:${id}`;
-      if (assignedPhotos.has(photoKey)) failures.push(`${map}/${marker.title}: photo ID assigned to multiple markers: ${id}`);
-      assignedPhotos.add(photoKey);
-      if (communityRoot) {
-        const localPhoto = path.join(communityRoot, 'assets', 'previews', ...photoPath(map, id).split('/'));
-        if (!fs.existsSync(localPhoto)) failures.push(`${map}/${marker.title}: missing source photo ${photoPath(map, id)}`);
+      if (!Array.isArray(marker.mapPosition)
+        || marker.mapPosition.length !== 2
+        || marker.mapPosition.some(value => !Number.isFinite(value) || value < 0 || value > 100)) {
+        fail(`${globalId}: invalid WTFMI display position`);
       }
-    }
-    for (const photo of directPhotos) {
-      explicitPhotoCount += 1;
-      if (!/^https:\/\//i.test(photo.url || '')) failures.push(`${map}/${marker.title}: direct photo must use HTTPS`);
-      const photoKey = `url:${photo.url}`;
-      if (assignedPhotos.has(photoKey)) failures.push(`${map}/${marker.title}: direct photo assigned to multiple markers: ${photo.url}`);
-      assignedPhotos.add(photoKey);
+      sourceCoordinateChecks += 1;
+
+      if (!source.detailImg || !Array.isArray(marker.photos) || marker.photos.length !== 1) {
+        fail(`${globalId}: source photo is not linked one-to-one`);
+      }
+      const relativePhoto = String(source.detailImg).replace(/\\/g, '/').replace(/^\.\//, '');
+      const expectedUrl = `https://perofunyang.github.io/battlepass_interactive_map/${relativePhoto}`;
+      if (marker.photos[0].url !== expectedUrl) fail(`${globalId}: photo URL does not match detailImg`);
+      const localPhoto = path.resolve(upstreamRoot, ...relativePhoto.split('/'));
+      const metadata = await sharp(localPhoto).metadata();
+      if (!metadata.width || !metadata.height || !metadata.format) fail(`${globalId}: source photo cannot be decoded`);
+      if (!marker.photoValidation?.checked
+        || !marker.photoValidation?.sourcePathMatchesDetailImg
+        || !marker.photoValidation?.decoded
+        || marker.photoValidation.width !== metadata.width
+        || marker.photoValidation.height !== metadata.height
+        || marker.photoValidation.format !== metadata.format) {
+        fail(`${globalId}: photo validation record does not match decoded image`);
+      }
+      photoChecks += 1;
     }
   }
+
+  if (importedCount !== 308) fail(`expected 308 document markers, found ${importedCount}`);
+  if (data.verification?.importedMarkerCount !== importedCount
+    || data.verification?.coordinateChecksPassed !== sourceCoordinateChecks
+    || data.verification?.photoChecksPassed !== photoChecks) {
+    fail('top-level verification counts do not match the marker audit');
+  }
+
+  console.log(`Validated clean import: ${importedCount} markers, ${sourceCoordinateChecks} exact source coordinates, ${photoChecks} decoded photos.`);
 }
 
-for (const coordinateKey of coordinateChecks.keys()) {
-  if (!checkedCoordinates.has(coordinateKey)) failures.push(`${coordinateKey}: required room/floor marker missing`);
-}
-
-if (exactNumberedRoomCount !== 14) failures.push(`expected 14 strict numbered-room markers, found ${exactNumberedRoomCount}`);
-if (globallyClassifiedRoomAuditCount !== markerCount) failures.push(`expected every marker to have a strict room classification, found ${globallyClassifiedRoomAuditCount}/${markerCount}`);
-if (exactLabRoomAuditCount !== 41) failures.push(`expected 41 explicitly classified Lab markers, found ${exactLabRoomAuditCount}`);
-if (labSourcePinAuditCount !== 22) failures.push(`expected 22 Lab markers backed by coordinate-pin screenshots, found ${labSourcePinAuditCount}`);
-if (labSourceTransferIssueCount !== 4) failures.push(`expected 4 corrected Lab source-to-WTFMI transfer errors, found ${labSourceTransferIssueCount}`);
-const expectedLabStatusCounts = new Map([
-  ['inside-exact-room', 28],
-  ['inside-named-area', 3],
-  ['manual-room-audit-required', 5],
-  ['map-room-missing', 2],
-  ['source-room-verified-map-missing', 3]
-]);
-for (const [status, expected] of expectedLabStatusCounts) {
-  const actual = labRoomAuditStatuses.get(status) || 0;
-  if (actual !== expected) failures.push(`expected ${expected} Lab markers with status ${status}, found ${actual}`);
-}
-const verifiedGlobalCounts = data.verification?.exactRoomAudit?.globalStatusCounts || {};
-for (const status of new Set([...acceptedGlobalRoomStatuses, ...Object.keys(verifiedGlobalCounts)])) {
-  const actual = globalRoomAuditStatuses.get(status) || 0;
-  const expected = Number(verifiedGlobalCounts[status] || 0);
-  if (actual !== expected) failures.push(`global exact-room status ${status}: verification says ${expected}, data has ${actual}`);
-}
-if (Number(data.verification?.exactRoomAudit?.globalMarkerCount) !== markerCount) {
-  failures.push(`global exact-room verification count does not match ${markerCount}`);
-}
-
-if (markerCount !== data.verification.projectedLocationCount) {
-  failures.push(`verification count ${data.verification.projectedLocationCount} does not match ${markerCount}`);
-}
-
-if (failures.length) {
-  console.error(failures.join('\n'));
-  process.exit(1);
-}
-
-console.log(`Validated ${markerCount} markers and ${explicitPhotoCount} explicit photo references.`);
+main().catch(error => {
+  console.error(error.message || error);
+  process.exitCode = 1;
+});
