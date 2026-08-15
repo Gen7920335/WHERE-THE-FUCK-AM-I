@@ -961,6 +961,12 @@ namespace eft_where_am_i
             }
             await jsExecutor.ExecuteScriptAsync(Constants.ADD_DIRECTION_INDICATORS_SCRIPT);
             await jsExecutor.ExecuteScriptAsync(Constants.DEAD_ZONE_AUTO_PAN_SCRIPT);
+            // Navigation can finish before jsExecutor and the overlay service are
+            // initialized on a fast page load. Reconfigure once more here so the
+            // initial map never misses its Battle Pass or squad overlays.
+            await ApplyEnhancementSettingsAsync();
+            await InjectBattlePassOverlayAsync();
+            await InjectSquadOverlayAsync();
         }
 
         private async Task CheckLocationAsync()

@@ -134,6 +134,11 @@
           pointer-events: none !important;
           visibility: hidden !important;
         }
+        [data-wtf-native-battle-pass-hidden="true"] {
+          display: none !important;
+          pointer-events: none !important;
+          visibility: hidden !important;
+        }
       `;
       (document.head || root).appendChild(style);
     }
@@ -1226,12 +1231,28 @@
       return;
     }
 
-    const lootTitle = [...leftPanel.querySelectorAll('.two-columns > .mb-5 > div:first-child > .bold')]
+    const groupTitles = [...leftPanel.querySelectorAll('.two-columns > .mb-5 > div:first-child > .bold')];
+    const lootTitle = groupTitles
       .find((element) => element.textContent.trim().toLowerCase() === 'loot');
-    const lootItems = lootTitle?.parentElement?.nextElementSibling;
+    const nativeBattlePassTitle = groupTitles
+      .find((element) => /^battle\s*pass$/i.test(element.textContent.trim()));
+    const hostTitle = lootTitle || nativeBattlePassTitle;
+    const lootItems = hostTitle?.parentElement?.nextElementSibling;
     if (!lootItems?.classList.contains('items')) return;
 
-    const scopeAttributes = [...((lootItems.firstElementChild || lootTitle).attributes || [])]
+    const usingNativeBattlePassGroup = !lootTitle && Boolean(nativeBattlePassTitle);
+    for (const row of leftPanel.querySelectorAll('[data-wtf-native-battle-pass-hidden="true"]')) {
+      row.removeAttribute('data-wtf-native-battle-pass-hidden');
+    }
+    if (usingNativeBattlePassGroup) {
+      for (const row of lootItems.children) {
+        if (row.id !== 'wtf-battle-pass-control') {
+          row.setAttribute('data-wtf-native-battle-pass-hidden', 'true');
+        }
+      }
+    }
+
+    const scopeAttributes = [...((lootItems.firstElementChild || hostTitle).attributes || [])]
       .filter((attribute) => attribute.name.startsWith('data-v-'))
       .map((attribute) => attribute.name);
     const applyScope = (element) => {
@@ -1267,7 +1288,7 @@
       icon.className = 'wtf-blue-cross';
       icon.setAttribute('aria-hidden', 'true');
       iconWrap.appendChild(icon);
-      label.append(iconWrap, document.createTextNode(' Battle Pass'));
+      label.append(iconWrap, document.createTextNode(usingNativeBattlePassGroup ? ' All documents' : ' Battle Pass'));
 
       const count = applyScope(document.createElement('span'));
       count.className = 'sub alt';

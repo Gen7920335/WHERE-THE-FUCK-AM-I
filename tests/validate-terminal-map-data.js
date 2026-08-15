@@ -62,6 +62,11 @@ assert(pageScript.includes('const setQuestSelected ='), 'Quest selection must be
 const enhancementScript = fs.readFileSync(path.join(htmlRoot, 'enhancements.js'), 'utf8');
 assert(enhancementScript.includes('ensureTerminalBattlePassControl'), 'Terminal Loot needs its native-style Battle Pass control integration.');
 assert(
+  enhancementScript.includes('nativeBattlePassTitle')
+    && enhancementScript.includes('usingNativeBattlePassGroup'),
+  'Maps without a Loot section must host the WTFMI document toggle in their native BattlePass group.'
+);
+assert(
   pageScript.includes(".terminal-side-panel, .terminal-right-panel, .panel_top"),
   'Panel interactions must not bubble into the map-background popup closer.'
 );
