@@ -37,7 +37,8 @@ function readSource(map) {
   const context = { window: {} };
   vm.runInNewContext(fs.readFileSync(sourcePath, 'utf8'), context, { filename: sourcePath });
   return context.window[`MAP_DATA_${sourceName}`]
-    .filter(marker => !['transit', 'temporary'].includes(marker.category));
+    .filter(marker => !['transit', 'temporary'].includes(marker.category))
+    .filter(marker => !(map === 'interchange' && marker.id === 'financial-4-0-1'));
 }
 
 function numericIdParts(id) {
@@ -102,11 +103,18 @@ function expectedFloor(map, marker) {
     };
   }
   if (map === 'lab') {
-    const sourceX = Number(marker.sourcePosition[1]);
+    const sourcePoint = [Number(marker.sourcePosition[1]), 2189 - Number(marker.sourcePosition[0])];
+    const panels = [
+      { floor: 2, bounds: [2456, 32, 3724, 1108] },
+      { floor: 1, bounds: [1120, 844, 2580, 2080] },
+      { floor: 0, bounds: [0, 0, 1000, 1450] }
+    ];
+    const panel = panels.find(item => sourcePoint[0] >= item.bounds[0] && sourcePoint[0] <= item.bounds[2]
+      && sourcePoint[1] >= item.bounds[1] && sourcePoint[1] <= item.bounds[3]);
     return {
-      status: 'derived',
-      expected: sourceX < 1300 ? 0 : sourceX < 2500 ? 1 : 2,
-      evidence: 'source Technical/First/Second panel'
+      status: panel ? 'derived' : 'unverified',
+      expected: panel?.floor ?? null,
+      evidence: 'WTFMI floor-matched source panel containment'
     };
   }
   if (map === 'reserve') {
@@ -146,35 +154,47 @@ function sha256(buffer) {
 }
 
 async function auditPhoto(sourceName, sourceMarker, generatedMarker, checkRemote) {
-  const relativePath = String(sourceMarker.detailImg || '').replace(/\\/g, '/').replace(/^\.\//, '');
-  const localPath = path.join(upstreamRoot, ...relativePath.split('/'));
-  const localBytes = fs.readFileSync(localPath);
-  const metadata = await sharp(localBytes).metadata();
-  const expectedUrl = `https://perofunyang.github.io/battlepass_interactive_map/${relativePath}`;
-  const generatedUrl = generatedMarker.photos?.[0]?.url || '';
-  const result = {
-    status: 'verified',
-    sourcePath: relativePath,
-    generatedUrl,
-    sourcePathMatches: generatedUrl === expectedUrl,
-    decoded: Boolean(metadata.width && metadata.height && metadata.format),
-    width: metadata.width,
-    height: metadata.height,
-    format: metadata.format,
-    localSha256: sha256(localBytes),
-    remoteChecked: false,
-    remoteBytesMatch: null
-  };
-
-  if (!result.sourcePathMatches || !result.decoded) result.status = 'failed';
-  if (checkRemote) {
-    const response = await fetch(expectedUrl);
-    const remoteBytes = Buffer.from(await response.arrayBuffer());
-    result.remoteChecked = true;
-    result.remoteStatus = response.status;
-    result.remoteBytesMatch = response.ok && sha256(remoteBytes) === result.localSha256;
-    if (!result.remoteBytesMatch) result.status = 'failed';
+  const sourcePhotos = Array.isArray(sourceMarker.detailImg)
+    ? sourceMarker.detailImg
+    : [sourceMarker.detailImg];
+  const images = [];
+  let allVerified = sourcePhotos.length > 0 && generatedMarker.photos?.length === sourcePhotos.length;
+  for (let index = 0; index < sourcePhotos.length; index += 1) {
+    const relativePath = String(sourcePhotos[index] || '').replace(/\\/g, '/').replace(/^\.\//, '');
+    const localPath = path.join(upstreamRoot, ...relativePath.split('/'));
+    const localBytes = fs.readFileSync(localPath);
+    const metadata = await sharp(localBytes).metadata();
+    const expectedUrl = `https://perofunyang.github.io/battlepass_interactive_map/${relativePath}`;
+    const generatedUrl = generatedMarker.photos?.[index]?.url || '';
+    const image = {
+      sourcePath: relativePath,
+      generatedUrl,
+      sourcePathMatches: generatedUrl === expectedUrl,
+      decoded: Boolean(metadata.width && metadata.height && metadata.format),
+      width: metadata.width,
+      height: metadata.height,
+      format: metadata.format,
+      localSha256: sha256(localBytes),
+      remoteChecked: false,
+      remoteBytesMatch: null
+    };
+    if (!image.sourcePathMatches || !image.decoded) allVerified = false;
+    if (checkRemote) {
+      const response = await fetch(expectedUrl);
+      const remoteBytes = Buffer.from(await response.arrayBuffer());
+      image.remoteChecked = true;
+      image.remoteStatus = response.status;
+      image.remoteBytesMatch = response.ok && sha256(remoteBytes) === image.localSha256;
+      if (!image.remoteBytesMatch) allVerified = false;
+    }
+    images.push(image);
   }
+  const result = {
+    status: allVerified ? 'verified' : 'failed',
+    imageCount: images.length,
+    images,
+    remoteBytesMatch: checkRemote && images.every(image => image.remoteBytesMatch === true)
+  };
   return result;
 }
 

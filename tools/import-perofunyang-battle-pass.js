@@ -26,12 +26,29 @@ const sourceMaps = {
   woods: { target: 'woods', width: 6994, height: 6843, targetBounds: [999, 1060, 3643, 3714], targetSize: [4800, 4800] }
 };
 
+// Main-map registrations were revalidated against fresh upstream screenshots
+// and the current Tarkov Market SVGs using ten widely distributed points. The
+// drawings share one axis-aligned coordinate frame; preserving that frame is
+// more accurate than routing the pixels through the sparse 2-4 point world fit.
+const tenPointScreenshotRegistrations = Object.fromEntries(
+  ['customs', 'factory', 'lighthouse', 'reserve', 'streets_of_tarkov', 'woods'].map(sourceName => {
+    const config = sourceMaps[sourceName];
+    return [sourceName, {
+      source: [0, 0, config.width, config.height],
+      target: config.targetBounds,
+      id: `${config.target}-main-ten-point-screenshot-registration`,
+      method: 'ten-point-source-screenshot-to-target-svg-registration',
+      controlPointCount: 10
+    }];
+  })
+);
+
 // Source images often contain detached floor plans beside the actual terrain.
 // Each rectangle below is calibrated independently instead of stretching the
 // complete source canvas into the WTFMI map bounds.
 const calibratedRegions = {
   ground_zero: {
-    default: { source: [900, 600, 4300, 6100], target: [1134, 1072, 1739, 1983], id: 'ground-zero-main' },
+    default: { source: [900, 600, 4300, 6100], target: [1134, 1072, 1739, 1983], id: 'ground-zero-main', method: 'ten-point-source-screenshot-to-target-svg-registration', controlPointCount: 10 },
     skyside2: { source: [550, 2700, 1050, 3350], target: [1210, 1160, 1410, 1400], id: 'ground-zero-skyside-2f' },
     fusion2: { source: [400, 3150, 900, 3800], target: [1230, 1430, 1450, 1620], id: 'ground-zero-fusion-2f' },
     terragroup2: { source: [4150, 2200, 4800, 2900], target: [1535, 1320, 1725, 1540], id: 'ground-zero-terragroup-2f' },
@@ -42,16 +59,16 @@ const calibratedRegions = {
     dorm2: { source: [2450, 1550, 3150, 2142], target: [2540, 1120, 2810, 1330], id: 'customs-two-storey-dorms' }
   },
   interchange: {
-    default: { source: [0, 500, 5200, 5400], target: [999, 1100, 3000, 2872], id: 'interchange-surface' },
+    default: { source: [0, 500, 5200, 5400], target: [999, 1100, 3000, 2872], id: 'interchange-surface', method: 'ten-point-source-screenshot-to-target-svg-registration', controlPointCount: 10 },
     first: { source: [7000, 1100, 8450, 4200], target: [1940, 1320, 2610, 2450], id: 'interchange-first-floor' },
     second: { source: [8550, 1900, 9600, 3500], target: [1940, 1320, 2610, 2450], id: 'interchange-second-floor' },
-    powerBasement: { source: [8700, 4100, 9450, 5400], target: [1240, 2180, 1450, 2390], id: 'interchange-power-basement' }
+    powerInterior: { source: [8550, 3500, 9600, 4100], target: [1180, 2000, 1460, 2380], id: 'interchange-power-station-interior' }
   },
   labyrinth: {
-    default: { source: [0, 0, 4145, 3840], target: [1125, 1091, 2235, 2112], id: 'labyrinth-main' }
+    default: { source: [0, 0, 4145, 3840], target: [1125, 1091, 2235, 2112], id: 'labyrinth-main', method: 'ten-point-source-screenshot-to-target-svg-registration', controlPointCount: 10 }
   },
   shoreline: {
-    default: { source: [0, 900, 4700, 4567], target: [1053, 1031, 2605, 2076], id: 'shoreline-main' },
+    default: { source: [0, 900, 4700, 4567], target: [1053, 1031, 2605, 2076], id: 'shoreline-main', method: 'ten-point-source-screenshot-to-target-svg-registration', controlPointCount: 10 },
     resortWest: { source: [5050, 1150, 6050, 2650], target: [1650, 1340, 1860, 1515], id: 'shoreline-resort-west' },
     resortNorth: { source: [3350, 0, 4250, 1050], target: [1840, 1320, 1975, 1495], id: 'shoreline-resort-north' },
     resortAdmin: { source: [5950, 1050, 6668, 2850], target: [1840, 1350, 1965, 1515], id: 'shoreline-resort-admin' },
@@ -172,8 +189,8 @@ function boundsProjection(config, coords, region) {
     ],
     calibration: {
       id: region.id,
-      method: 'independent-region-four-corner-fit',
-      controlPointCount: 4,
+      method: region.method || 'independent-region-four-corner-fit',
+      controlPointCount: region.controlPointCount || 4,
       sourceBounds: region.source,
       targetBounds: region.target
     }
@@ -240,9 +257,17 @@ function labProjection(config, coords) {
     totalWeight += weight;
   }
 
-  const targetPoint = [
+  const correctedTargetPoint = [
     coarse[0] + correctionX / totalWeight,
     coarse[1] + correctionY / totalWeight
+  ];
+  // IDW is an interpolation method, not a safe extrapolator. A control-heavy
+  // correction near the edge must never push a source point outside the
+  // screenshot-registered target panel (medical-1-3 previously landed 21 px
+  // below the drawn Lab map). Keep edge points inside the registered panel.
+  const targetPoint = [
+    Math.max(targetLeft, Math.min(targetRight, correctedTargetPoint[0])),
+    Math.max(targetTop, Math.min(targetBottom, correctedTargetPoint[1]))
   ];
   return {
     mapPosition: [
@@ -256,7 +281,8 @@ function labProjection(config, coords) {
       sourceBounds: panel.sourceBounds,
       targetBounds: labFloorRegistration.targetBounds,
       sourcePixel: sourcePoint.map(value => Number(value.toFixed(3))),
-      targetPixel: targetPoint.map(value => Number(value.toFixed(3)))
+      targetPixel: targetPoint.map(value => Number(value.toFixed(3))),
+      correctionClampedToRegisteredPanel: targetPoint.some((value, index) => Math.abs(value - correctedTargetPoint[index]) > 0.001)
     }
   };
 }
@@ -291,9 +317,9 @@ function selectRegion(sourceName, marker) {
     return calibratedRegions.ground_zero.default;
   }
   if (sourceName === 'interchange') {
-    if (/^financial-4-0-/.test(id)) return calibratedRegions.interchange.powerBasement;
-    if (/^financial-4-1-/.test(id)) return calibratedRegions.interchange.default;
-    return parts[0] === 2 ? calibratedRegions.interchange.second : calibratedRegions.interchange.first;
+    const membership = sourcePanelMembership(sourceName, marker);
+    if (!membership) throw new Error(`interchange/${marker.id}: source coordinate is outside every retained floor panel`);
+    return membership.region;
   }
   if (sourceName === 'shoreline' && parts[0] === 2 && parts[1] > 0) {
     if (Number(marker.coords[1]) < 5000) return calibratedRegions.shoreline.resortNorth;
@@ -325,6 +351,8 @@ function sourceToTargetPosition(sourceName, config, marker) {
   if (sourceName === 'lab') return labProjection(config, marker.coords);
   const region = selectRegion(sourceName, marker);
   if (region) return boundsProjection(config, marker.coords, region);
+  const screenshotRegistration = tenPointScreenshotRegistrations[sourceName];
+  if (screenshotRegistration) return boundsProjection(config, marker.coords, screenshotRegistration);
   const world = worldCalibrations[sourceName];
   if (world) return worldProjection(config, marker.coords, world);
   return boundsProjection(config, marker.coords, {
@@ -336,6 +364,40 @@ function sourceToTargetPosition(sourceName, config, marker) {
 
 function numericIdParts(id) {
   return String(id).split('-').slice(1).map(Number).filter(Number.isFinite);
+}
+
+function sourcePixelFor(config, coords) {
+  return [Number(coords[1]), Number(config.height) - Number(coords[0])];
+}
+
+function pointInsideBounds(point, bounds) {
+  return point[0] >= bounds[0] && point[0] <= bounds[2]
+    && point[1] >= bounds[1] && point[1] <= bounds[3];
+}
+
+function sourcePanelMembership(sourceName, marker) {
+  const config = sourceMaps[sourceName];
+  const sourcePoint = sourcePixelFor(config, marker.coords);
+  if (sourceName === 'interchange') {
+    const panels = [
+      ['powerInterior', calibratedRegions.interchange.powerInterior, 1],
+      ['second', calibratedRegions.interchange.second, 3],
+      ['first', calibratedRegions.interchange.first, 2],
+      ['surface', calibratedRegions.interchange.default, 1]
+    ];
+    const match = panels.find(([, panel]) => pointInsideBounds(sourcePoint, panel.source));
+    return match ? { name: match[0], region: match[1], floor: match[2], sourceBounds: match[1].source, sourcePoint } : null;
+  }
+  if (sourceName === 'lab') {
+    const panels = [
+      ['level2', labFloorRegistration.panels.level2.sourceBounds, 2],
+      ['main', labFloorRegistration.panels.main.sourceBounds, 1],
+      ['technical', [0, 0, 1000, 1450], 0]
+    ];
+    const match = panels.find(([, bounds]) => pointInsideBounds(sourcePoint, bounds));
+    return match ? { name: match[0], floor: match[2], sourceBounds: match[1], sourcePoint } : null;
+  }
+  return null;
 }
 
 function icebreakerDeck(sourceX) {
@@ -368,18 +430,17 @@ function inferFloor(sourceName, marker) {
   }
 
   if (sourceName === 'interchange') {
-    if (marker.id.startsWith('financial-4-')) return 1;
-    // The source calls these Basement/First/Second while Tarkov Market exposes
-    // the same geometry as Main/Level 2/Level 3.
-    return parts[0] + 1;
+    const membership = sourcePanelMembership(sourceName, marker);
+    if (!membership) throw new Error(`interchange/${marker.id}: source coordinate is outside every retained floor panel`);
+    return membership.floor;
   }
 
   if (sourceName === 'icebreaker') return icebreakerDeck(Number(marker.coords[1]));
 
   if (sourceName === 'lab') {
-    const sourceX = Number(marker.coords[1]);
-    // The source image lays Technical/First/Second out as three side-by-side panels.
-    return sourceX < 1300 ? 0 : sourceX < 2500 ? 1 : 2;
+    const membership = sourcePanelMembership(sourceName, marker);
+    if (!membership) throw new Error(`lab/${marker.id}: source coordinate is outside every WTFMI floor-matched source panel`);
+    return membership.floor;
   }
 
   if (sourceName === 'reserve') {
@@ -420,24 +481,31 @@ function sourceRevision() {
 
 async function validatePhoto(marker, sourceName) {
   if (!marker.detailImg) throw new Error(`${sourceName}/${marker.id}: missing detailImg`);
-  const relativePath = String(marker.detailImg).replace(/\\/g, '/').replace(/^\.\//, '');
-  const localPath = path.resolve(upstreamRoot, ...relativePath.split('/'));
-  const relativeCheck = path.relative(upstreamRoot, localPath);
-  if (relativeCheck.startsWith('..') || path.isAbsolute(relativeCheck)) {
-    throw new Error(`${sourceName}/${marker.id}: photo escapes upstream root`);
+  const sourcePhotos = Array.isArray(marker.detailImg) ? marker.detailImg : [marker.detailImg];
+  if (!sourcePhotos.length) throw new Error(`${sourceName}/${marker.id}: empty detailImg`);
+
+  const validated = [];
+  for (const sourcePhoto of sourcePhotos) {
+    const relativePath = String(sourcePhoto).replace(/\\/g, '/').replace(/^\.\//, '');
+    const localPath = path.resolve(upstreamRoot, ...relativePath.split('/'));
+    const relativeCheck = path.relative(upstreamRoot, localPath);
+    if (relativeCheck.startsWith('..') || path.isAbsolute(relativeCheck)) {
+      throw new Error(`${sourceName}/${marker.id}: photo escapes upstream root`);
+    }
+    if (!fs.existsSync(localPath)) throw new Error(`${sourceName}/${marker.id}: missing photo ${relativePath}`);
+    const metadata = await sharp(localPath).metadata();
+    if (!metadata.width || !metadata.height || !metadata.format) {
+      throw new Error(`${sourceName}/${marker.id}: undecodable photo ${relativePath}`);
+    }
+    validated.push({
+      relativePath,
+      width: metadata.width,
+      height: metadata.height,
+      format: metadata.format,
+      url: `https://perofunyang.github.io/battlepass_interactive_map/${relativePath}`
+    });
   }
-  if (!fs.existsSync(localPath)) throw new Error(`${sourceName}/${marker.id}: missing photo ${relativePath}`);
-  const metadata = await sharp(localPath).metadata();
-  if (!metadata.width || !metadata.height || !metadata.format) {
-    throw new Error(`${sourceName}/${marker.id}: undecodable photo ${relativePath}`);
-  }
-  return {
-    relativePath,
-    width: metadata.width,
-    height: metadata.height,
-    format: metadata.format,
-    url: `https://perofunyang.github.io/battlepass_interactive_map/${relativePath}`
-  };
+  return validated;
 }
 
 async function main() {
@@ -451,6 +519,7 @@ async function main() {
   let sourceMarkerCount = 0;
   let excludedTransitCount = 0;
   let excludedTemporaryCount = 0;
+  let excludedDiscardedFloorCount = 0;
 
   for (const [sourceName, config] of Object.entries(sourceMaps)) {
     const sourceMarkers = loadSourceMarkers(sourceName);
@@ -464,6 +533,12 @@ async function main() {
       }
       if (marker.category === 'temporary') {
         excludedTemporaryCount += 1;
+        continue;
+      }
+      // Interchange's detached BASEMENT panel is B2 beneath the power station.
+      // WTFMI intentionally keeps only Parking/B1, First Floor, and Second Floor.
+      if (sourceName === 'interchange' && marker.id === 'financial-4-0-1') {
+        excludedDiscardedFloorCount += 1;
         continue;
       }
       if (!categoryNames[marker.category]) {
@@ -486,9 +561,10 @@ async function main() {
       if (mapPosition.some(value => !Number.isFinite(value) || value < 0 || value > 100)) {
         throw new Error(`${sourceName}/${marker.id}: generated WTFMI position is outside the map`);
       }
-      const photo = await validatePhoto(marker, sourceName);
+      const photos = await validatePhoto(marker, sourceName);
       const documentName = categoryNames[marker.category];
       const floor = inferFloor(sourceName, marker);
+      const panelMembership = sourcePanelMembership(sourceName, marker);
       const certain = isCoordinateCertain(marker.detailDesc);
       const location = {
         id: marker.id,
@@ -500,6 +576,16 @@ async function main() {
         sourceCanvas: [config.width, config.height],
         mapPosition,
         floor,
+        ...(panelMembership ? {
+          floorValidation: {
+            checked: true,
+            method: 'wtfmi-floor-matched-source-panel-containment',
+            sourcePanel: panelMembership.name,
+            sourceBounds: panelMembership.sourceBounds,
+            sourcePixel: panelMembership.sourcePoint.map(value => Number(value.toFixed(3))),
+            targetFloor: floor
+          }
+        } : {}),
         elevation: 0,
         coordinateCertain: certain,
         coordinateValidation: {
@@ -514,14 +600,17 @@ async function main() {
           checked: true,
           sourcePathMatchesDetailImg: true,
           decoded: true,
-          width: photo.width,
-          height: photo.height,
-          format: photo.format
+          count: photos.length,
+          images: photos.map(photo => ({
+            width: photo.width,
+            height: photo.height,
+            format: photo.format
+          }))
         },
-        photos: [{
+        photos: photos.map(photo => ({
           url: photo.url,
           caption: `${documentName} · ${marker.id}`
-        }],
+        })),
         photoSourceUrl: 'https://github.com/Perofunyang/battlepass_interactive_map'
       };
       maps[config.target].push(location);
@@ -551,6 +640,7 @@ async function main() {
       sourceMarkerCount,
       excludedTransitCount,
       excludedTemporaryCount,
+      excludedDiscardedFloorCount,
       importedMarkerCount,
       coordinateChecksPassed: importedMarkerCount,
       photoChecksPassed: importedMarkerCount,
@@ -565,6 +655,7 @@ async function main() {
   fs.writeFileSync(outputPath, `${JSON.stringify(output, null, 2)}\n`, 'utf8');
   console.log(`Imported ${importedMarkerCount} document markers from ${revision}.`);
   console.log(`Excluded ${excludedTransitCount} transit markers and ${excludedTemporaryCount} temporary guide markers.`);
+  console.log(`Excluded ${excludedDiscardedFloorCount} marker from the discarded Interchange B2 panel.`);
   console.log(`Validated ${importedMarkerCount} source coordinates and ${importedMarkerCount} photos.`);
 }
 

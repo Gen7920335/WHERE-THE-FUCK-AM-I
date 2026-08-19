@@ -14,6 +14,7 @@ namespace eft_where_am_i.Classes
         private const int MaxClients = 8;
         private readonly string localPlayerId = Guid.NewGuid().ToString("N");
         private readonly ConcurrentDictionary<string, SquadPosition> positions = new(StringComparer.OrdinalIgnoreCase);
+        private readonly ConcurrentDictionary<string, MapPing> pings = new(StringComparer.OrdinalIgnoreCase);
         private readonly ConcurrentDictionary<string, PeerConnection> hostPeers = new(StringComparer.OrdinalIgnoreCase);
         private CancellationTokenSource? cancellation;
         private TcpListener? listener;
@@ -26,6 +27,9 @@ namespace eft_where_am_i.Classes
         public event Action<string>? StatusChanged;
         public event Action? ParticipantsChanged;
         public event Action? PositionsChanged;
+        public event Action<MapPing>? PingReceived;
+        public event Action<string, string>? PingDeleted;
+        public event Action<string>? PingsCleared;
 
         public bool IsHost { get; private set; }
         public bool IsConnected { get; private set; }
@@ -111,6 +115,73 @@ namespace eft_where_am_i.Classes
             }
         }
 
+        public void PublishPing(MapPing source)
+        {
+            if (!IsConnected || source == null || !IsValidPing(source))
+            {
+                return;
+            }
+
+            MapPing ping = source.Copy();
+            ping.creatorId = localPlayerId;
+            ping.creatorName = localName;
+            pings[ping.id] = ping;
+            var message = new SquadNetworkMessage { type = "ping-upsert", ping = ping };
+            if (IsHost)
+            {
+                _ = BroadcastAsync(message, null, cancellation?.Token ?? CancellationToken.None);
+            }
+            else if (serverConnection != null)
+            {
+                _ = SafeSendAsync(serverConnection, message, cancellation?.Token ?? CancellationToken.None);
+            }
+        }
+
+        public void ClearPings(string map)
+        {
+            string normalizedMap = NormalizeMap(map);
+            if (!IsConnected || normalizedMap.Length == 0)
+            {
+                return;
+            }
+
+            RemovePingsForMap(normalizedMap);
+            var message = new SquadNetworkMessage { type = "ping-clear", map = normalizedMap };
+            if (IsHost)
+            {
+                _ = BroadcastAsync(message, null, cancellation?.Token ?? CancellationToken.None);
+            }
+            else if (serverConnection != null)
+            {
+                _ = SafeSendAsync(serverConnection, message, cancellation?.Token ?? CancellationToken.None);
+            }
+        }
+
+        public void DeletePing(string map, string pingId)
+        {
+            string normalizedMap = NormalizeMap(map);
+            if (!IsConnected || normalizedMap.Length == 0 || !IsValidPingId(pingId))
+            {
+                return;
+            }
+
+            RemovePing(normalizedMap, pingId);
+            var message = new SquadNetworkMessage
+            {
+                type = "ping-delete",
+                map = normalizedMap,
+                pingId = pingId
+            };
+            if (IsHost)
+            {
+                _ = BroadcastAsync(message, null, cancellation?.Token ?? CancellationToken.None);
+            }
+            else if (serverConnection != null)
+            {
+                _ = SafeSendAsync(serverConnection, message, cancellation?.Token ?? CancellationToken.None);
+            }
+        }
+
         public IReadOnlyList<SquadPosition> GetRemotePositions() => positions.Values
             .Where(position => !string.Equals(position.playerId, localPlayerId, StringComparison.OrdinalIgnoreCase))
             .Select(position => position.Copy())
@@ -151,6 +222,7 @@ namespace eft_where_am_i.Classes
             }
             hostPeers.Clear();
             positions.Clear();
+            pings.Clear();
             cancellation?.Dispose();
             cancellation = null;
             IsConnected = false;
@@ -214,6 +286,10 @@ namespace eft_where_am_i.Classes
                 {
                     await peer.SendAsync(new SquadNetworkMessage { type = "position", position = position }, token);
                 }
+                foreach (MapPing ping in pings.Values.OrderBy(value => value.createdAt))
+                {
+                    await peer.SendAsync(new SquadNetworkMessage { type = "ping-upsert", ping = ping.Copy() }, token);
+                }
 
                 RaiseStatus($"{peer.Name} joined");
                 ParticipantsChanged?.Invoke();
@@ -263,6 +339,36 @@ namespace eft_where_am_i.Classes
                     PositionsChanged?.Invoke();
                     await BroadcastAsync(message, peer.PlayerId, token);
                 }
+                else if (message.type == "ping-upsert" && message.ping != null && IsValidPing(message.ping))
+                {
+                    MapPing ping = message.ping.Copy();
+                    ping.creatorId = peer.PlayerId;
+                    ping.creatorName = peer.Name;
+                    pings[ping.id] = ping;
+                    PingReceived?.Invoke(ping.Copy());
+                    await BroadcastAsync(new SquadNetworkMessage { type = "ping-upsert", ping = ping }, peer.PlayerId, token);
+                }
+                else if (message.type == "ping-clear")
+                {
+                    string map = NormalizeMap(message.map);
+                    if (map.Length == 0) continue;
+                    RemovePingsForMap(map);
+                    PingsCleared?.Invoke(map);
+                    await BroadcastAsync(new SquadNetworkMessage { type = "ping-clear", map = map }, null, token);
+                }
+                else if (message.type == "ping-delete" && IsValidPingId(message.pingId))
+                {
+                    string map = NormalizeMap(message.map);
+                    if (map.Length == 0) continue;
+                    RemovePing(map, message.pingId);
+                    PingDeleted?.Invoke(map, message.pingId);
+                    await BroadcastAsync(new SquadNetworkMessage
+                    {
+                        type = "ping-delete",
+                        map = map,
+                        pingId = message.pingId
+                    }, null, token);
+                }
             }
         }
 
@@ -290,6 +396,26 @@ namespace eft_where_am_i.Classes
                         positions.TryRemove(message.playerId, out _);
                         ParticipantsChanged?.Invoke();
                         PositionsChanged?.Invoke();
+                    }
+                    else if (message.type == "ping-upsert" && message.ping != null && IsValidPing(message.ping))
+                    {
+                        MapPing ping = message.ping.Copy();
+                        pings[ping.id] = ping;
+                        PingReceived?.Invoke(ping.Copy());
+                    }
+                    else if (message.type == "ping-clear")
+                    {
+                        string map = NormalizeMap(message.map);
+                        if (map.Length == 0) continue;
+                        RemovePingsForMap(map);
+                        PingsCleared?.Invoke(map);
+                    }
+                    else if (message.type == "ping-delete" && IsValidPingId(message.pingId))
+                    {
+                        string map = NormalizeMap(message.map);
+                        if (map.Length == 0) continue;
+                        RemovePing(map, message.pingId);
+                        PingDeleted?.Invoke(map, message.pingId);
                     }
                 }
             }
@@ -319,6 +445,44 @@ namespace eft_where_am_i.Classes
                 }
                 await SafeSendAsync(peer, message, token);
             }
+        }
+
+        private void RemovePingsForMap(string map)
+        {
+            foreach (KeyValuePair<string, MapPing> entry in pings)
+            {
+                if (string.Equals(entry.Value.map, map, StringComparison.OrdinalIgnoreCase))
+                {
+                    pings.TryRemove(entry.Key, out _);
+                }
+            }
+        }
+
+        private void RemovePing(string map, string pingId)
+        {
+            if (pings.TryGetValue(pingId, out MapPing? ping)
+                && string.Equals(ping.map, map, StringComparison.OrdinalIgnoreCase))
+            {
+                pings.TryRemove(pingId, out _);
+            }
+        }
+
+        private static bool IsValidPingId(string? pingId) =>
+            !string.IsNullOrWhiteSpace(pingId) && pingId.Length <= 80;
+
+        private static bool IsValidPing(MapPing ping) =>
+            !string.IsNullOrWhiteSpace(ping.id)
+            && ping.id.Length <= 80
+            && NormalizeMap(ping.map).Length > 0
+            && double.IsFinite(ping.left)
+            && double.IsFinite(ping.top)
+            && ping.left >= 0 && ping.left <= 100
+            && ping.top >= 0 && ping.top <= 100;
+
+        private static string NormalizeMap(string? map)
+        {
+            string value = (map ?? string.Empty).Trim().ToLowerInvariant();
+            return value.Length <= 64 ? value : string.Empty;
         }
 
         private static async Task SafeSendAsync(PeerConnection peer, SquadNetworkMessage message, CancellationToken token)

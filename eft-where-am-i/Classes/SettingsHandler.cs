@@ -320,6 +320,10 @@ namespace eft_where_am_i.Classes
         public double quest_requirements_panel_height { get; set; } = 520;
         public bool quest_requirements_panel_collapsed { get; set; } = false;
         public Dictionary<string, bool> battle_pass_visible_per_map { get; set; } = new Dictionary<string, bool>();
+        public List<MapPing> map_pings { get; set; } = new List<MapPing>();
+        public Dictionary<string, bool> ping_visible_per_map { get; set; } = new Dictionary<string, bool>();
+        public List<MapRouteNode> map_route_nodes { get; set; } = new List<MapRouteNode>();
+        public Dictionary<string, bool> route_visible_per_map { get; set; } = new Dictionary<string, bool>();
         public string squad_name { get; set; } = string.Empty;
         public string squad_host { get; set; } = "127.0.0.1";
         public int squad_port { get; set; } = 16243;

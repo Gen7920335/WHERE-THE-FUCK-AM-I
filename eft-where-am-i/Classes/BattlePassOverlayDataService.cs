@@ -45,6 +45,11 @@ namespace eft_where_am_i.Classes
             {
                 foreach (JObject location in locations.OfType<JObject>())
                 {
+                    if (location["excluded"]?.Value<bool?>() == true)
+                    {
+                        continue;
+                    }
+
                     if (location["mapPosition"] is not JArray mapPosition
                         || mapPosition.Count < 2
                         || !TryReadDouble(mapPosition[0], out double left)

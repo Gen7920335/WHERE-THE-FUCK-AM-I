@@ -3,6 +3,50 @@ using Newtonsoft.Json;
 
 namespace eft_where_am_i.Classes
 {
+    public sealed class MapRouteNode
+    {
+        public string id { get; set; } = string.Empty;
+        public string map { get; set; } = string.Empty;
+        public double left { get; set; }
+        public double top { get; set; }
+        public int? floor { get; set; }
+        public long createdAt { get; set; }
+
+        public MapRouteNode Copy() => new()
+        {
+            id = id,
+            map = map,
+            left = left,
+            top = top,
+            floor = floor,
+            createdAt = createdAt
+        };
+    }
+
+    public sealed class MapPing
+    {
+        public string id { get; set; } = string.Empty;
+        public string map { get; set; } = string.Empty;
+        public string creatorId { get; set; } = string.Empty;
+        public string creatorName { get; set; } = string.Empty;
+        public double left { get; set; }
+        public double top { get; set; }
+        public int? floor { get; set; }
+        public long createdAt { get; set; }
+
+        public MapPing Copy() => new()
+        {
+            id = id,
+            map = map,
+            creatorId = creatorId,
+            creatorName = creatorName,
+            left = left,
+            top = top,
+            floor = floor,
+            createdAt = createdAt
+        };
+    }
+
     internal sealed class SquadPosition
     {
         public string playerId { get; set; } = string.Empty;
@@ -132,6 +176,9 @@ namespace eft_where_am_i.Classes
     {
         public string type { get; set; } = string.Empty;
         public SquadPosition? position { get; set; }
+        public MapPing? ping { get; set; }
+        public string map { get; set; } = string.Empty;
+        public string pingId { get; set; } = string.Empty;
         public string playerId { get; set; } = string.Empty;
     }
 

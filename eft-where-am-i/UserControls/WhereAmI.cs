@@ -9,6 +9,7 @@ using Microsoft.Web.WebView2.Core;
 using Newtonsoft.Json.Linq;
 using eft_where_am_i.Classes;
 using System.Runtime.InteropServices;
+using System.Globalization;
 
 namespace eft_where_am_i
 {
@@ -19,6 +20,7 @@ namespace eft_where_am_i
         private JavaScriptExecutor jsExecutor;
         private QuestRepository questRepository;
         private BattlePassOverlayDataService battlePassOverlayDataService;
+        private QuestOverlayDataService questOverlayDataService;
         private readonly QuestTranslationService questTranslationService = new();
         private FloorManager floorManager;
         private readonly Dictionary<string, string> mapDisplayNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -70,6 +72,9 @@ namespace eft_where_am_i
         private GlobalHotkeyManager hotkeyManager;
         private readonly SquadNetworkService squadNetworkService;
         private SquadForm? squadForm;
+        private System.Windows.Forms.Timer? responsiveMapZoomTimer;
+        private bool responsiveMapZoomUpdateRunning;
+        private bool squadPingsPublished;
 
         private static bool IsLocalTerminalMap(string? mapName) =>
             string.Equals(mapName, "terminal", StringComparison.OrdinalIgnoreCase);
@@ -81,9 +86,13 @@ namespace eft_where_am_i
         public WhereAmI()
         {
             InitializeComponent();
+            InitializeResponsiveMapZoom();
             squadNetworkService = new SquadNetworkService();
             squadNetworkService.PositionsChanged += OnSquadPositionsChanged;
             squadNetworkService.StatusChanged += OnSquadStatusChanged;
+            squadNetworkService.PingReceived += OnSquadPingReceived;
+            squadNetworkService.PingDeleted += OnSquadPingDeleted;
+            squadNetworkService.PingsCleared += OnSquadPingsCleared;
             settingsHandler = SettingsHandler.Instance;             // 싱글톤 인스턴스 사용
             settingsHandler.SettingsChanged += OnSettingsChanged;   // 세팅 변경될 때마다 호출됨
             LoadSettings();                                         // 동기작업
@@ -110,6 +119,7 @@ namespace eft_where_am_i
                 jsExecutor = new JavaScriptExecutor(webView2);
                 questRepository = new QuestRepository();
                 battlePassOverlayDataService = new BattlePassOverlayDataService();
+                questOverlayDataService = new QuestOverlayDataService();
                 floorManager = new FloorManager();
 
                 // 4. 앱 시작 시 패널을 강제로 열어둠
@@ -607,6 +617,8 @@ namespace eft_where_am_i
         {
             if (!e.IsSuccess) return;
 
+            ScheduleResponsiveMapZoomUpdate();
+
             // jsExecutor가 아직 초기화되지 않은 경우 무시
             if (jsExecutor == null) return;
 
@@ -618,6 +630,8 @@ namespace eft_where_am_i
             {
                 await InjectBattlePassOverlayAsync();
                 await InjectSquadOverlayAsync();
+                await InjectPingOverlayAsync();
+                await InjectRouteOverlayAsync();
                 await jsExecutor.ExecuteScriptAsync(Constants.ADD_DIRECTION_INDICATORS_SCRIPT);
                 return;
             }
@@ -630,14 +644,14 @@ namespace eft_where_am_i
 
             if (containerReady)
             {
-                // 클릭 리스너 주입
-                await jsExecutor.InjectQuestClickListenerAsync();
-                // 퀘스트 복원
+                await InjectQuestOverlayAsync();
                 await RestoreQuestsAsync(appSettings.latest_map);
             }
 
             await InjectBattlePassOverlayAsync();
             await InjectSquadOverlayAsync();
+            await InjectPingOverlayAsync();
+            await InjectRouteOverlayAsync();
 
             // 새로고침의 경우 Where Am I 패널과 방향 표시를 다시 적용
             try
@@ -683,12 +697,12 @@ namespace eft_where_am_i
             });
             await webView2.ExecuteScriptAsync($"window.__wtfSetEnhancementSettings?.({settingsJson});");
 
-            if (appSettings.language?.StartsWith("ko", StringComparison.OrdinalIgnoreCase) == true)
-            {
-                Dictionary<string, string> translations = await questTranslationService.GetKoreanTranslationsAsync();
-                string translationsJson = Newtonsoft.Json.JsonConvert.SerializeObject(translations);
-                await webView2.ExecuteScriptAsync($"window.__wtfSetQuestTranslations?.({translationsJson});");
-            }
+            KoreanGameLocalizationCatalog localization =
+                appSettings.language?.StartsWith("ko", StringComparison.OrdinalIgnoreCase) == true
+                    ? await questTranslationService.GetKoreanCatalogAsync()
+                    : new KoreanGameLocalizationCatalog();
+            string localizationJson = Newtonsoft.Json.JsonConvert.SerializeObject(localization);
+            await webView2.ExecuteScriptAsync($"window.__wtfSetKoreanLocalization?.({localizationJson});");
         }
 
         private async Task InjectBattlePassOverlayAsync()
@@ -715,6 +729,26 @@ namespace eft_where_am_i
             }
         }
 
+        private async Task InjectQuestOverlayAsync()
+        {
+            if (webView2.CoreWebView2 == null || questOverlayDataService == null || appSettings == null)
+            {
+                return;
+            }
+
+            try
+            {
+                QuestOverlaySnapshot snapshot = questOverlayDataService.GetMapSnapshot(appSettings.latest_map);
+                string snapshotJson = Newtonsoft.Json.JsonConvert.SerializeObject(snapshot);
+                await webView2.ExecuteScriptAsync($"window.__wtfQuestOverlay?.configure({snapshotJson});");
+                AppLogger.Info("QuestOverlay", $"Configured {snapshot.markers.Count} independent markers for {appSettings.latest_map}.");
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("QuestOverlay", $"Unable to configure quest markers: {ex.Message}");
+            }
+        }
+
         private async Task InjectSquadOverlayAsync()
         {
             if (webView2.CoreWebView2 == null || appSettings == null)
@@ -734,6 +768,57 @@ namespace eft_where_am_i
             {
                 AppLogger.Warn("Squad", $"Unable to configure teammate markers: {ex.Message}");
             }
+        }
+
+        private async Task InjectPingOverlayAsync()
+        {
+            if (webView2.CoreWebView2 == null || appSettings == null)
+            {
+                return;
+            }
+
+            appSettings.map_pings ??= new List<MapPing>();
+            appSettings.ping_visible_per_map ??= new Dictionary<string, bool>();
+            bool visible = !appSettings.ping_visible_per_map.TryGetValue(appSettings.latest_map, out bool savedVisible)
+                || savedVisible;
+            var snapshot = new
+            {
+                map = appSettings.latest_map,
+                visible,
+                pings = appSettings.map_pings
+                    .Where(ping => string.Equals(ping.map, appSettings.latest_map, StringComparison.OrdinalIgnoreCase))
+                    .OrderBy(ping => ping.createdAt)
+                    .Select(ping => ping.Copy())
+                    .ToList()
+            };
+            string snapshotJson = Newtonsoft.Json.JsonConvert.SerializeObject(snapshot);
+            await webView2.ExecuteScriptAsync($"window.__wtfPingOverlay?.configure({snapshotJson});");
+        }
+
+        private async Task InjectRouteOverlayAsync()
+        {
+            if (webView2.CoreWebView2 == null || appSettings == null)
+            {
+                return;
+            }
+
+            appSettings.map_route_nodes ??= new List<MapRouteNode>();
+            appSettings.route_visible_per_map ??= new Dictionary<string, bool>();
+            bool visible = !appSettings.route_visible_per_map.TryGetValue(appSettings.latest_map, out bool savedVisible)
+                || savedVisible;
+            var snapshot = new
+            {
+                map = appSettings.latest_map,
+                visible,
+                maxNodes = 10,
+                nodes = appSettings.map_route_nodes
+                    .Where(node => string.Equals(node.map, appSettings.latest_map, StringComparison.OrdinalIgnoreCase))
+                    .OrderBy(node => node.createdAt)
+                    .Select(node => node.Copy())
+                    .ToList()
+            };
+            string snapshotJson = Newtonsoft.Json.JsonConvert.SerializeObject(snapshot);
+            await webView2.ExecuteScriptAsync($"window.__wtfRouteOverlay?.configure({snapshotJson});");
         }
 
         private void OpenSquadWindow()
@@ -757,6 +842,91 @@ namespace eft_where_am_i
             BeginInvoke(new Action(async () => await InjectSquadOverlayAsync()));
         }
 
+        private void OnSquadPingReceived(MapPing ping)
+        {
+            if (IsDisposed || !IsHandleCreated || ping == null)
+            {
+                return;
+            }
+            BeginInvoke(new Action(async () =>
+            {
+                UpsertSavedPing(ping);
+                SaveSettings();
+                await InjectPingOverlayAsync();
+            }));
+        }
+
+        private void OnSquadPingsCleared(string map)
+        {
+            if (IsDisposed || !IsHandleCreated || string.IsNullOrWhiteSpace(map))
+            {
+                return;
+            }
+            BeginInvoke(new Action(async () =>
+            {
+                RemoveSavedPings(map);
+                SaveSettings();
+                await InjectPingOverlayAsync();
+            }));
+        }
+
+        private void OnSquadPingDeleted(string map, string pingId)
+        {
+            if (IsDisposed || !IsHandleCreated || string.IsNullOrWhiteSpace(map) || string.IsNullOrWhiteSpace(pingId))
+            {
+                return;
+            }
+            BeginInvoke(new Action(async () =>
+            {
+                RemoveSavedPing(map, pingId);
+                SaveSettings();
+                await InjectPingOverlayAsync();
+            }));
+        }
+
+        private void UpsertSavedPing(MapPing ping)
+        {
+            appSettings.map_pings ??= new List<MapPing>();
+            int index = appSettings.map_pings.FindIndex(value =>
+                string.Equals(value.id, ping.id, StringComparison.OrdinalIgnoreCase));
+            if (index >= 0)
+            {
+                appSettings.map_pings[index] = ping.Copy();
+            }
+            else
+            {
+                appSettings.map_pings.Add(ping.Copy());
+            }
+        }
+
+        private void RemoveSavedPings(string map)
+        {
+            appSettings.map_pings ??= new List<MapPing>();
+            appSettings.map_pings.RemoveAll(ping =>
+                string.Equals(ping.map, map, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private void RemoveSavedPing(string map, string pingId)
+        {
+            appSettings.map_pings ??= new List<MapPing>();
+            appSettings.map_pings.RemoveAll(ping =>
+                string.Equals(ping.map, map, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(ping.id, pingId, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private void PublishSavedPingsToSquad()
+        {
+            if (!squadNetworkService.IsConnected)
+            {
+                return;
+            }
+            appSettings.map_pings ??= new List<MapPing>();
+            foreach (MapPing ping in appSettings.map_pings)
+            {
+                squadNetworkService.PublishPing(ping);
+            }
+        }
+
         private void OnSquadStatusChanged(string _)
         {
             if (IsDisposed || !IsHandleCreated)
@@ -768,8 +938,19 @@ namespace eft_where_am_i
                 if (squadNetworkService.IsConnected)
                 {
                     PublishLatestSquadPosition();
+                    if (!squadPingsPublished)
+                    {
+                        PublishSavedPingsToSquad();
+                        squadPingsPublished = true;
+                    }
+                }
+                else
+                {
+                    squadPingsPublished = false;
                 }
                 await InjectSquadOverlayAsync();
+                await InjectPingOverlayAsync();
+                await InjectRouteOverlayAsync();
             }));
         }
 
@@ -823,12 +1004,14 @@ namespace eft_where_am_i
                 if (containerReady)
                 {
                     await jsExecutor.ExecuteScriptAsync(Constants.ADD_DIRECTION_INDICATORS_SCRIPT);
-                    await jsExecutor.InjectQuestClickListenerAsync();
+                    await InjectQuestOverlayAsync();
                     await RestoreQuestsAsync(appSettings.latest_map);
                 }
 
                 await InjectBattlePassOverlayAsync();
                 await InjectSquadOverlayAsync();
+                await InjectPingOverlayAsync();
+                await InjectRouteOverlayAsync();
             }
         }
 
@@ -946,6 +1129,8 @@ namespace eft_where_am_i
                 await ApplyEnhancementSettingsAsync();
                 await InjectBattlePassOverlayAsync();
                 await InjectSquadOverlayAsync();
+                await InjectPingOverlayAsync();
+                await InjectRouteOverlayAsync();
                 await jsExecutor.ExecuteScriptAsync(Constants.ADD_DIRECTION_INDICATORS_SCRIPT);
                 await jsExecutor.ExecuteScriptAsync(Constants.DEAD_ZONE_AUTO_PAN_SCRIPT);
                 return;
@@ -965,8 +1150,12 @@ namespace eft_where_am_i
             // initialized on a fast page load. Reconfigure once more here so the
             // initial map never misses its Battle Pass or squad overlays.
             await ApplyEnhancementSettingsAsync();
+            await InjectQuestOverlayAsync();
+            await RestoreQuestsAsync(appSettings.latest_map);
             await InjectBattlePassOverlayAsync();
             await InjectSquadOverlayAsync();
+            await InjectPingOverlayAsync();
+            await InjectRouteOverlayAsync();
         }
 
         private async Task CheckLocationAsync()
@@ -1131,11 +1320,7 @@ namespace eft_where_am_i
             try
             {
                 var quests = questRepository.GetQuests(mapName);
-                foreach (var questName in quests)
-                {
-                    await jsExecutor.SelectQuestByNameAsync(questName);
-                    await Task.Delay(300); // Wait between selections to avoid race conditions
-                }
+                await jsExecutor.SetQuestPinsAsync(quests);
             }
             catch (Exception ex)
             {
@@ -1219,6 +1404,113 @@ namespace eft_where_am_i
                         SaveSettings();
                         break;
 
+                    case "map-ping-add":
+                        double pingLeft = message["left"]?.Value<double>() ?? double.NaN;
+                        double pingTop = message["top"]?.Value<double>() ?? double.NaN;
+                        if (!double.IsFinite(pingLeft) || !double.IsFinite(pingTop)
+                            || pingLeft < 0 || pingLeft > 100 || pingTop < 0 || pingTop > 100)
+                        {
+                            break;
+                        }
+                        var ping = new MapPing
+                        {
+                            id = Guid.NewGuid().ToString("N"),
+                            map = appSettings.latest_map,
+                            creatorName = string.IsNullOrWhiteSpace(appSettings.squad_name)
+                                ? Environment.UserName
+                                : appSettings.squad_name.Trim(),
+                            left = pingLeft,
+                            top = pingTop,
+                            floor = message["floor"]?.Type == JTokenType.Integer
+                                ? message["floor"]?.Value<int>()
+                                : null,
+                            createdAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+                        };
+                        UpsertSavedPing(ping);
+                        SaveSettings();
+                        squadNetworkService.PublishPing(ping);
+                        await InjectPingOverlayAsync();
+                        break;
+
+                    case "map-pings-toggle":
+                        bool pingsVisible = message["checked"]?.Value<bool>() ?? true;
+                        appSettings.ping_visible_per_map ??= new Dictionary<string, bool>();
+                        appSettings.ping_visible_per_map[appSettings.latest_map] = pingsVisible;
+                        SaveSettings();
+                        await InjectPingOverlayAsync();
+                        break;
+
+                    case "map-ping-delete":
+                        string pingId = message["id"]?.ToString() ?? string.Empty;
+                        if (pingId.Length == 0)
+                        {
+                            break;
+                        }
+                        RemoveSavedPing(appSettings.latest_map, pingId);
+                        SaveSettings();
+                        squadNetworkService.DeletePing(appSettings.latest_map, pingId);
+                        await InjectPingOverlayAsync();
+                        break;
+
+                    case "map-pings-clear":
+                        RemoveSavedPings(appSettings.latest_map);
+                        SaveSettings();
+                        squadNetworkService.ClearPings(appSettings.latest_map);
+                        await InjectPingOverlayAsync();
+                        break;
+
+                    case "map-route-node-add":
+                        appSettings.map_route_nodes ??= new List<MapRouteNode>();
+                        int currentRouteNodeCount = appSettings.map_route_nodes.Count(node =>
+                            string.Equals(node.map, appSettings.latest_map, StringComparison.OrdinalIgnoreCase));
+                        if (currentRouteNodeCount >= 10)
+                        {
+                            break;
+                        }
+                        double routeLeft = message["left"]?.Value<double>() ?? double.NaN;
+                        double routeTop = message["top"]?.Value<double>() ?? double.NaN;
+                        if (!double.IsFinite(routeLeft) || !double.IsFinite(routeTop)
+                            || routeLeft < 0 || routeLeft > 100 || routeTop < 0 || routeTop > 100)
+                        {
+                            break;
+                        }
+                        appSettings.map_route_nodes.Add(new MapRouteNode
+                        {
+                            id = Guid.NewGuid().ToString("N"),
+                            map = appSettings.latest_map,
+                            left = routeLeft,
+                            top = routeTop,
+                            floor = message["floor"]?.Type == JTokenType.Integer
+                                ? message["floor"]?.Value<int>()
+                                : null,
+                            createdAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+                        });
+                        SaveSettings();
+                        await InjectRouteOverlayAsync();
+                        break;
+
+                    case "map-route-node-delete":
+                        string routeNodeId = message["id"]?.ToString() ?? string.Empty;
+                        if (routeNodeId.Length == 0)
+                        {
+                            break;
+                        }
+                        appSettings.map_route_nodes ??= new List<MapRouteNode>();
+                        appSettings.map_route_nodes.RemoveAll(node =>
+                            string.Equals(node.map, appSettings.latest_map, StringComparison.OrdinalIgnoreCase)
+                            && string.Equals(node.id, routeNodeId, StringComparison.OrdinalIgnoreCase));
+                        SaveSettings();
+                        await InjectRouteOverlayAsync();
+                        break;
+
+                    case "map-route-toggle":
+                        bool routeVisible = message["checked"]?.Value<bool>() ?? true;
+                        appSettings.route_visible_per_map ??= new Dictionary<string, bool>();
+                        appSettings.route_visible_per_map[appSettings.latest_map] = routeVisible;
+                        SaveSettings();
+                        await InjectRouteOverlayAsync();
+                        break;
+
                     case "quest-requirements-layout":
                         string panelMode = message["mode"]?.ToString()?.ToLowerInvariant() ?? "right";
                         appSettings.quest_requirements_panel_mode = panelMode == "bottom" || panelMode == "floating"
@@ -1271,6 +1563,66 @@ namespace eft_where_am_i
             catch (Exception ex)
             {
                 AppLogger.Error("WebView2Content", $"Message handling error: {ex.Message}");
+            }
+        }
+
+        private void InitializeResponsiveMapZoom()
+        {
+            responsiveMapZoomTimer = new System.Windows.Forms.Timer(components)
+            {
+                Interval = 120
+            };
+            responsiveMapZoomTimer.Tick += ResponsiveMapZoomTimer_Tick;
+            webView2.Resize += (_, _) => ScheduleResponsiveMapZoomUpdate();
+        }
+
+        private void ScheduleResponsiveMapZoomUpdate()
+        {
+            if (responsiveMapZoomTimer == null || IsDisposed)
+            {
+                return;
+            }
+
+            responsiveMapZoomTimer.Stop();
+            responsiveMapZoomTimer.Start();
+        }
+
+        private async void ResponsiveMapZoomTimer_Tick(object? sender, EventArgs e)
+        {
+            responsiveMapZoomTimer?.Stop();
+            if (responsiveMapZoomUpdateRunning || webView2.CoreWebView2 == null || IsDisposed)
+            {
+                return;
+            }
+
+            responsiveMapZoomUpdateRunning = true;
+            try
+            {
+                string rawWidth = await webView2.ExecuteScriptAsync("window.innerWidth");
+                if (!double.TryParse(rawWidth?.Trim('"'), NumberStyles.Float, CultureInfo.InvariantCulture, out double cssWidth))
+                {
+                    return;
+                }
+
+                double currentZoom = webView2.ZoomFactor;
+                double targetZoom = ResponsiveMapZoom.Calculate(cssWidth, currentZoom);
+                if (Math.Abs(currentZoom - targetZoom) < 0.005)
+                {
+                    return;
+                }
+
+                webView2.ZoomFactor = targetZoom;
+                AppLogger.Info(
+                    "ResponsiveLayout",
+                    $"Map viewport {cssWidth:F0}px at zoom {currentZoom:F3}; applied {targetZoom:F3} to preserve desktop panels.");
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("ResponsiveLayout", $"Adaptive map zoom failed: {ex.Message}");
+            }
+            finally
+            {
+                responsiveMapZoomUpdateRunning = false;
             }
         }
 

@@ -185,6 +185,12 @@ namespace eft_where_am_i.Classes
             await ExecuteScriptAsync(script);
         }
 
+        public async Task SetQuestPinsAsync(IReadOnlyCollection<string> questNames)
+        {
+            string questNamesJson = JsonConvert.SerializeObject(questNames ?? Array.Empty<string>());
+            await ExecuteScriptAsync($"window.__wtfQuestOverlay?.setPinnedQuests({questNamesJson});");
+        }
+
         /// <summary>
         /// 퀘스트 컨테이너가 로드될 때까지 폴링하며 대기합니다.
         /// Nuxt/SPA 페이지의 동적 렌더링 완료를 감지합니다.

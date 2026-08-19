@@ -172,6 +172,11 @@
   };
 
   const wtfOverlayState = {
+    quest: { map: '', markers: [] },
+    questPins: new Map(),
+    questLayer: null,
+    questPopup: null,
+    questPopupMarker: null,
     battlePass: { map: '', markers: [] },
     battlePassVisible: false,
     battlePassLayer: null,
@@ -181,6 +186,12 @@
     floorEventsInstalled: false,
     squad: { map: '', members: [] },
     squadLayer: null,
+    pings: { map: '', pings: [] },
+    pingsVisible: true,
+    pingLayer: null,
+    route: { map: '', nodes: [], maxNodes: 10 },
+    routeVisible: true,
+    routeLayer: null,
     mapWrap: null,
     domObserver: null,
     mapObserver: null,
@@ -193,16 +204,102 @@
     questRequirementsSaveTimer: 0,
     questRequirementsResizeObserver: null,
     questTranslations: new Map(),
+    normalizedQuestTranslations: new Map(),
+    questNameTranslations: new Map(),
+    itemNameTranslations: new Map(),
+    locationTranslations: new Map(),
+    localizedTextOriginals: new WeakMap(),
     updateFrame: 0,
     hydrateFrame: 0
   };
 
-  window.__wtfSetQuestTranslations = (translations = {}) => {
-    wtfOverlayState.questTranslations = new Map(Object.entries(translations || {}));
+  window.__wtfSetKoreanLocalization = (catalog = {}) => {
+    wtfOverlayState.questTranslations = new Map(Object.entries(catalog.questSteps || {}));
+    wtfOverlayState.normalizedQuestTranslations = buildNormalizedTranslationMap(catalog.questSteps || {});
+    wtfOverlayState.questNameTranslations = new Map(Object.entries(catalog.questNames || {}));
+    wtfOverlayState.itemNameTranslations = new Map(Object.entries(catalog.itemNames || {}));
+    wtfOverlayState.locationTranslations = new Map(Object.entries(catalog.locations || {}));
+    localizeNativeGameNames();
     renderQuestRequirementsPanel();
+    renderQuestMarkers();
+  };
+
+  window.__wtfSetQuestTranslations = (translations = {}) => {
+    window.__wtfSetKoreanLocalization({ questSteps: translations });
   };
 
   const isKoreanQuestMode = () => state.language === 'ko' || state.language.startsWith('ko-');
+
+  const normalizeQuestTranslationKey = (value) => String(value || '')
+    .normalize('NFKC')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/×/g, 'x')
+    .replace(/^\s*(?:[•·▪▫\-–—]|\d+[.)]|\d+\s*\/\s*\d+|\[[ x✓✔]\])\s*/i, '')
+    .replace(/\(\s*x\s*(\d+)\s*\)/gi, '(x$1)')
+    .replace(/\s+/g, ' ')
+    .replace(/[.;]+$/, '')
+    .trim()
+    .toLowerCase();
+
+  function buildNormalizedTranslationMap(translations) {
+    const result = new Map();
+    const collisions = new Set();
+    for (const [english, korean] of Object.entries(translations || {})) {
+      const key = normalizeQuestTranslationKey(english);
+      if (!key || collisions.has(key)) continue;
+      if (result.has(key) && result.get(key) !== korean) {
+        result.delete(key);
+        collisions.add(key);
+      } else {
+        result.set(key, korean);
+      }
+    }
+    return result;
+  }
+
+  const bilingualGameName = (english, translations) => {
+    const source = String(english || '').replace(/\s+/g, ' ').trim();
+    if (!isKoreanQuestMode() || !source) return source;
+    const korean = String(translations.get(source) || '').replace(/\s+/g, ' ').trim();
+    if (!korean || korean.localeCompare(source, undefined, { sensitivity: 'accent' }) === 0) return source;
+    return `${korean}(${source})`;
+  };
+
+  const formatQuestName = (english) => bilingualGameName(english, wtfOverlayState.questNameTranslations);
+  const formatItemName = (english) => bilingualGameName(english, wtfOverlayState.itemNameTranslations);
+
+  const questDetailUiKo = new Map(Object.entries({
+    Requirements: '선행 조건',
+    Prerequisites: '선행 조건',
+    Objectives: '목표',
+    'Current objectives': '현재 목표',
+    Rewards: '보상',
+    Experience: '경험치',
+    Reputation: '우호도',
+    Unlocks: '해금',
+    'Previous quest': '이전 퀘스트',
+    'Next quest': '다음 퀘스트',
+    Trader: '상인',
+    Map: '지도',
+    Status: '상태',
+    Level: '레벨',
+    Optional: '선택',
+    Completed: '완료',
+    Failed: '실패',
+    'Required for Kappa': 'Kappa 필수'
+  }));
+
+  const translateLocationNames = (value) => {
+    let output = String(value || '');
+    if (!isKoreanQuestMode()) return output;
+    const pairs = [...wtfOverlayState.locationTranslations.entries()]
+      .sort((left, right) => right[0].length - left[0].length);
+    for (const [english, korean] of pairs) {
+      if (output.trim() === english) return korean;
+      output = output.replace(new RegExp(`\\b${english.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi'), korean);
+    }
+    return output;
+  };
 
   const questPanelCopy = (key, count = 0) => {
     const english = {
@@ -260,7 +357,28 @@
 
     const optional = /^\[?optional\]?[:\s-]*/i.test(text);
     text = text.replace(/^\[?optional\]?[:\s-]*/i, '');
-    const finish = (value) => optional ? `${value} (선택)` : value;
+    const shorten = (value) => String(value || '')
+      .replace(/살아서 탈출하기$/g, '생존 후 탈출')
+      .replace(/생존하여 탈출하기$/g, '생존 후 탈출')
+      .replace(/건네주기$/g, '전달')
+      .replace(/전달하기$/g, '전달')
+      .replace(/획득하기$/g, '획득')
+      .replace(/찾아 건네주기$/g, '획득 후 전달')
+      .replace(/찾기$/g, '획득')
+      .replace(/처치하기$/g, '처치')
+      .replace(/방문하기$/g, '이동')
+      .replace(/위치 확인하기$/g, '이동')
+      .replace(/설치하기$/g, '설치')
+      .replace(/표식하기$/g, '표시')
+      .replace(/숨겨두기$/g, '은닉')
+      .replace(/놓기$/g, '배치')
+      .replace(/회수하기$/g, '회수')
+      .replace(/달성하기$/g, '달성')
+      .replace(/완료하기$/g, '완료')
+      .replace(/작동시키기$/g, '작동')
+      .replace(/잠금 해제하기$/g, '잠금 해제')
+      .replace(/사용하기$/g, '사용');
+    const finish = (value) => optional ? `${shorten(value)} (선택)` : shorten(value);
     let match;
 
     if (section === 'requirements') {
@@ -308,8 +426,9 @@
   const translateQuestStep = (text, section) => {
     const source = String(text || '').replace(/\s+/g, ' ').trim();
     if (!isKoreanQuestMode() || !source) return source;
-    const official = wtfOverlayState.questTranslations.get(source);
-    return official || fallbackQuestStepKo(source, section);
+    const official = wtfOverlayState.questTranslations.get(source)
+      || wtfOverlayState.normalizedQuestTranslations.get(normalizeQuestTranslationKey(source));
+    return official || translateLocationNames(fallbackQuestStepKo(source, section));
   };
 
   const installWtfOverlayStyles = () => {
@@ -334,6 +453,73 @@
       .wtf-quest-pin:disabled {
         cursor: default !important;
         opacity: .45;
+      }
+      div.items.scroll div.no-wrap.d-flex[data-wtf-pinned="true"] > span:not(.alt) {
+        color: #ded9cd !important;
+      }
+      #wtf-quest-layer {
+        inset: 0;
+        overflow: hidden;
+        pointer-events: none !important;
+        position: absolute;
+        z-index: 7;
+      }
+      .wtf-quest-marker {
+        align-items: center;
+        cursor: pointer;
+        display: flex;
+        height: 18px;
+        justify-content: center;
+        left: 0;
+        pointer-events: auto !important;
+        position: absolute;
+        top: 0;
+        transform: translate(-50%, -50%) scale(var(--wtf-icon-scale, 1));
+        transform-origin: center;
+        user-select: none;
+        width: 18px;
+      }
+      .wtf-quest-marker-glyph {
+        align-items: center;
+        border: 2px solid #70a800;
+        border-radius: 50%;
+        box-sizing: border-box;
+        color: #70a800;
+        display: flex;
+        filter: drop-shadow(0 0 2px #000) drop-shadow(0 0 1px #000);
+        font-family: Arial, sans-serif;
+        font-size: 13px;
+        font-weight: 900;
+        height: 18px;
+        justify-content: center;
+        line-height: 14px;
+        width: 18px;
+      }
+      .wtf-quest-marker:focus-visible {
+        outline: 2px solid #e5b35c;
+        outline-offset: 4px;
+      }
+      .wtf-quest-popup.map-popup {
+        box-sizing: border-box;
+        margin: 0;
+        pointer-events: auto;
+        position: absolute;
+        transform: translateX(calc(-50% - 10px)) translateY(calc(-100% - 24px));
+        transform-origin: calc(50% + 10px) calc(100% + 24px);
+        z-index: 31;
+      }
+      .wtf-quest-popup[hidden] {
+        display: none !important;
+      }
+      .wtf-quest-popup-objective {
+        color: #d7d0c4;
+        margin-top: 7px;
+        white-space: normal;
+      }
+      .wtf-quest-popup-meta {
+        color: #a49d90;
+        font-size: 11px;
+        margin-top: 6px;
       }
       #wtf-quest-requirements-panel {
         background: rgba(20, 20, 18, .97);
@@ -587,7 +773,7 @@
       .wtf-popup-close:focus-visible {
         color: #e5b35c !important;
       }
-      .map-popup:not(.wtf-battle-pass-popup) .large.pointer.text-right {
+      .map-popup:not(.wtf-battle-pass-popup):not(.wtf-quest-popup) .large.pointer.text-right {
         display: none !important;
       }
       .wtf-battle-pass-title {
@@ -743,6 +929,135 @@
         top: 25px;
         transform: translateX(-50%);
         white-space: nowrap;
+      }
+      #wtf-ping-layer {
+        inset: 0;
+        overflow: hidden;
+        pointer-events: none !important;
+        position: absolute;
+        z-index: 9;
+      }
+      #wtf-ping-layer[hidden] { display: none !important; }
+      .wtf-ping-marker {
+        height: 24px;
+        left: 0;
+        pointer-events: none !important;
+        position: absolute;
+        top: 0;
+        transform: translate(-50%, -50%) scale(var(--wtf-icon-scale, 1));
+        transform-origin: center;
+        width: 24px;
+      }
+      .wtf-ping-marker::before,
+      .wtf-ping-marker::after {
+        border: 2px solid #ffb129;
+        border-radius: 50%;
+        box-sizing: border-box;
+        content: '';
+        left: 50%;
+        position: absolute;
+        top: 50%;
+        transform: translate(-50%, -50%);
+      }
+      .wtf-ping-marker::before {
+        background: #ffb129;
+        box-shadow: 0 0 8px rgba(255, 177, 41, .95);
+        height: 8px;
+        width: 8px;
+      }
+      .wtf-ping-marker::after {
+        height: 22px;
+        width: 22px;
+      }
+      .wtf-ping-marker.wtf-other-floor { opacity: .35; }
+      .wtf-ping-name {
+        background: rgba(0, 0, 0, .76);
+        border-radius: 2px;
+        color: #ffd992;
+        font: 700 10px/1.2 Arial, sans-serif;
+        left: 50%;
+        max-width: 130px;
+        overflow: hidden;
+        padding: 2px 4px;
+        position: absolute;
+        text-overflow: ellipsis;
+        top: 25px;
+        transform: translateX(-50%);
+        white-space: nowrap;
+      }
+      #wtf-ping-control {
+        cursor: pointer;
+        user-select: none;
+      }
+      .wtf-ping-dot {
+        background: #ffb129;
+        border: 2px solid #6f4a0c;
+        border-radius: 50%;
+        box-shadow: 0 0 4px rgba(255, 177, 41, .8);
+        box-sizing: border-box;
+        display: inline-block;
+        height: 12px;
+        margin: 3px 4px 0 2px;
+        width: 12px;
+      }
+      #wtf-clear-pings-button {
+        white-space: nowrap;
+      }
+      #wtf-route-layer {
+        inset: 0;
+        overflow: hidden;
+        pointer-events: none !important;
+        position: absolute;
+        z-index: 8;
+      }
+      #wtf-route-layer[hidden] { display: none !important; }
+      .wtf-route-lines {
+        height: 100%;
+        inset: 0;
+        overflow: visible;
+        pointer-events: none !important;
+        position: absolute;
+        width: 100%;
+      }
+      .wtf-route-line {
+        fill: none;
+        stroke: rgba(102, 190, 255, .48);
+        stroke-dasharray: 4 5;
+        stroke-linecap: round;
+        stroke-width: 1.5;
+      }
+      .wtf-route-line.wtf-other-floor { opacity: .32; }
+      .wtf-route-node {
+        background: #66beff;
+        border: 1px solid rgba(225, 246, 255, .95);
+        border-radius: 50%;
+        box-shadow: 0 0 4px rgba(102, 190, 255, .8);
+        box-sizing: border-box;
+        cursor: context-menu;
+        height: 7px;
+        left: 0;
+        pointer-events: auto !important;
+        position: absolute;
+        top: 0;
+        transform: translate(-50%, -50%) scale(var(--wtf-icon-scale, 1));
+        transform-origin: center;
+        width: 7px;
+      }
+      .wtf-route-node.wtf-other-floor { opacity: .32; }
+      #wtf-route-control {
+        cursor: pointer;
+        user-select: none;
+      }
+      .wtf-route-dot {
+        background: #66beff;
+        border: 1px solid #d7f2ff;
+        border-radius: 50%;
+        box-shadow: 0 0 3px rgba(102, 190, 255, .7);
+        box-sizing: border-box;
+        display: inline-block;
+        height: 8px;
+        margin: 5px 6px 0 4px;
+        width: 8px;
       }
     `;
     (document.head || document.documentElement).appendChild(style);
@@ -960,8 +1275,9 @@
       const objectivesRoot = frameDocument?.querySelector('.quest .objectives');
       if (objectivesRoot) {
         const headings = [...objectivesRoot.querySelectorAll('.title')];
-        const getList = (label) => {
-          const heading = headings.find((element) => element.textContent.trim() === label);
+        const getList = (labels) => {
+          const acceptedLabels = new Set(labels.map((label) => label.toLocaleLowerCase()));
+          const heading = headings.find((element) => acceptedLabels.has(element.textContent.trim().toLocaleLowerCase()));
           const list = heading?.nextElementSibling?.matches('ul')
             ? heading.nextElementSibling
             : heading?.parentElement?.querySelector('ul.list');
@@ -970,8 +1286,8 @@
             .filter(Boolean);
         };
         return {
-          requirements: getList('Requirements'),
-          objectives: getList('Objectives')
+          requirements: getList(['Requirements', 'Prerequisites', '요구 사항', '선행 조건']),
+          objectives: getList(['Objectives', 'Current objectives', '목표', '현재 목표'])
         };
       }
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -1052,7 +1368,7 @@
       card.className = 'wtf-quest-requirements-card';
       const name = document.createElement('div');
       name.className = 'wtf-quest-requirements-name';
-      name.textContent = quest.name;
+      name.textContent = formatQuestName(quest.name);
       card.appendChild(name);
 
       const details = wtfOverlayState.questRequirementsCache.get(quest.id);
@@ -1087,10 +1403,11 @@
   };
 
   const syncQuestRequirementsPanel = () => {
-    const quests = [...document.querySelectorAll('div.items.scroll div.no-wrap.d-flex.selected[data-quest-uid]')]
+    const quests = [...document.querySelectorAll('div.items.scroll div.no-wrap.d-flex[data-quest-uid]')]
+      .filter((row) => wtfOverlayState.questPins.has(normalizeQuestName(getCanonicalQuestName(row))))
       .map((row) => ({
         id: row.dataset.questUid || '',
-        name: getQuestNameElement(row)?.textContent?.trim() || 'Quest'
+        name: getCanonicalQuestName(row) || 'Quest'
       }))
       .filter((quest) => quest.id);
     const key = quests.map((quest) => `${quest.id}:${quest.name}`).join('|');
@@ -1107,29 +1424,162 @@
     return row?.querySelector?.('span:not(.alt)') || null;
   };
 
+  const getCanonicalQuestName = (row) => {
+    const nameElement = getQuestNameElement(row);
+    if (!nameElement) return '';
+    if (!row.dataset.wtfQuestNameOriginal) {
+      row.dataset.wtfQuestNameOriginal = nameElement.textContent?.replace(/\s+/g, ' ').trim() || '';
+    }
+    return row.dataset.wtfQuestNameOriginal;
+  };
+
+  const localizeNativeQuestNames = () => {
+    for (const row of document.querySelectorAll('div.items.scroll div.no-wrap.d-flex[data-quest-uid]')) {
+      const nameElement = getQuestNameElement(row);
+      if (!nameElement) continue;
+      const original = getCanonicalQuestName(row);
+      const display = formatQuestName(original);
+      if (nameElement.textContent !== display) nameElement.textContent = display;
+    }
+  };
+
+  const localizeNativeItemNames = () => {
+    for (const element of document.querySelectorAll('a[href*="/item/"], [data-item-uid] a, [data-item-id] a')) {
+      if (element.children.length) continue;
+      if (!element.dataset.wtfItemNameOriginal) {
+        element.dataset.wtfItemNameOriginal = element.textContent?.replace(/\s+/g, ' ').trim() || '';
+      }
+      const original = element.dataset.wtfItemNameOriginal;
+      if (!original || !wtfOverlayState.itemNameTranslations.has(original)) continue;
+      const display = formatItemName(original);
+      if (element.textContent !== display) element.textContent = display;
+    }
+  };
+
+  const localizeNativeLocationNames = () => {
+    const selectors = [
+      '.maps-list span',
+      '.map-list span',
+      '[data-map] span',
+      '[data-location] span',
+      'select option',
+      '.locations span',
+      '.location span'
+    ].join(',');
+    for (const element of document.querySelectorAll(selectors)) {
+      if (element.children.length) continue;
+      if (!element.dataset.wtfLocationOriginal) {
+        element.dataset.wtfLocationOriginal = element.textContent?.replace(/\s+/g, ' ').trim() || '';
+      }
+      const original = element.dataset.wtfLocationOriginal;
+      const display = isKoreanQuestMode() ? translateLocationNames(original) : original;
+      if (display && element.textContent !== display) element.textContent = display;
+    }
+  };
+
+  const localizeExactCatalogNames = () => {
+    for (const element of document.querySelectorAll('body *:not(script):not(style):not(svg):not(path)')) {
+      if (!(element instanceof HTMLElement) || element.childElementCount) continue;
+      if (!element.dataset.wtfGameNameOriginal) {
+        const candidate = element.textContent?.replace(/\s+/g, ' ').trim() || '';
+        if (!wtfOverlayState.questNameTranslations.has(candidate)
+          && !wtfOverlayState.itemNameTranslations.has(candidate)) continue;
+        element.dataset.wtfGameNameOriginal = candidate;
+      }
+      const original = element.dataset.wtfGameNameOriginal;
+      const display = wtfOverlayState.questNameTranslations.has(original)
+        ? formatQuestName(original)
+        : formatItemName(original);
+      if (display && element.textContent !== display) element.textContent = display;
+    }
+  };
+
+  const localizeNativeQuestDetailText = () => {
+    if (!document.body) return;
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    const textNodes = [];
+    while (walker.nextNode()) textNodes.push(walker.currentNode);
+
+    for (const textNode of textNodes) {
+      const parent = textNode.parentElement;
+      if (!parent || parent.closest('script, style, textarea, input, #wtf-quest-requirements-panel, .wtf-quest-popup')) continue;
+
+      const savedOriginal = wtfOverlayState.localizedTextOriginals.get(textNode);
+      if (!isKoreanQuestMode()) {
+        if (savedOriginal !== undefined && textNode.nodeValue !== savedOriginal) textNode.nodeValue = savedOriginal;
+        continue;
+      }
+
+      const raw = savedOriginal ?? String(textNode.nodeValue || '');
+      const normalized = raw.replace(/\s+/g, ' ').trim();
+      if (!normalized) continue;
+      const prefixMatch = normalized.match(/^((?:[•·▪▫\-–—]|\d+[.)]|\d+\s*\/\s*\d+)\s+)/);
+      const prefix = prefixMatch?.[1] || '';
+      const source = prefix ? normalized.slice(prefix.length).trim() : normalized;
+      let translated = '';
+      if (wtfOverlayState.questTranslations.has(source)
+        || wtfOverlayState.normalizedQuestTranslations.has(normalizeQuestTranslationKey(source))) {
+        translated = translateQuestStep(source, 'objectives');
+      } else if (wtfOverlayState.questNameTranslations.has(source)) {
+        translated = formatQuestName(source);
+      } else if (wtfOverlayState.itemNameTranslations.has(source)) {
+        translated = formatItemName(source);
+      } else if (wtfOverlayState.locationTranslations.has(source)) {
+        translated = wtfOverlayState.locationTranslations.get(source) || '';
+      } else if (questDetailUiKo.has(source)) {
+        translated = questDetailUiKo.get(source) || '';
+      }
+      if (!translated) continue;
+
+      if (savedOriginal === undefined) wtfOverlayState.localizedTextOriginals.set(textNode, raw);
+      const leading = raw.match(/^\s*/)?.[0] || '';
+      const trailing = raw.match(/\s*$/)?.[0] || '';
+      const display = `${leading}${prefix}${translated}${trailing}`;
+      if (textNode.nodeValue !== display) textNode.nodeValue = display;
+    }
+  };
+
+  function localizeNativeGameNames() {
+    localizeNativeQuestNames();
+    localizeNativeItemNames();
+    localizeNativeLocationNames();
+    localizeExactCatalogNames();
+    localizeNativeQuestDetailText();
+  }
+
+  const normalizeQuestName = (value) => String(value || '')
+    .normalize('NFKC')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+
   const syncNativeQuestCheckbox = (row, checkbox) => {
-    const selected = row.classList.contains('selected');
+    const questName = getCanonicalQuestName(row);
+    const selected = wtfOverlayState.questPins.has(normalizeQuestName(questName));
     checkbox.checked = selected;
-    checkbox.disabled = row.classList.contains('disabled');
+    checkbox.disabled = false;
     checkbox.setAttribute('aria-checked', selected ? 'true' : 'false');
+    row.dataset.wtfPinned = selected ? 'true' : 'false';
   };
 
   const toggleNativeQuestSelection = (row, checkbox) => {
     const desired = checkbox.checked;
-    const selected = row.classList.contains('selected');
+    const questName = getCanonicalQuestName(row);
+    const key = normalizeQuestName(questName);
+    const selected = wtfOverlayState.questPins.has(key);
     if (desired === selected) return;
 
-    row.dispatchEvent(new MouseEvent('contextmenu', {
-      bubbles: true,
-      cancelable: true,
-      button: 2,
-      view: window
+    if (desired) wtfOverlayState.questPins.set(key, questName);
+    else wtfOverlayState.questPins.delete(key);
+    syncNativeQuestCheckbox(row, checkbox);
+    syncQuestRequirementsPanel();
+    renderQuestMarkers();
+    window.chrome?.webview?.postMessage(JSON.stringify({
+      action: 'quest-toggled',
+      questName,
+      isSelected: desired
     }));
-
-    setTimeout(() => {
-      syncNativeQuestCheckbox(row, checkbox);
-      syncQuestRequirementsPanel();
-    }, 120);
   };
 
   const addNativeQuestCheckboxes = () => {
@@ -1137,6 +1587,7 @@
     for (const row of rows) {
       const nameElement = getQuestNameElement(row);
       if (!nameElement) continue;
+      const questName = getCanonicalQuestName(row);
 
       let checkbox = row.querySelector(':scope > .wtf-quest-pin');
       if (!checkbox) {
@@ -1145,7 +1596,7 @@
         checkbox.className = 'wtf-quest-pin';
         checkbox.dataset.questId = row.dataset.questUid || '';
         checkbox.title = 'Select quest markers';
-        checkbox.setAttribute('aria-label', 'Select ' + nameElement.textContent.trim() + ' markers');
+        checkbox.setAttribute('aria-label', 'Select ' + questName + ' markers');
 
         const stopRowInteraction = (event) => event.stopPropagation();
         checkbox.addEventListener('pointerdown', stopRowInteraction);
@@ -1164,6 +1615,17 @@
         });
 
         nameElement.insertAdjacentElement('beforebegin', checkbox);
+      }
+
+      if (!row.dataset.wtfQuestContextListener) {
+        row.dataset.wtfQuestContextListener = 'true';
+        row.addEventListener('contextmenu', (event) => {
+          if (event.target instanceof Element && event.target.closest('.wtf-quest-pin')) return;
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          checkbox.checked = !wtfOverlayState.questPins.has(normalizeQuestName(getCanonicalQuestName(row)));
+          toggleNativeQuestSelection(row, checkbox);
+        }, true);
       }
 
       syncNativeQuestCheckbox(row, checkbox);
@@ -1308,6 +1770,228 @@
     control.setAttribute('aria-checked', wtfOverlayState.battlePassVisible ? 'true' : 'false');
   };
 
+  const pingCopy = (english, korean) => state.language.startsWith('ko') ? korean : english;
+
+  const setPingsVisible = (visible, notifyHost) => {
+    wtfOverlayState.pingsVisible = Boolean(visible);
+    if (wtfOverlayState.pingLayer) wtfOverlayState.pingLayer.hidden = !wtfOverlayState.pingsVisible;
+    const control = document.getElementById('wtf-ping-control');
+    control?.classList.toggle('active', wtfOverlayState.pingsVisible);
+    control?.classList.toggle('inactive', !wtfOverlayState.pingsVisible);
+    control?.classList.toggle('selected', wtfOverlayState.pingsVisible);
+    control?.setAttribute('aria-checked', String(wtfOverlayState.pingsVisible));
+    if (notifyHost) {
+      window.chrome?.webview?.postMessage(JSON.stringify({
+        action: 'map-pings-toggle', checked: wtfOverlayState.pingsVisible
+      }));
+    }
+  };
+
+  const ensurePingControl = () => {
+    const leftPanel = document.querySelector('.panel_left');
+    if (!leftPanel) return;
+    let items = null;
+    let scopeSource = null;
+
+    if (leftPanel.classList.contains('terminal-side-panel')) {
+      let group = leftPanel.querySelector('.wtf-ping-filter-group');
+      if (!group) {
+        group = document.createElement('section');
+        group.className = 'mb-5 terminal-filter-section wtf-ping-filter-group';
+        group.dataset.section = 'visibility';
+        const heading = document.createElement('button');
+        heading.type = 'button';
+        heading.className = 'terminal-section-heading';
+        heading.setAttribute('aria-expanded', 'true');
+        heading.innerHTML = `<span class="bold">${pingCopy('Visibility', '가시성')}</span><span aria-hidden="true">-/+</span>`;
+        items = document.createElement('div');
+        items.className = 'items scroll terminal-filter-items';
+        heading.addEventListener('click', () => {
+          const collapsed = group.classList.toggle('collapsed');
+          heading.setAttribute('aria-expanded', String(!collapsed));
+        });
+        group.append(heading, items);
+        leftPanel.querySelector('.terminal-layer-list')?.appendChild(group);
+      } else {
+        items = group.querySelector('.terminal-filter-items');
+      }
+    } else {
+      const columns = leftPanel.querySelector('.two-columns');
+      if (!columns) return;
+      const titles = [...columns.querySelectorAll(':scope > .mb-5 > div:first-child > .bold')];
+      const title = titles.find(element => /^(?:visibility|가시성)$/i.test(element.textContent.trim()));
+      items = title?.parentElement?.nextElementSibling || null;
+      scopeSource = items?.firstElementChild || title;
+      if (!items?.classList.contains('items')) {
+        let group = columns.querySelector(':scope > .wtf-ping-filter-group');
+        if (!group) {
+          group = document.createElement('div');
+          group.className = 'mb-5 wtf-ping-filter-group';
+          const headingRow = document.createElement('div');
+          const heading = document.createElement('span');
+          heading.className = 'bold';
+          heading.textContent = pingCopy('Visibility', '가시성');
+          headingRow.appendChild(heading);
+          items = document.createElement('div');
+          items.className = 'items';
+          group.append(headingRow, items);
+          columns.appendChild(group);
+        } else {
+          items = group.querySelector('.items');
+        }
+        scopeSource = titles[0] || columns.firstElementChild;
+      }
+    }
+    if (!items) return;
+
+    const scopeAttributes = [...(scopeSource?.attributes || [])]
+      .filter(attribute => attribute.name.startsWith('data-v-'))
+      .map(attribute => attribute.name);
+    const applyScope = (element) => {
+      for (const attribute of scopeAttributes) element.setAttribute(attribute, '');
+      return element;
+    };
+    let control = document.getElementById('wtf-ping-control');
+    if (!control || control.parentElement !== items) {
+      control?.remove();
+      control = applyScope(document.createElement('div'));
+      control.id = 'wtf-ping-control';
+      control.className = leftPanel.classList.contains('terminal-side-panel')
+        ? 'terminal-filter-row no-wrap d-flex inactive'
+        : 'd-flex h-space-between mb-5 no-wrap inactive';
+      control.tabIndex = 0;
+      control.setAttribute('role', 'checkbox');
+      control.title = pingCopy(
+        'Alt + click to add a ping; repeat near a ping to delete it',
+        'Alt + 좌클릭으로 핑 추가 · 핑 근처에서 반복하면 삭제'
+      );
+      const toggle = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setPingsVisible(!wtfOverlayState.pingsVisible, true);
+      };
+      control.addEventListener('click', toggle);
+      control.addEventListener('keydown', event => {
+        if (event.key === 'Enter' || event.key === ' ') toggle(event);
+      });
+      const label = applyScope(document.createElement('span'));
+      label.className = 'd-flex';
+      const icon = document.createElement('span');
+      icon.className = 'wtf-ping-dot';
+      label.append(icon, document.createTextNode(` ${pingCopy('Pings', '핑')}`));
+      const count = applyScope(document.createElement('span'));
+      count.className = 'sub alt';
+      count.dataset.wtfPingCount = '';
+      control.append(label, count);
+      items.appendChild(control);
+    }
+    const count = control.querySelector('[data-wtf-ping-count]');
+    const countText = String(wtfOverlayState.pings.pings?.length || 0);
+    if (count && count.textContent !== countText) count.textContent = countText;
+    setPingsVisible(wtfOverlayState.pingsVisible, false);
+  };
+
+  const setRouteVisible = (visible, notifyHost) => {
+    wtfOverlayState.routeVisible = Boolean(visible);
+    if (wtfOverlayState.routeLayer) wtfOverlayState.routeLayer.hidden = !wtfOverlayState.routeVisible;
+    const control = document.getElementById('wtf-route-control');
+    control?.classList.toggle('active', wtfOverlayState.routeVisible);
+    control?.classList.toggle('inactive', !wtfOverlayState.routeVisible);
+    control?.classList.toggle('selected', wtfOverlayState.routeVisible);
+    control?.setAttribute('aria-checked', String(wtfOverlayState.routeVisible));
+    if (notifyHost) {
+      window.chrome?.webview?.postMessage(JSON.stringify({
+        action: 'map-route-toggle', checked: wtfOverlayState.routeVisible
+      }));
+    }
+  };
+
+  const ensureRouteControl = () => {
+    ensurePingControl();
+    const pingControl = document.getElementById('wtf-ping-control');
+    const items = pingControl?.parentElement;
+    if (!pingControl || !items) return;
+    let control = document.getElementById('wtf-route-control');
+    if (!control || control.parentElement !== items) {
+      control?.remove();
+      control = document.createElement('div');
+      control.id = 'wtf-route-control';
+      control.className = pingControl.className;
+      control.tabIndex = 0;
+      control.setAttribute('role', 'checkbox');
+      control.title = pingCopy(
+        'Wheel-click to add a node; repeat near a node to delete it',
+        '휠 클릭으로 노드 추가 · 노드 근처에서 반복하면 삭제'
+      );
+      for (const attribute of pingControl.attributes) {
+        if (attribute.name.startsWith('data-v-')) control.setAttribute(attribute.name, '');
+      }
+      const toggle = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setRouteVisible(!wtfOverlayState.routeVisible, true);
+      };
+      control.addEventListener('click', toggle);
+      control.addEventListener('keydown', event => {
+        if (event.key === 'Enter' || event.key === ' ') toggle(event);
+      });
+      const label = document.createElement('span');
+      label.className = 'd-flex';
+      const icon = document.createElement('span');
+      icon.className = 'wtf-route-dot';
+      label.append(icon, document.createTextNode(` ${pingCopy('Route', '경로')}`));
+      const count = document.createElement('span');
+      count.className = 'sub alt';
+      count.dataset.wtfRouteCount = '';
+      for (const attribute of pingControl.attributes) {
+        if (!attribute.name.startsWith('data-v-')) continue;
+        label.setAttribute(attribute.name, '');
+        count.setAttribute(attribute.name, '');
+      }
+      control.append(label, count);
+      pingControl.after(control);
+    }
+    const count = control.querySelector('[data-wtf-route-count]');
+    const countText = `${wtfOverlayState.route.nodes?.length || 0}/${wtfOverlayState.route.maxNodes || 10}`;
+    if (count && count.textContent !== countText) count.textContent = countText;
+    setRouteVisible(wtfOverlayState.routeVisible, false);
+  };
+
+  const ensureClearPingsButton = () => {
+    const topPanel = document.querySelector('.panel_top');
+    if (!topPanel) return;
+    let button = document.getElementById('wtf-clear-pings-button');
+    if (!button || button.parentElement !== topPanel) {
+      button?.remove();
+      button = document.createElement('button');
+      button.id = 'wtf-clear-pings-button';
+      button.type = 'button';
+      const nativeButton = topPanel.querySelector('button');
+      if (nativeButton) {
+        button.className = nativeButton.className;
+        for (const attribute of nativeButton.attributes) {
+          if (attribute.name.startsWith('data-v-')) button.setAttribute(attribute.name, '');
+        }
+      }
+      button.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (!(wtfOverlayState.pings.pings?.length > 0)) return;
+        const confirmed = window.confirm(pingCopy(
+          'Delete every ping on this map?',
+          '이 지도에 찍힌 핑을 전부 삭제할까요?'
+        ));
+        if (confirmed) window.chrome?.webview?.postMessage(JSON.stringify({ action: 'map-pings-clear' }));
+      });
+      const status = topPanel.querySelector('.terminal-status');
+      if (status) status.before(button);
+      else topPanel.appendChild(button);
+    }
+    const buttonText = pingCopy('Delete all pings', '핑 전부 삭제');
+    if (button.textContent !== buttonText) button.textContent = buttonText;
+    button.disabled = !(wtfOverlayState.pings.pings?.length > 0);
+  };
+
   const getLayoutOffset = (element, ancestor) => {
     let left = 0;
     let top = 0;
@@ -1320,9 +2004,116 @@
     return { left, top };
   };
 
+  const parseMapTransform = (transform) => {
+    if (!transform || transform === 'none') return { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
+    const Matrix = window.DOMMatrixReadOnly || window.DOMMatrix || window.WebKitCSSMatrix;
+    if (typeof Matrix === 'function') {
+      try { return new Matrix(transform); } catch (_) { }
+    }
+    const matrix2d = transform.match(/^matrix\(\s*([^)]*)\)$/i);
+    if (matrix2d) {
+      const values = matrix2d[1].split(',').map(value => Number.parseFloat(value.trim()));
+      if (values.length === 6 && values.every(Number.isFinite)) {
+        return { a: values[0], b: values[1], c: values[2], d: values[3], e: values[4], f: values[5] };
+      }
+    }
+    const matrix3d = transform.match(/^matrix3d\(\s*([^)]*)\)$/i);
+    if (matrix3d) {
+      const values = matrix3d[1].split(',').map(value => Number.parseFloat(value.trim()));
+      if (values.length === 16 && values.every(Number.isFinite)) {
+        return { a: values[0], b: values[1], c: values[4], d: values[5], e: values[12], f: values[13] };
+      }
+    }
+    return { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
+  };
+
   const applyNativePopupScope = (element) => {
     element.setAttribute('data-v-6c75efb4', '');
     return element;
+  };
+
+  const closeQuestPopup = () => {
+    if (wtfOverlayState.questPopup) {
+      wtfOverlayState.questPopup.hidden = true;
+      wtfOverlayState.questPopup.replaceChildren();
+    }
+    wtfOverlayState.questPopupMarker = null;
+  };
+
+  const updateQuestPopupPosition = () => {
+    const popup = wtfOverlayState.questPopup;
+    const marker = wtfOverlayState.questPopupMarker;
+    if (!popup?.isConnected || popup.hidden || !marker?.isConnected) return;
+    popup.style.left = marker.style.left;
+    popup.style.top = marker.style.top;
+  };
+
+  const renderQuestPopup = (markerData) => {
+    const popup = wtfOverlayState.questPopup;
+    if (!popup) return;
+    popup.replaceChildren();
+
+    const inner = applyNativePopupScope(document.createElement('div'));
+    inner.className = 'inner';
+    const header = applyNativePopupScope(document.createElement('div'));
+    header.className = 'd-flex h-space-between v-start';
+    const title = applyNativePopupScope(document.createElement('div'));
+    title.className = 'title w-100';
+    title.textContent = formatQuestName(String(markerData.quest || 'Quest'));
+    const close = applyNativePopupScope(document.createElement('button'));
+    close.type = 'button';
+    close.className = 'wtf-popup-close';
+    close.textContent = '\u00d7';
+    close.title = state.language === 'ko' ? '\uB2EB\uAE30' : 'Close';
+    close.setAttribute('aria-label', close.title);
+    close.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      closeQuestPopup();
+    });
+    header.append(title, close);
+
+    const objective = applyNativePopupScope(document.createElement('div'));
+    objective.className = 'wtf-quest-popup-objective';
+    objective.textContent = translateQuestStep(String(markerData.objective || ''), 'objectives');
+    const meta = applyNativePopupScope(document.createElement('div'));
+    meta.className = 'wtf-quest-popup-meta';
+    const labels = [
+      markerData.category === 'item'
+        ? (state.language === 'ko' ? '\uD018\uC2A4\uD2B8 \uC544\uC774\uD15C \uC704\uCE58' : 'Quest item location')
+        : (state.language === 'ko' ? '\uD018\uC2A4\uD2B8 \uBAA9\uD45C' : 'Quest objective'),
+      markerData.optional ? (state.language === 'ko' ? '\uC120\uD0DD \uBAA9\uD45C' : 'Optional') : ''
+    ].filter(Boolean);
+    meta.textContent = labels.join(' \u00b7 ');
+    inner.append(header, objective, meta);
+    popup.appendChild(inner);
+    popup.hidden = false;
+    updateQuestPopupPosition();
+  };
+
+  const ensureQuestPopup = () => {
+    const mapContainer = document.querySelector('.map-cont');
+    if (!mapContainer) return null;
+    let popup = wtfOverlayState.questPopup;
+    if (!popup?.isConnected || popup.parentElement !== mapContainer) {
+      popup?.remove();
+      popup = applyNativePopupScope(document.createElement('div'));
+      popup.className = 'map-popup wtf-quest-popup';
+      popup.hidden = true;
+      popup.setAttribute('role', 'dialog');
+      popup.addEventListener('pointerdown', (event) => event.stopPropagation());
+      popup.addEventListener('mousedown', (event) => event.stopPropagation());
+      popup.addEventListener('click', (event) => event.stopPropagation());
+      mapContainer.appendChild(popup);
+      wtfOverlayState.questPopup = popup;
+    }
+    return popup;
+  };
+
+  const openQuestPopup = (markerData, marker) => {
+    ensureQuestPopup();
+    wtfOverlayState.questPopupMarker = marker;
+    renderQuestPopup(markerData);
   };
 
   const closeBattlePassPopup = () => {
@@ -1501,7 +2292,7 @@
   };
 
   const ensureNativeQuestPopupCloseButton = () => {
-    for (const popup of document.querySelectorAll('.map-popup:not(.wtf-battle-pass-popup)')) {
+    for (const popup of document.querySelectorAll('.map-popup:not(.wtf-battle-pass-popup):not(.wtf-quest-popup)')) {
       const nativeSizeToggle = popup.querySelector('.large.pointer.text-right');
       nativeSizeToggle?.setAttribute('aria-hidden', 'true');
       const controls = nativeSizeToggle?.parentElement || popup.querySelector('.ml-15.self-start');
@@ -1521,6 +2312,92 @@
     }
   };
 
+  const renderQuestMarkers = () => {
+    const overlay = wtfOverlayState.questLayer;
+    if (!overlay) return;
+    closeQuestPopup();
+    overlay.replaceChildren();
+
+    const markerDataList = (wtfOverlayState.quest.markers || [])
+      .filter((markerData) => wtfOverlayState.questPins.has(normalizeQuestName(markerData.quest)));
+    const collisionGroups = new Map();
+    for (const markerData of markerDataList) {
+      const key = `${Number(markerData.left).toFixed(6)}|${Number(markerData.top).toFixed(6)}`;
+      const group = collisionGroups.get(key) || [];
+      group.push(markerData);
+      collisionGroups.set(key, group);
+    }
+    const collisionOffsets = new Map();
+    for (const group of collisionGroups.values()) {
+      if (group.length < 2) continue;
+      const radius = Math.max(10, Math.min(22, 8 + group.length));
+      group.forEach((markerData, index) => {
+        const angle = (-Math.PI / 2) + ((Math.PI * 2 * index) / group.length);
+        collisionOffsets.set(markerData, {
+          x: Math.cos(angle) * radius,
+          y: Math.sin(angle) * radius
+        });
+      });
+    }
+
+    for (const markerData of markerDataList) {
+      const marker = document.createElement('div');
+      marker.className = 'wtf-quest-marker';
+      marker.dataset.left = String(markerData.left);
+      marker.dataset.top = String(markerData.top);
+      marker.dataset.elevation = String(markerData.elevation ?? '');
+      const collisionOffset = collisionOffsets.get(markerData);
+      marker.dataset.spreadX = String(collisionOffset?.x || 0);
+      marker.dataset.spreadY = String(collisionOffset?.y || 0);
+      marker.title = [
+        formatQuestName(markerData.quest),
+        translateQuestStep(markerData.objective, 'objectives')
+      ].filter(Boolean).join(' \u00b7 ');
+      marker.setAttribute('role', 'button');
+      marker.setAttribute('aria-label', marker.title);
+      marker.tabIndex = 0;
+      const stopMarkerEvent = (event) => event.stopPropagation();
+      marker.addEventListener('pointerdown', stopMarkerEvent);
+      marker.addEventListener('mousedown', stopMarkerEvent);
+      marker.addEventListener('dblclick', stopMarkerEvent);
+      marker.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        openQuestPopup(markerData, marker);
+      });
+      marker.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        event.stopPropagation();
+        openQuestPopup(markerData, marker);
+      });
+      const glyph = document.createElement('span');
+      glyph.className = 'wtf-quest-marker-glyph';
+      glyph.textContent = '!';
+      glyph.setAttribute('aria-hidden', 'true');
+      marker.appendChild(glyph);
+      overlay.appendChild(marker);
+    }
+    scheduleBattlePassPositionUpdate();
+  };
+
+  const ensureQuestLayer = () => {
+    const mapContainer = document.querySelector('.map-cont');
+    const mapWrap = mapContainer?.querySelector('.map-wrap');
+    if (!mapContainer || !mapWrap) return false;
+    if (!wtfOverlayState.questLayer?.isConnected || wtfOverlayState.questLayer.parentElement !== mapContainer) {
+      wtfOverlayState.questLayer?.remove();
+      const overlay = document.createElement('div');
+      overlay.id = 'wtf-quest-layer';
+      overlay.setAttribute('aria-hidden', 'true');
+      mapContainer.appendChild(overlay);
+      wtfOverlayState.questLayer = overlay;
+      renderQuestMarkers();
+    }
+    observeMapTransform(mapContainer, mapWrap);
+    return true;
+  };
+
   const updateBattlePassPositions = () => {
     wtfOverlayState.updateFrame = 0;
     const overlay = wtfOverlayState.battlePassLayer;
@@ -1529,13 +2406,7 @@
     if (!overlay?.isConnected || !mapWrap?.isConnected || !mapContainer) return;
 
     const computed = getComputedStyle(mapWrap);
-    const Matrix = window.DOMMatrixReadOnly || window.DOMMatrix || window.WebKitCSSMatrix;
-    let matrix;
-    try {
-      matrix = new Matrix(computed.transform === 'none' ? undefined : computed.transform);
-    } catch (_) {
-      matrix = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
-    }
+    const matrix = parseMapTransform(computed.transform);
 
     const originParts = computed.transformOrigin.split(/\s+/);
     const originX = Number.parseFloat(originParts[0]) || 0;
@@ -1544,8 +2415,12 @@
     const width = mapWrap.offsetWidth || Number.parseFloat(computed.width) || 0;
     const height = mapWrap.offsetHeight || Number.parseFloat(computed.height) || 0;
 
-    for (const marker of document.querySelectorAll('.wtf-battle-pass-marker, .wtf-squad-marker')) {
-      if (marker.parentElement !== overlay && marker.parentElement !== wtfOverlayState.squadLayer) continue;
+    for (const marker of document.querySelectorAll('.wtf-quest-marker, .wtf-battle-pass-marker, .wtf-squad-marker, .wtf-ping-marker, .wtf-route-node')) {
+      if (marker.parentElement !== wtfOverlayState.questLayer
+          && marker.parentElement !== overlay
+          && marker.parentElement !== wtfOverlayState.squadLayer
+          && marker.parentElement !== wtfOverlayState.pingLayer
+          && marker.parentElement !== wtfOverlayState.routeLayer) continue;
       const localX = (Number(marker.dataset.left) / 100) * width;
       const localY = (Number(marker.dataset.top) / 100) * height;
       const relativeX = localX - originX;
@@ -1555,12 +2430,288 @@
       marker.style.left = (layout.left + originX + (matrix.a * relativeX) + (matrix.c * relativeY) + matrix.e + spreadX) + 'px';
       marker.style.top = (layout.top + originY + (matrix.b * relativeX) + (matrix.d * relativeY) + matrix.f + spreadY) + 'px';
     }
+    updateRouteLines();
+    updateQuestPopupPosition();
     updateBattlePassPopupPosition();
   };
 
   const scheduleBattlePassPositionUpdate = () => {
     if (wtfOverlayState.updateFrame) return;
     wtfOverlayState.updateFrame = requestAnimationFrame(updateBattlePassPositions);
+  };
+
+  const mapPercentFromClientPoint = (mapContainer, mapWrap, clientX, clientY) => {
+    const computed = getComputedStyle(mapWrap);
+    const matrix = parseMapTransform(computed.transform);
+    const determinant = (matrix.a * matrix.d) - (matrix.b * matrix.c);
+    if (!Number.isFinite(determinant) || Math.abs(determinant) < 1e-8) return null;
+    const originParts = computed.transformOrigin.split(/\s+/);
+    const originX = Number.parseFloat(originParts[0]) || 0;
+    const originY = Number.parseFloat(originParts[1]) || 0;
+    const layout = getLayoutOffset(mapWrap, mapContainer);
+    const containerRect = mapContainer.getBoundingClientRect();
+    const mappedX = (clientX - containerRect.left) - layout.left - originX - matrix.e;
+    const mappedY = (clientY - containerRect.top) - layout.top - originY - matrix.f;
+    const relativeX = ((matrix.d * mappedX) - (matrix.c * mappedY)) / determinant;
+    const relativeY = ((-matrix.b * mappedX) + (matrix.a * mappedY)) / determinant;
+    const width = mapWrap.offsetWidth || Number.parseFloat(computed.width) || 0;
+    const height = mapWrap.offsetHeight || Number.parseFloat(computed.height) || 0;
+    if (!(width > 0) || !(height > 0)) return null;
+    const left = ((relativeX + originX) / width) * 100;
+    const top = ((relativeY + originY) / height) * 100;
+    if (!Number.isFinite(left) || !Number.isFinite(top) || left < 0 || left > 100 || top < 0 || top > 100) return null;
+    return { left, top };
+  };
+
+  const nearestOverlayMarker = (selector, clientX, clientY, radius = 24) => {
+    let nearest = null;
+    let nearestDistanceSquared = Number.POSITIVE_INFINITY;
+    for (const marker of document.querySelectorAll(selector)) {
+      const rect = marker.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) continue;
+      const deltaX = clientX - (rect.left + rect.width / 2);
+      const deltaY = clientY - (rect.top + rect.height / 2);
+      const distanceSquared = deltaX * deltaX + deltaY * deltaY;
+      const hitRadius = radius + Math.max(rect.width, rect.height) / 2;
+      if (distanceSquared <= hitRadius * hitRadius && distanceSquared < nearestDistanceSquared) {
+        nearest = marker;
+        nearestDistanceSquared = distanceSquared;
+      }
+    }
+    return nearest;
+  };
+
+  const selectedPingFloor = () => {
+    const inputs = [...document.querySelectorAll('input[name="layers"]')];
+    const selected = inputs.find(input => input.checked || input.getAttribute('aria-checked') === 'true');
+    if (!selected || inputs.length < 2) return null;
+    if (selected.value === 'Level 2') return 2;
+    if (selected.value === 'Ground') return 1;
+    return readFloorLevel(selected);
+  };
+
+  const updatePingFloorOpacity = () => {
+    const selectedFloor = selectedPingFloor();
+    for (const marker of document.querySelectorAll('.wtf-ping-marker')) {
+      const markerFloor = Number(marker.dataset.floor);
+      marker.classList.toggle('wtf-other-floor', selectedFloor !== null
+        && Number.isFinite(markerFloor) && marker.dataset.floor !== '' && markerFloor !== selectedFloor);
+    }
+  };
+
+  const renderPingMarkers = () => {
+    const overlay = wtfOverlayState.pingLayer;
+    if (!overlay) return;
+    overlay.replaceChildren();
+    overlay.hidden = !wtfOverlayState.pingsVisible;
+    for (const ping of wtfOverlayState.pings.pings || []) {
+      const marker = document.createElement('div');
+      marker.className = 'wtf-ping-marker';
+      marker.dataset.id = String(ping.id || '');
+      marker.dataset.left = String(ping.left);
+      marker.dataset.top = String(ping.top);
+      marker.dataset.floor = ping.floor === null || ping.floor === undefined ? '' : String(ping.floor);
+      marker.title = String(ping.creatorName || pingCopy('Ping', '핑'));
+      marker.setAttribute('aria-hidden', 'true');
+      const label = document.createElement('span');
+      label.className = 'wtf-ping-name';
+      label.textContent = String(ping.creatorName || pingCopy('Ping', '핑'));
+      marker.appendChild(label);
+      overlay.appendChild(marker);
+    }
+    updatePingFloorOpacity();
+    ensurePingControl();
+    ensureClearPingsButton();
+    scheduleBattlePassPositionUpdate();
+  };
+
+  const installPingPlacement = (mapContainer, mapWrap) => {
+    if (mapContainer.__wtfPingMapWrap === mapWrap) return;
+    if (mapContainer.__wtfPingPointerHandler) {
+      mapContainer.removeEventListener('pointerdown', mapContainer.__wtfPingPointerHandler, true);
+    }
+    const handler = (event) => {
+      if (!event.altKey || event.button !== 0
+          || event.target.closest('.panel_top, .panel_left, .panel_right, button, input, label, a, .map-popup, .wtf-quest-marker, .wtf-battle-pass-marker')) return;
+      const nearbyPing = nearestOverlayMarker('.wtf-ping-marker', event.clientX, event.clientY);
+      if (nearbyPing?.dataset.id) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        window.chrome?.webview?.postMessage(JSON.stringify({
+          action: 'map-ping-delete', id: nearbyPing.dataset.id
+        }));
+        return;
+      }
+      const point = mapPercentFromClientPoint(mapContainer, mapWrap, event.clientX, event.clientY);
+      if (!point) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      window.chrome?.webview?.postMessage(JSON.stringify({
+        action: 'map-ping-add',
+        left: point.left,
+        top: point.top,
+        floor: selectedPingFloor()
+      }));
+    };
+    mapContainer.__wtfPingMapWrap = mapWrap;
+    mapContainer.__wtfPingPointerHandler = handler;
+    mapContainer.addEventListener('pointerdown', handler, true);
+  };
+
+  const ensurePingLayer = () => {
+    const mapContainer = document.querySelector('.map-cont');
+    const mapWrap = mapContainer?.querySelector('.map-wrap');
+    if (!mapContainer || !mapWrap) return false;
+    if (!wtfOverlayState.pingLayer?.isConnected || wtfOverlayState.pingLayer.parentElement !== mapContainer) {
+      wtfOverlayState.pingLayer?.remove();
+      const overlay = document.createElement('div');
+      overlay.id = 'wtf-ping-layer';
+      overlay.setAttribute('aria-hidden', 'true');
+      mapContainer.appendChild(overlay);
+      wtfOverlayState.pingLayer = overlay;
+      renderPingMarkers();
+    }
+    installPingPlacement(mapContainer, mapWrap);
+    observeMapTransform(mapContainer, mapWrap);
+    return true;
+  };
+
+  const updateRouteFloorOpacity = () => {
+    const selectedFloor = selectedPingFloor();
+    const floorById = new Map();
+    for (const marker of document.querySelectorAll('.wtf-route-node')) {
+      const markerFloor = Number(marker.dataset.floor);
+      const hasFloor = marker.dataset.floor !== '' && Number.isFinite(markerFloor);
+      floorById.set(marker.dataset.id, hasFloor ? markerFloor : null);
+      marker.classList.toggle('wtf-other-floor', selectedFloor !== null && hasFloor && markerFloor !== selectedFloor);
+    }
+    for (const line of document.querySelectorAll('.wtf-route-line')) {
+      const floors = [floorById.get(line.dataset.from), floorById.get(line.dataset.to)];
+      line.classList.toggle('wtf-other-floor', selectedFloor !== null
+        && floors.some(floor => floor !== null && floor !== undefined && floor !== selectedFloor));
+    }
+  };
+
+  const updateRouteLines = () => {
+    const layer = wtfOverlayState.routeLayer;
+    if (!layer?.isConnected) return;
+    const markerById = new Map(
+      [...layer.querySelectorAll('.wtf-route-node')].map(marker => [marker.dataset.id, marker])
+    );
+    for (const line of layer.querySelectorAll('.wtf-route-line')) {
+      const from = markerById.get(line.dataset.from);
+      const to = markerById.get(line.dataset.to);
+      if (!from || !to) continue;
+      line.setAttribute('x1', Number.parseFloat(from.style.left) || 0);
+      line.setAttribute('y1', Number.parseFloat(from.style.top) || 0);
+      line.setAttribute('x2', Number.parseFloat(to.style.left) || 0);
+      line.setAttribute('y2', Number.parseFloat(to.style.top) || 0);
+    }
+    updateRouteFloorOpacity();
+  };
+
+  const renderRouteNodes = () => {
+    const layer = wtfOverlayState.routeLayer;
+    if (!layer) return;
+    layer.replaceChildren();
+    layer.hidden = !wtfOverlayState.routeVisible;
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.classList.add('wtf-route-lines');
+    svg.setAttribute('aria-hidden', 'true');
+    layer.appendChild(svg);
+    const nodes = wtfOverlayState.route.nodes || [];
+    for (let index = 1; index < nodes.length; index += 1) {
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.classList.add('wtf-route-line');
+      line.dataset.from = String(nodes[index - 1].id || '');
+      line.dataset.to = String(nodes[index].id || '');
+      svg.appendChild(line);
+    }
+    for (const node of nodes) {
+      const marker = document.createElement('div');
+      marker.className = 'wtf-route-node';
+      marker.dataset.id = String(node.id || '');
+      marker.dataset.left = String(node.left);
+      marker.dataset.top = String(node.top);
+      marker.dataset.floor = node.floor === null || node.floor === undefined ? '' : String(node.floor);
+      marker.title = pingCopy('Right-click to delete this route node', '우클릭으로 경로 노드 삭제');
+      marker.addEventListener('contextmenu', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        window.chrome?.webview?.postMessage(JSON.stringify({
+          action: 'map-route-node-delete', id: marker.dataset.id
+        }));
+      });
+      layer.appendChild(marker);
+    }
+    ensureRouteControl();
+    scheduleBattlePassPositionUpdate();
+  };
+
+  const installRoutePlacement = (mapContainer, mapWrap) => {
+    if (mapContainer.__wtfRouteMapWrap === mapWrap) return;
+    if (mapContainer.__wtfRoutePointerHandler) {
+      mapContainer.removeEventListener('pointerdown', mapContainer.__wtfRoutePointerHandler, true);
+      mapContainer.removeEventListener('auxclick', mapContainer.__wtfRouteAuxHandler, true);
+    }
+    const isInteractiveUi = target => target.closest(
+      '.panel_top, .panel_left, .panel_right, button, input, label, a, .map-popup, '
+      + '.wtf-quest-marker, .wtf-battle-pass-marker, .wtf-ping-marker'
+    );
+    const handler = event => {
+      if (event.button !== 1 || isInteractiveUi(event.target)) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const nearbyNode = nearestOverlayMarker('.wtf-route-node', event.clientX, event.clientY);
+      if (nearbyNode?.dataset.id) {
+        window.chrome?.webview?.postMessage(JSON.stringify({
+          action: 'map-route-node-delete', id: nearbyNode.dataset.id
+        }));
+        return;
+      }
+      const maxNodes = Number(wtfOverlayState.route.maxNodes) || 10;
+      if ((wtfOverlayState.route.nodes?.length || 0) >= maxNodes) {
+        window.alert(pingCopy(
+          `A route can contain up to ${maxNodes} nodes.`,
+          `경로 노드는 최대 ${maxNodes}개까지 배치할 수 있습니다.`
+        ));
+        return;
+      }
+      const point = mapPercentFromClientPoint(mapContainer, mapWrap, event.clientX, event.clientY);
+      if (!point) return;
+      window.chrome?.webview?.postMessage(JSON.stringify({
+        action: 'map-route-node-add',
+        left: point.left,
+        top: point.top,
+        floor: selectedPingFloor()
+      }));
+    };
+    const auxHandler = event => {
+      if (event.button === 1 && !isInteractiveUi(event.target)) event.preventDefault();
+    };
+    mapContainer.__wtfRouteMapWrap = mapWrap;
+    mapContainer.__wtfRoutePointerHandler = handler;
+    mapContainer.__wtfRouteAuxHandler = auxHandler;
+    mapContainer.addEventListener('pointerdown', handler, true);
+    mapContainer.addEventListener('auxclick', auxHandler, true);
+  };
+
+  const ensureRouteLayer = () => {
+    const mapContainer = document.querySelector('.map-cont');
+    const mapWrap = mapContainer?.querySelector('.map-wrap');
+    if (!mapContainer || !mapWrap) return false;
+    if (!wtfOverlayState.routeLayer?.isConnected || wtfOverlayState.routeLayer.parentElement !== mapContainer) {
+      wtfOverlayState.routeLayer?.remove();
+      const overlay = document.createElement('div');
+      overlay.id = 'wtf-route-layer';
+      overlay.setAttribute('aria-label', pingCopy('Route nodes', '경로 노드'));
+      mapContainer.appendChild(overlay);
+      wtfOverlayState.routeLayer = overlay;
+      renderRouteNodes();
+    }
+    installRoutePlacement(mapContainer, mapWrap);
+    observeMapTransform(mapContainer, mapWrap);
+    return true;
   };
 
   const readFloorLevel = (input) => {
@@ -1602,11 +2753,14 @@
     document.addEventListener('change', (event) => {
       if (event.target instanceof Element && event.target.matches('.no-wrap input[name="layers"]')) {
         requestAnimationFrame(updateBattlePassFloorOpacity);
+        requestAnimationFrame(updatePingFloorOpacity);
+        requestAnimationFrame(updateRouteFloorOpacity);
       }
     });
     document.addEventListener('click', (event) => {
       if (event.target instanceof Element && event.target.closest('.no-wrap input[name="layers"], .no-wrap label')) {
         requestAnimationFrame(updateBattlePassFloorOpacity);
+        requestAnimationFrame(updatePingFloorOpacity);
       }
     });
   };
@@ -1850,14 +3004,24 @@
     wtfOverlayState.hydrateFrame = 0;
     installWtfOverlayStyles();
     hideCommercialAndPaidUi();
+    localizeNativeGameNames();
     addNativeQuestCheckboxes();
     syncQuestRequirementsPanel();
+    ensureQuestLayer();
+    ensureQuestPopup();
     ensureBattlePassControl();
     ensureBattlePassLayer();
     ensureBattlePassPopup();
     ensureNativeQuestPopupCloseButton();
     ensureSquadLayer();
+    ensurePingControl();
+    ensureClearPingsButton();
+    ensurePingLayer();
+    ensureRouteControl();
+    ensureRouteLayer();
     updateBattlePassFloorOpacity();
+    updatePingFloorOpacity();
+    updateRouteFloorOpacity();
   };
 
   const scheduleWtfEnhancementHydration = () => {
@@ -1871,6 +3035,7 @@
     wtfOverlayState.domObserver.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ['class'],
+      characterData: true,
       childList: true,
       subtree: true
     });
@@ -1879,6 +3044,9 @@
     window.addEventListener('keydown', (event) => {
       if (event.key === 'Escape' && wtfOverlayState.battlePassPopup && !wtfOverlayState.battlePassPopup.hidden) {
         closeBattlePassPopup();
+      }
+      if (event.key === 'Escape' && wtfOverlayState.questPopup && !wtfOverlayState.questPopup.hidden) {
+        closeQuestPopup();
       }
     });
     scheduleWtfEnhancementHydration();
@@ -1902,6 +3070,31 @@
     }
   };
 
+  window.__wtfQuestOverlay = {
+    configure(snapshot = {}) {
+      wtfOverlayState.quest = {
+        map: String(snapshot.map || ''),
+        markers: Array.isArray(snapshot.markers) ? snapshot.markers : []
+      };
+      installWtfOverlayStyles();
+      ensureQuestLayer();
+      ensureQuestPopup();
+      renderQuestMarkers();
+      startWtfEnhancementObserver();
+    },
+    setPinnedQuests(questNames = []) {
+      wtfOverlayState.questPins.clear();
+      for (const questName of Array.isArray(questNames) ? questNames : []) {
+        const name = String(questName || '').trim();
+        const key = normalizeQuestName(name);
+        if (key) wtfOverlayState.questPins.set(key, name);
+      }
+      addNativeQuestCheckboxes();
+      syncQuestRequirementsPanel();
+      renderQuestMarkers();
+    }
+  };
+
   window.__wtfSquadOverlay = {
     configure(snapshot = {}) {
       wtfOverlayState.squad = {
@@ -1911,6 +3104,39 @@
       installWtfOverlayStyles();
       ensureSquadLayer();
       renderSquadMarkers();
+      startWtfEnhancementObserver();
+    }
+  };
+
+  window.__wtfPingOverlay = {
+    configure(snapshot = {}) {
+      wtfOverlayState.pings = {
+        map: String(snapshot.map || ''),
+        pings: Array.isArray(snapshot.pings) ? snapshot.pings : []
+      };
+      wtfOverlayState.pingsVisible = snapshot.visible !== false;
+      installWtfOverlayStyles();
+      ensurePingLayer();
+      renderPingMarkers();
+      ensurePingControl();
+      ensureClearPingsButton();
+      startWtfEnhancementObserver();
+    }
+  };
+
+  window.__wtfRouteOverlay = {
+    configure(snapshot = {}) {
+      wtfOverlayState.route = {
+        map: String(snapshot.map || ''),
+        nodes: Array.isArray(snapshot.nodes) ? snapshot.nodes.slice(0, 10) : [],
+        maxNodes: Math.min(10, Math.max(1, Number(snapshot.maxNodes) || 10))
+      };
+      wtfOverlayState.routeVisible = snapshot.visible !== false;
+      installWtfOverlayStyles();
+      ensureRouteLayer();
+      renderRouteNodes();
+      ensureRouteControl();
+      installFloorEvents();
       startWtfEnhancementObserver();
     }
   };

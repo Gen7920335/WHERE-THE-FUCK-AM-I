@@ -30,7 +30,7 @@ const sourceNames = {
 
 const labRegistrationAnchors = {
   'user-1-1': [2561.201, 1426.939], // 1F Reception desk
-  'medical-1-1': [2086.957, 2701.863], // Blue/G11 outer office
+  'medical-1-1': [2129.97, 2684.766], // Blue/G11 outer office (upstream b00e66f correction)
   'medical-2-1': [2209.788, 2773.443], // Green keycard room
   'user-2-12': [2626.025, 1724.119] // central Roundtable room
 };
@@ -70,7 +70,8 @@ async function main() {
 
   for (const [mapId, sourceName] of Object.entries(sourceNames)) {
     const sourceMarkers = readSource(sourceName)
-      .filter(marker => marker.category !== 'transit' && marker.category !== 'temporary');
+      .filter(marker => marker.category !== 'transit' && marker.category !== 'temporary')
+      .filter(marker => !(mapId === 'interchange' && marker.id === 'financial-4-0-1'));
     const generated = data.maps?.[mapId];
     if (!Array.isArray(generated)) fail(`${mapId}: generated marker list is missing`);
     if (generated.length !== sourceMarkers.length) {
@@ -120,28 +121,38 @@ async function main() {
       }
       sourceCoordinateChecks += 1;
 
-      if (!source.detailImg || !Array.isArray(marker.photos) || marker.photos.length !== 1) {
-        fail(`${globalId}: source photo is not linked one-to-one`);
+      const sourcePhotos = Array.isArray(source.detailImg) ? source.detailImg : [source.detailImg];
+      if (!source.detailImg || !Array.isArray(marker.photos) || marker.photos.length !== sourcePhotos.length) {
+        fail(`${globalId}: source photos are not linked one-to-one`);
       }
-      const relativePhoto = String(source.detailImg).replace(/\\/g, '/').replace(/^\.\//, '');
-      const expectedUrl = `https://perofunyang.github.io/battlepass_interactive_map/${relativePhoto}`;
-      if (marker.photos[0].url !== expectedUrl) fail(`${globalId}: photo URL does not match detailImg`);
-      const localPhoto = path.resolve(upstreamRoot, ...relativePhoto.split('/'));
-      const metadata = await sharp(localPhoto).metadata();
-      if (!metadata.width || !metadata.height || !metadata.format) fail(`${globalId}: source photo cannot be decoded`);
+      const decodedPhotos = [];
+      for (let photoIndex = 0; photoIndex < sourcePhotos.length; photoIndex += 1) {
+        const relativePhoto = String(sourcePhotos[photoIndex]).replace(/\\/g, '/').replace(/^\.\//, '');
+        const expectedUrl = `https://perofunyang.github.io/battlepass_interactive_map/${relativePhoto}`;
+        if (marker.photos[photoIndex].url !== expectedUrl) fail(`${globalId}: photo ${photoIndex + 1} URL does not match detailImg`);
+        const localPhoto = path.resolve(upstreamRoot, ...relativePhoto.split('/'));
+        const metadata = await sharp(localPhoto).metadata();
+        if (!metadata.width || !metadata.height || !metadata.format) fail(`${globalId}: source photo ${photoIndex + 1} cannot be decoded`);
+        decodedPhotos.push({ width: metadata.width, height: metadata.height, format: metadata.format });
+      }
       if (!marker.photoValidation?.checked
         || !marker.photoValidation?.sourcePathMatchesDetailImg
         || !marker.photoValidation?.decoded
-        || marker.photoValidation.width !== metadata.width
-        || marker.photoValidation.height !== metadata.height
-        || marker.photoValidation.format !== metadata.format) {
+        || marker.photoValidation.count !== decodedPhotos.length
+        || JSON.stringify(marker.photoValidation.images) !== JSON.stringify(decodedPhotos)) {
         fail(`${globalId}: photo validation record does not match decoded image`);
       }
       photoChecks += 1;
     }
   }
 
-  if (importedCount !== 308) fail(`expected 308 document markers, found ${importedCount}`);
+  const expectedImportedCount = Object.values(sourceNames)
+    .flatMap((sourceName) => readSource(sourceName)
+      .filter(marker => !(sourceName === 'interchange' && marker.id === 'financial-4-0-1')))
+    .filter(marker => marker.category !== 'transit' && marker.category !== 'temporary').length;
+  if (importedCount !== expectedImportedCount) {
+    fail(`expected ${expectedImportedCount} document markers, found ${importedCount}`);
+  }
   if (data.verification?.importedMarkerCount !== importedCount
     || data.verification?.coordinateChecksPassed !== sourceCoordinateChecks
     || data.verification?.photoChecksPassed !== photoChecks) {
