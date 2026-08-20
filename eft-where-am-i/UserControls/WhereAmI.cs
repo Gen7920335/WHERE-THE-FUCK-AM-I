@@ -19,7 +19,6 @@ namespace eft_where_am_i
         private AppSettings appSettings; // AppSettings 참조
         private JavaScriptExecutor jsExecutor;
         private QuestRepository questRepository;
-        private QuestOverlayDataService questOverlayDataService;
         private readonly QuestTranslationService questTranslationService = new();
         private FloorManager floorManager;
         private readonly Dictionary<string, string> mapDisplayNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -120,7 +119,6 @@ namespace eft_where_am_i
                 // 3. 모든 WebView가 초기화된 후에 jsExecutor 생성
                 jsExecutor = new JavaScriptExecutor(webView2);
                 questRepository = new QuestRepository();
-                questOverlayDataService = new QuestOverlayDataService();
                 floorManager = new FloorManager();
 
                 // 4. 앱 시작 시 패널을 강제로 열어둠
@@ -706,17 +704,19 @@ namespace eft_where_am_i
 
         private async Task InjectQuestOverlayAsync()
         {
-            if (webView2.CoreWebView2 == null || questOverlayDataService == null || appSettings == null)
+            if (webView2.CoreWebView2 == null || appSettings == null)
             {
                 return;
             }
 
             try
             {
-                QuestOverlaySnapshot snapshot = questOverlayDataService.GetMapSnapshot(appSettings.latest_map);
-                string snapshotJson = Newtonsoft.Json.JsonConvert.SerializeObject(snapshot);
-                await webView2.ExecuteScriptAsync($"window.__wtfQuestOverlay?.configure({snapshotJson});");
-                AppLogger.Info("QuestOverlay", $"Configured {snapshot.markers.Count} independent markers for {appSettings.latest_map}.");
+                string configurationJson = Newtonsoft.Json.JsonConvert.SerializeObject(new
+                {
+                    map = appSettings.latest_map
+                });
+                await webView2.ExecuteScriptAsync($"window.__wtfQuestOverlay?.configure({configurationJson});");
+                AppLogger.Info("QuestOverlay", $"Requested live Tarkov-Market quest markers for {appSettings.latest_map}.");
             }
             catch (Exception ex)
             {
@@ -1457,6 +1457,21 @@ namespace eft_where_am_i
                                 questRepository.AddQuest(appSettings.latest_map, questName);
                             else
                                 questRepository.RemoveQuest(appSettings.latest_map, questName);
+                        }
+                        break;
+
+                    case "quest-overlay-status":
+                        string overlayStatus = message["status"]?.ToString() ?? "unknown";
+                        string overlaySource = message["source"]?.ToString() ?? "unknown";
+                        int overlayMarkerCount = message["markerCount"]?.Value<int?>() ?? 0;
+                        string overlayError = message["error"]?.ToString() ?? string.Empty;
+                        if (overlayStatus.Equals("ready", StringComparison.OrdinalIgnoreCase))
+                        {
+                            AppLogger.Info("QuestOverlay", $"Live source ready: {overlaySource}, {overlayMarkerCount} markers on {appSettings.latest_map}.");
+                        }
+                        else
+                        {
+                            AppLogger.Warn("QuestOverlay", $"Live source {overlayStatus}: {overlaySource}. {overlayError}");
                         }
                         break;
 

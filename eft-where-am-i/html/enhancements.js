@@ -169,6 +169,11 @@
   const wtfOverlayState = {
     quest: { map: '', markers: [] },
     questPins: new Map(),
+    liveQuestStore: null,
+    liveQuestLoadPromise: null,
+    liveQuestRetryTimer: 0,
+    liveQuestSource: 'not-loaded',
+    liveQuestError: '',
     questLayer: null,
     questPopup: null,
     questPopupMarker: null,
@@ -195,11 +200,32 @@
     questTranslations: new Map(),
     normalizedQuestTranslations: new Map(),
     questNameTranslations: new Map(),
+    reverseQuestNameTranslations: new Map(),
+    questIdentityCache: new Map(),
     itemNameTranslations: new Map(),
     locationTranslations: new Map(),
     localizedTextOriginals: new WeakMap(),
     updateFrame: 0,
     hydrateFrame: 0
+  };
+
+  const tarkovMarketQuestIconPath = 'm253.943,502.885c-66.495,0-129.01-25.895-176.029-72.913C30.895,382.953,5,320.438,5,253.943S30.895,124.933,77.914,77.914,187.448,5,253.943,5s129.01,25.895,176.029,72.914c47.019,47.019,72.913,109.534,72.913,176.029s-25.895,129.01-72.913,176.029c-47.02,47.019-109.534,72.913-176.029,72.913Zm0-437.885c-104.184,0-188.943,84.759-188.943,188.943s84.759,188.942,188.943,188.942,188.942-84.759,188.942-188.942-84.759-188.943-188.942-188.943Zm40,289.2h-80v70h80v-70Zm0-269.75h-80v250.265h80V84.449Z';
+
+  // Keep the same projection constants and operation order as Tarkov-Market's
+  // canvas renderer. Live marker geometry is projected directly from its store.
+  const tarkovMarketMapDefinitions = {
+    'ground-zero': { width: 2800, height: 3100, zoom: 1, rotate: 90, xOffset: 1600, yOffset: 1300, ratio: 2 },
+    factory: { width: 3600, height: 3600, zoom: 0.7, rotate: 0, xOffset: 1800, yOffset: 1850, ratio: 10 },
+    customs: { width: 4400, height: 3200, zoom: 0.6, rotate: 90, xOffset: 2600, yOffset: 1600, ratio: 2 },
+    interchange: { width: 4000, height: 3900, zoom: 0.55, rotate: 90, xOffset: 2166, yOffset: 2004, ratio: 2 },
+    woods: { width: 4800, height: 4800, zoom: 0.4, rotate: 90, xOffset: 2200, yOffset: 2840, ratio: 2 },
+    shoreline: { width: 3700, height: 3100, zoom: 0.8, rotate: 90, xOffset: 1570, yOffset: 1450, ratio: 1 },
+    reserve: { width: 3200, height: 3000, zoom: 1, rotate: 105, xOffset: 1600, yOffset: 1520, ratio: 2 },
+    lighthouse: { width: 3100, height: 3700, zoom: 0.65, rotate: 90, xOffset: 1550, yOffset: 2050, ratio: 1 },
+    streets: { width: 3260, height: 3500, zoom: 0.7, rotate: 90, xOffset: 1660, yOffset: 1420, ratio: 2 },
+    lab: { width: 5500, height: 4200, zoom: 0.41, rotate: 180, xOffset: 6100, yOffset: 4050, ratio: 10 },
+    labyrinth: { width: 3300, height: 3200, zoom: 0.8, rotate: 180, xOffset: 1485, yOffset: 1602, ratio: 10 },
+    icebreaker: { width: 5000, height: 8400, zoom: 0.24, rotate: 90, xOffset: 2500, yOffset: 4200, ratio: 25 }
   };
 
   const participantPalette = [
@@ -240,9 +266,13 @@
     wtfOverlayState.questTranslations = new Map(Object.entries(catalog.questSteps || {}));
     wtfOverlayState.normalizedQuestTranslations = buildNormalizedTranslationMap(catalog.questSteps || {});
     wtfOverlayState.questNameTranslations = new Map(Object.entries(catalog.questNames || {}));
+    wtfOverlayState.reverseQuestNameTranslations = buildReverseQuestNameMap(catalog.questNames || {});
     wtfOverlayState.itemNameTranslations = new Map(Object.entries(catalog.itemNames || {}));
     wtfOverlayState.locationTranslations = new Map(Object.entries(catalog.locations || {}));
+    migrateQuestPinsToCanonicalNames();
     localizeNativeGameNames();
+    addNativeQuestCheckboxes();
+    syncQuestRequirementsPanel();
     renderQuestRequirementsPanel();
     renderQuestMarkers();
   };
@@ -491,32 +521,25 @@
         align-items: center;
         cursor: pointer;
         display: flex;
-        height: 18px;
+        height: 30px;
         justify-content: center;
         left: 0;
         pointer-events: auto !important;
         position: absolute;
         top: 0;
-        transform: translate(-50%, -50%) scale(var(--wtf-icon-scale, 1));
+        transform: translate(-50%, -50%) scale(var(--wtf-quest-marker-scale, 1));
         transform-origin: center;
         user-select: none;
-        width: 18px;
+        width: 30px;
       }
-      .wtf-quest-marker-glyph {
-        align-items: center;
-        border: 2px solid #70a800;
-        border-radius: 50%;
-        box-sizing: border-box;
-        color: #70a800;
-        display: flex;
-        filter: drop-shadow(0 0 2px #000) drop-shadow(0 0 1px #000);
-        font-family: Arial, sans-serif;
-        font-size: 13px;
-        font-weight: 900;
-        height: 18px;
-        justify-content: center;
-        line-height: 14px;
-        width: 18px;
+      .wtf-quest-marker-icon {
+        display: block;
+        height: 30px;
+        overflow: visible;
+        width: 30px;
+      }
+      .wtf-quest-marker.wtf-other-floor {
+        opacity: .2;
       }
       .wtf-quest-marker:focus-visible {
         outline: 2px solid #e5b35c;
@@ -1240,14 +1263,22 @@
   };
 
   const syncQuestRequirementsPanel = () => {
-    const quests = [...document.querySelectorAll('div.items.scroll div.no-wrap.d-flex[data-quest-uid]')]
-      .filter((row) => wtfOverlayState.questPins.has(normalizeQuestName(getCanonicalQuestName(row))))
-      .map((row) => ({
-        id: row.dataset.questUid || '',
-        name: getCanonicalQuestName(row) || 'Quest'
-      }))
-      .filter((quest) => quest.id);
+    let identityChanged = false;
+    for (const row of document.querySelectorAll('div.items.scroll div.no-wrap.d-flex[data-quest-uid]')) {
+      const name = getCanonicalQuestName(row);
+      const key = normalizeQuestName(name);
+      const id = row.dataset.questUid || '';
+      if (key && id) {
+        const previous = wtfOverlayState.questIdentityCache.get(key);
+        if (previous?.id !== id || previous?.name !== name) identityChanged = true;
+        wtfOverlayState.questIdentityCache.set(key, { id, name });
+      }
+    }
+    const quests = [...wtfOverlayState.questIdentityCache.entries()]
+      .filter(([key]) => wtfOverlayState.questPins.has(key))
+      .map(([, quest]) => quest);
     const key = quests.map((quest) => `${quest.id}:${quest.name}`).join('|');
+    if (identityChanged) renderQuestMarkers();
     if (key === wtfOverlayState.questSelectionKey) return;
     wtfOverlayState.questSelectionKey = key;
     wtfOverlayState.selectedQuests = quests;
@@ -1267,7 +1298,11 @@
     if (!row.dataset.wtfQuestNameOriginal) {
       row.dataset.wtfQuestNameOriginal = nameElement.textContent?.replace(/\s+/g, ' ').trim() || '';
     }
-    return row.dataset.wtfQuestNameOriginal;
+    const canonical = resolveCanonicalQuestName(row.dataset.wtfQuestNameOriginal);
+    if (canonical && canonical !== row.dataset.wtfQuestNameOriginal) {
+      row.dataset.wtfQuestNameOriginal = canonical;
+    }
+    return canonical;
   };
 
   const localizeNativeQuestNames = () => {
@@ -1390,6 +1425,224 @@
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase();
+
+  const buildReverseQuestNameMap = (translations) => {
+    const reverse = new Map();
+    for (const [english, localized] of Object.entries(translations || {})) {
+      const key = normalizeQuestName(localized);
+      if (!key) continue;
+      const candidates = reverse.get(key) || [];
+      if (!candidates.includes(english)) candidates.push(english);
+      reverse.set(key, candidates);
+    }
+    return reverse;
+  };
+
+  const resolveCanonicalQuestName = (value) => {
+    const source = String(value || '').replace(/\s+/g, ' ').trim();
+    if (!source) return '';
+    if (wtfOverlayState.questNameTranslations.has(source)) return source;
+
+    const bilingualMatch = source.match(/\(([^()]*)\)\s*$/);
+    const englishSuffix = bilingualMatch?.[1]?.trim() || '';
+    if (englishSuffix && wtfOverlayState.questNameTranslations.has(englishSuffix)) return englishSuffix;
+
+    const candidates = wtfOverlayState.reverseQuestNameTranslations.get(normalizeQuestName(source)) || [];
+    if (candidates.length) return candidates[0];
+    return source;
+  };
+
+  const migrateQuestPinsToCanonicalNames = () => {
+    const pinnedNames = [...wtfOverlayState.questPins.values()];
+    wtfOverlayState.questPins.clear();
+    for (const pinnedName of pinnedNames) {
+      const canonical = resolveCanonicalQuestName(pinnedName);
+      const key = normalizeQuestName(canonical);
+      if (key) wtfOverlayState.questPins.set(key, canonical);
+    }
+  };
+
+  const unwrapReactiveValue = (value) => (
+    value && typeof value === 'object' && 'value' in value ? value.value : value
+  );
+
+  const projectLiveQuestMarker = (mapSlug, x, y) => {
+    const definition = tarkovMarketMapDefinitions[String(mapSlug || '').toLowerCase()];
+    x = Number(x);
+    y = Number(y);
+    if (!definition || !Number.isFinite(x) || !Number.isFinite(y)) return null;
+    const radians = -definition.rotate * (Math.PI / 180);
+    const cosine = Math.cos(radians);
+    const sine = Math.sin(radians);
+    const rotatedX = Math.round(((x * cosine) - (y * sine)) * 10000) / 10000;
+    const rotatedY = Math.round(((x * sine) + (y * cosine)) * 10000) / 10000;
+    const mapX = Math.round((definition.xOffset - (rotatedX * definition.ratio)) * 10000) / 10000;
+    const mapY = Math.round((definition.yOffset - (rotatedY * definition.ratio)) * 10000) / 10000;
+    const left = (mapX / definition.width) * 100;
+    const top = (mapY / definition.height) * 100;
+    if (!Number.isFinite(left) || !Number.isFinite(top)
+      || left < 0 || left > 100 || top < 0 || top > 100) return null;
+    return { left, top };
+  };
+
+  const questDisplayNameFromLiveData = (quest) => String(
+    quest?.name || quest?.name_en || quest?.shortName || quest?.uid || ''
+  ).replace(/\s+/g, ' ').trim();
+
+  const liveQuestMarkerColor = (markerData) => {
+    if (markerData.storyline) return '#8598a6';
+    if (markerData.requiredForKappa) return '#70a800';
+    return '#a87b00';
+  };
+
+  const getPinnedQuestUids = () => {
+    const result = new Set();
+    for (const [key, identity] of wtfOverlayState.questIdentityCache.entries()) {
+      if (wtfOverlayState.questPins.has(key) && identity?.id) result.add(String(identity.id));
+    }
+    return result;
+  };
+
+  const createLiveQuestSnapshot = (source, mapSlug) => {
+    const allMarkers = unwrapReactiveValue(source?.allMarkers)
+      || unwrapReactiveValue(source?.state)?.allMarkers
+      || [];
+    const quests = unwrapReactiveValue(source?.quests)
+      || unwrapReactiveValue(source?.state)?.quests
+      || [];
+    if (!Array.isArray(allMarkers) || !Array.isArray(quests)) {
+      throw new Error('The live Tarkov-Market quest store returned an unexpected shape.');
+    }
+    const questsByUid = new Map(quests.map((quest) => [String(quest?.uid || ''), quest]));
+    const markers = [];
+    for (const marker of allMarkers) {
+      if (String(marker?.map || '').toLowerCase() !== mapSlug
+        || marker?.category !== 'Quests'
+        || marker?.subCategory !== 'Quest'
+        || !marker?.questUid
+        || !marker?.geometry) continue;
+      const point = projectLiveQuestMarker(mapSlug, marker.geometry.x, marker.geometry.y);
+      if (!point) continue;
+      const quest = questsByUid.get(String(marker.questUid));
+      const questName = questDisplayNameFromLiveData(quest);
+      markers.push({
+        markerUid: String(marker.uid || ''),
+        questId: String(marker.questUid),
+        quest: questName,
+        objective: String(marker.name || marker.desc || ''),
+        questStepUids: Array.isArray(marker.questStepUids) ? [...marker.questStepUids] : [],
+        left: point.left,
+        top: point.top,
+        level: marker.level === null || marker.level === undefined ? null : Number(marker.level),
+        storyline: quest?.type === 'Storyline',
+        requiredForKappa: Boolean(quest?.requiredForKappa)
+      });
+    }
+    return { map: mapSlug, markers, questCount: quests.length };
+  };
+
+  const discoverTarkovMarketQuestStore = async () => {
+    if (window.__wtfQuestLiveSource) {
+      const source = typeof window.__wtfQuestLiveSource === 'function'
+        ? await window.__wtfQuestLiveSource()
+        : window.__wtfQuestLiveSource;
+      return { source, label: 'test-live-store' };
+    }
+    const moduleUrls = [...document.querySelectorAll('script[type="module"][src]')]
+      .map((script) => script.src)
+      .filter((url) => {
+        try {
+          const parsed = new URL(url, location.href);
+          return parsed.origin === location.origin && parsed.pathname.includes('/_nuxt');
+        } catch {
+          return false;
+        }
+      });
+    const queue = [...new Set(moduleUrls)];
+    const visited = new Set();
+    while (queue.length && visited.size < 80) {
+      const moduleUrl = queue.shift();
+      if (!moduleUrl || visited.has(moduleUrl)) continue;
+      visited.add(moduleUrl);
+      const response = await fetch(moduleUrl, { credentials: 'same-origin' });
+      if (!response.ok) continue;
+      const moduleText = await response.text();
+      if (moduleText.includes('fetchAllMarkers')
+        && moduleText.includes('questsAllMarkersMap')
+        && moduleText.includes('waitForQuestsDataLoaded')) {
+        const module = await import(moduleUrl);
+        const factory = Object.values(module).find((candidate) => {
+          if (typeof candidate !== 'function') return false;
+          const source = Function.prototype.toString.call(candidate);
+          return source.includes('fetchAllMarkers')
+            && source.includes('questsAllMarkersMap')
+            && source.includes('waitForQuestsDataLoaded');
+        });
+        if (factory) {
+          const source = factory();
+          if (typeof source?.fetchQuests === 'function') await source.fetchQuests();
+          if (typeof source?.fetchAllMarkers === 'function') await source.fetchAllMarkers();
+          return { source, label: 'tarkov-market-live-store' };
+        }
+      }
+      for (const match of moduleText.matchAll(/["'](\.\/[^"']+\.js)["']/g)) {
+        const dependencyUrl = new URL(match[1], moduleUrl).href;
+        if (!visited.has(dependencyUrl) && !queue.includes(dependencyUrl)) queue.push(dependencyUrl);
+      }
+    }
+    throw new Error('Unable to locate the Tarkov-Market quest store module.');
+  };
+
+  const reportLiveQuestStatus = (status, extra = {}) => {
+    window.chrome?.webview?.postMessage(JSON.stringify({
+      action: 'quest-overlay-status',
+      status,
+      source: wtfOverlayState.liveQuestSource,
+      map: wtfOverlayState.quest.map,
+      markerCount: wtfOverlayState.quest.markers.length,
+      ...extra
+    }));
+  };
+
+  const loadLiveQuestMarkers = async () => {
+    if (wtfOverlayState.liveQuestLoadPromise) return wtfOverlayState.liveQuestLoadPromise;
+    wtfOverlayState.liveQuestLoadPromise = (async () => {
+      try {
+        const mapSlug = String(wtfOverlayState.quest.map || '').toLowerCase();
+        if (!tarkovMarketMapDefinitions[mapSlug]) {
+          wtfOverlayState.liveQuestSource = 'unsupported-map';
+          wtfOverlayState.quest.markers = [];
+          renderQuestMarkers();
+          return;
+        }
+        const discovered = wtfOverlayState.liveQuestStore
+          ? { source: wtfOverlayState.liveQuestStore, label: wtfOverlayState.liveQuestSource }
+          : await discoverTarkovMarketQuestStore();
+        wtfOverlayState.liveQuestStore = discovered.source;
+        wtfOverlayState.liveQuestSource = discovered.label;
+        const snapshot = createLiveQuestSnapshot(discovered.source, mapSlug);
+        if (!snapshot.markers.length) throw new Error(`No live quest markers were returned for ${mapSlug}.`);
+        wtfOverlayState.quest = snapshot;
+        wtfOverlayState.liveQuestError = '';
+        renderQuestMarkers();
+        reportLiveQuestStatus('ready', { questCount: snapshot.questCount });
+      } catch (error) {
+        wtfOverlayState.liveQuestError = String(error?.message || error);
+        wtfOverlayState.liveQuestSource = 'load-failed';
+        reportLiveQuestStatus('error', { error: wtfOverlayState.liveQuestError });
+        clearTimeout(wtfOverlayState.liveQuestRetryTimer);
+        wtfOverlayState.liveQuestRetryTimer = window.setTimeout(() => {
+          wtfOverlayState.liveQuestLoadPromise = null;
+          loadLiveQuestMarkers();
+        }, 2000);
+      } finally {
+        if (wtfOverlayState.liveQuestSource !== 'load-failed') {
+          wtfOverlayState.liveQuestLoadPromise = null;
+        }
+      }
+    })();
+    return wtfOverlayState.liveQuestLoadPromise;
+  };
 
   const syncNativeQuestCheckbox = (row, checkbox) => {
     const questName = getCanonicalQuestName(row);
@@ -1836,43 +2089,50 @@
     }
   };
 
+  const openNativeQuestMarkerDetails = (markerData) => {
+    if (!markerData?.questId || !markerData?.markerUid) return;
+    const url = new URL(location.href);
+    url.searchParams.set('view', String(markerData.questId));
+    url.searchParams.set('obj', String(markerData.markerUid));
+    history.pushState(history.state, '', url);
+    window.dispatchEvent(new PopStateEvent('popstate', { state: history.state }));
+    requestAnimationFrame(renderQuestMarkers);
+  };
+
+  const updateQuestMarkerFloorOpacity = () => {
+    const selectedFloor = selectedPingFloor();
+    for (const marker of document.querySelectorAll('.wtf-quest-marker')) {
+      const markerFloor = Number(marker.dataset.floor);
+      const hasFloor = marker.dataset.floor !== '' && Number.isFinite(markerFloor);
+      marker.classList.toggle('wtf-other-floor', selectedFloor !== null
+        && hasFloor && markerFloor !== selectedFloor);
+    }
+  };
+
   const renderQuestMarkers = () => {
     const overlay = wtfOverlayState.questLayer;
     if (!overlay) return;
-    closeQuestPopup();
     overlay.replaceChildren();
 
+    const pinnedQuestUids = getPinnedQuestUids();
+    const nativeQuestView = new URLSearchParams(location.search).get('view') || '';
     const markerDataList = (wtfOverlayState.quest.markers || [])
-      .filter((markerData) => wtfOverlayState.questPins.has(normalizeQuestName(markerData.quest)));
-    const collisionGroups = new Map();
-    for (const markerData of markerDataList) {
-      const key = `${Number(markerData.left).toFixed(6)}|${Number(markerData.top).toFixed(6)}`;
-      const group = collisionGroups.get(key) || [];
-      group.push(markerData);
-      collisionGroups.set(key, group);
-    }
-    const collisionOffsets = new Map();
-    for (const group of collisionGroups.values()) {
-      if (group.length < 2) continue;
-      const radius = Math.max(10, Math.min(22, 8 + group.length));
-      group.forEach((markerData, index) => {
-        const angle = (-Math.PI / 2) + ((Math.PI * 2 * index) / group.length);
-        collisionOffsets.set(markerData, {
-          x: Math.cos(angle) * radius,
-          y: Math.sin(angle) * radius
-        });
-      });
-    }
+      .filter((markerData) => markerData.questId !== nativeQuestView)
+      .filter((markerData) => pinnedQuestUids.has(String(markerData.questId))
+        || wtfOverlayState.questPins.has(normalizeQuestName(markerData.quest)));
 
     for (const markerData of markerDataList) {
       const marker = document.createElement('div');
       marker.className = 'wtf-quest-marker';
       marker.dataset.left = String(markerData.left);
       marker.dataset.top = String(markerData.top);
-      marker.dataset.elevation = String(markerData.elevation ?? '');
-      const collisionOffset = collisionOffsets.get(markerData);
-      marker.dataset.spreadX = String(collisionOffset?.x || 0);
-      marker.dataset.spreadY = String(collisionOffset?.y || 0);
+      marker.dataset.floor = markerData.level === null || markerData.level === undefined
+        ? ''
+        : String(markerData.level);
+      marker.dataset.questUid = String(markerData.questId || '');
+      marker.dataset.markerUid = String(markerData.markerUid || '');
+      marker.dataset.spreadX = '0';
+      marker.dataset.spreadY = '0';
       marker.title = [
         formatQuestName(markerData.quest),
         translateQuestStep(markerData.objective, 'objectives')
@@ -1887,21 +2147,29 @@
       marker.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();
-        openQuestPopup(markerData, marker);
+        openNativeQuestMarkerDetails(markerData);
       });
       marker.addEventListener('keydown', (event) => {
         if (event.key !== 'Enter' && event.key !== ' ') return;
         event.preventDefault();
         event.stopPropagation();
-        openQuestPopup(markerData, marker);
+        openNativeQuestMarkerDetails(markerData);
       });
-      const glyph = document.createElement('span');
-      glyph.className = 'wtf-quest-marker-glyph';
-      glyph.textContent = '!';
-      glyph.setAttribute('aria-hidden', 'true');
-      marker.appendChild(glyph);
+
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.classList.add('wtf-quest-marker-icon');
+      svg.setAttribute('viewBox', '0 0 507.885 507.885');
+      svg.setAttribute('aria-hidden', 'true');
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', tarkovMarketQuestIconPath);
+      path.setAttribute('fill', liveQuestMarkerColor(markerData));
+      path.setAttribute('stroke', '#000');
+      path.setAttribute('stroke-width', '20');
+      svg.appendChild(path);
+      marker.appendChild(svg);
       overlay.appendChild(marker);
     }
+    updateQuestMarkerFloorOpacity();
     scheduleOverlayPositionUpdate();
   };
 
@@ -1937,6 +2205,12 @@
     const layout = getLayoutOffset(mapWrap, mapContainer);
     const width = mapWrap.offsetWidth || Number.parseFloat(computed.width) || 0;
     const height = mapWrap.offsetHeight || Number.parseFloat(computed.height) || 0;
+    const currentZoom = Math.hypot(matrix.a, matrix.b);
+    const mapSlug = String(wtfOverlayState.quest.map || '').toLowerCase();
+    const baseZoom = tarkovMarketMapDefinitions[mapSlug]?.zoom || 1;
+    const nativeQuestMarkerScale = currentZoom >= baseZoom
+      ? 1
+      : Math.max(0.5, Math.sqrt(currentZoom / baseZoom));
 
     for (const marker of document.querySelectorAll('.wtf-quest-marker, .wtf-squad-marker, .wtf-ping-marker, .wtf-route-node')) {
       if (marker.parentElement !== wtfOverlayState.questLayer
@@ -1951,6 +2225,12 @@
       const spreadY = Number(marker.dataset.spreadY) || 0;
       marker.style.left = (layout.left + originX + (matrix.a * relativeX) + (matrix.c * relativeY) + matrix.e + spreadX) + 'px';
       marker.style.top = (layout.top + originY + (matrix.b * relativeX) + (matrix.d * relativeY) + matrix.f + spreadY) + 'px';
+      if (marker.classList.contains('wtf-quest-marker')) {
+        marker.style.setProperty(
+          '--wtf-quest-marker-scale',
+          String(state.iconScale * nativeQuestMarkerScale)
+        );
+      }
     }
     updateRouteLines();
     updateQuestPopupPosition();
@@ -2277,12 +2557,14 @@
     wtfOverlayState.floorEventsInstalled = true;
     document.addEventListener('change', (event) => {
       if (event.target instanceof Element && event.target.matches('.no-wrap input[name="layers"]')) {
+        requestAnimationFrame(updateQuestMarkerFloorOpacity);
         requestAnimationFrame(updatePingFloorOpacity);
         requestAnimationFrame(updateRouteFloorOpacity);
       }
     });
     document.addEventListener('click', (event) => {
       if (event.target instanceof Element && event.target.closest('.no-wrap input[name="layers"], .no-wrap label')) {
+        requestAnimationFrame(updateQuestMarkerFloorOpacity);
         requestAnimationFrame(updatePingFloorOpacity);
       }
     });
@@ -2416,7 +2698,6 @@
     addNativeQuestCheckboxes();
     syncQuestRequirementsPanel();
     ensureQuestLayer();
-    ensureQuestPopup();
     ensureNativeQuestPopupCloseButton();
     ensureSquadLayer();
     ensurePingControl();
@@ -2457,24 +2738,41 @@
     configure(snapshot = {}) {
       wtfOverlayState.quest = {
         map: String(snapshot.map || ''),
-        markers: Array.isArray(snapshot.markers) ? snapshot.markers : []
+        markers: []
       };
+      wtfOverlayState.liveQuestStore = null;
+      wtfOverlayState.liveQuestSource = 'not-loaded';
+      wtfOverlayState.liveQuestError = '';
+      clearTimeout(wtfOverlayState.liveQuestRetryTimer);
+      wtfOverlayState.liveQuestLoadPromise = null;
       installWtfOverlayStyles();
       ensureQuestLayer();
-      ensureQuestPopup();
       renderQuestMarkers();
       startWtfEnhancementObserver();
+      loadLiveQuestMarkers();
     },
     setPinnedQuests(questNames = []) {
       wtfOverlayState.questPins.clear();
       for (const questName of Array.isArray(questNames) ? questNames : []) {
-        const name = String(questName || '').trim();
+        const name = resolveCanonicalQuestName(questName);
         const key = normalizeQuestName(name);
         if (key) wtfOverlayState.questPins.set(key, name);
       }
       addNativeQuestCheckboxes();
       syncQuestRequirementsPanel();
       renderQuestMarkers();
+      loadLiveQuestMarkers();
+    },
+    debugSnapshot() {
+      return {
+        map: wtfOverlayState.quest.map,
+        source: wtfOverlayState.liveQuestSource,
+        error: wtfOverlayState.liveQuestError,
+        availableMarkers: wtfOverlayState.quest.markers.length,
+        pinnedQuests: wtfOverlayState.questPins.size,
+        pinnedQuestUids: getPinnedQuestUids().size,
+        renderedMarkers: document.querySelectorAll('.wtf-quest-marker').length
+      };
     }
   };
 
