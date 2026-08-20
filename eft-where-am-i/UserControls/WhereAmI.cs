@@ -19,7 +19,6 @@ namespace eft_where_am_i
         private AppSettings appSettings; // AppSettings 참조
         private JavaScriptExecutor jsExecutor;
         private QuestRepository questRepository;
-        private BattlePassOverlayDataService battlePassOverlayDataService;
         private QuestOverlayDataService questOverlayDataService;
         private readonly QuestTranslationService questTranslationService = new();
         private FloorManager floorManager;
@@ -121,7 +120,6 @@ namespace eft_where_am_i
                 // 3. 모든 WebView가 초기화된 후에 jsExecutor 생성
                 jsExecutor = new JavaScriptExecutor(webView2);
                 questRepository = new QuestRepository();
-                battlePassOverlayDataService = new BattlePassOverlayDataService();
                 questOverlayDataService = new QuestOverlayDataService();
                 floorManager = new FloorManager();
 
@@ -631,7 +629,6 @@ namespace eft_where_am_i
 
             if (IsLocalTerminalMap(appSettings.latest_map))
             {
-                await InjectBattlePassOverlayAsync();
                 await InjectSquadOverlayAsync();
                 await InjectPingOverlayAsync();
                 await InjectRouteOverlayAsync();
@@ -651,7 +648,6 @@ namespace eft_where_am_i
                 await RestoreQuestsAsync(appSettings.latest_map);
             }
 
-            await InjectBattlePassOverlayAsync();
             await InjectSquadOverlayAsync();
             await InjectPingOverlayAsync();
             await InjectRouteOverlayAsync();
@@ -706,30 +702,6 @@ namespace eft_where_am_i
                     : new KoreanGameLocalizationCatalog();
             string localizationJson = Newtonsoft.Json.JsonConvert.SerializeObject(localization);
             await webView2.ExecuteScriptAsync($"window.__wtfSetKoreanLocalization?.({localizationJson});");
-        }
-
-        private async Task InjectBattlePassOverlayAsync()
-        {
-            if (webView2.CoreWebView2 == null || battlePassOverlayDataService == null || appSettings == null)
-            {
-                return;
-            }
-
-            try
-            {
-                BattlePassOverlaySnapshot snapshot = battlePassOverlayDataService.GetMapSnapshot(appSettings.latest_map);
-                appSettings.battle_pass_visible_per_map ??= new Dictionary<string, bool>();
-                bool visible = appSettings.battle_pass_visible_per_map.TryGetValue(appSettings.latest_map, out bool savedVisible)
-                    && savedVisible;
-                string snapshotJson = Newtonsoft.Json.JsonConvert.SerializeObject(snapshot);
-                await webView2.ExecuteScriptAsync(
-                    $"window.__wtfBattlePassOverlay?.configure({snapshotJson}, {visible.ToString().ToLowerInvariant()});");
-                AppLogger.Info("BattlePassOverlay", $"Configured {snapshot.markers.Count} markers for {appSettings.latest_map}.");
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Warn("BattlePassOverlay", $"Unable to configure Battle Pass markers: {ex.Message}");
-            }
         }
 
         private async Task InjectQuestOverlayAsync()
@@ -1102,7 +1074,6 @@ namespace eft_where_am_i
                     await RestoreQuestsAsync(appSettings.latest_map);
                 }
 
-                await InjectBattlePassOverlayAsync();
                 await InjectSquadOverlayAsync();
                 await InjectPingOverlayAsync();
                 await InjectRouteOverlayAsync();
@@ -1221,7 +1192,6 @@ namespace eft_where_am_i
             {
                 await Task.Delay(750);
                 await ApplyEnhancementSettingsAsync();
-                await InjectBattlePassOverlayAsync();
                 await InjectSquadOverlayAsync();
                 await InjectPingOverlayAsync();
                 await InjectRouteOverlayAsync();
@@ -1240,13 +1210,12 @@ namespace eft_where_am_i
             }
             await jsExecutor.ExecuteScriptAsync(Constants.ADD_DIRECTION_INDICATORS_SCRIPT);
             await jsExecutor.ExecuteScriptAsync(Constants.DEAD_ZONE_AUTO_PAN_SCRIPT);
-            // Navigation can finish before jsExecutor and the overlay service are
+            // Navigation can finish before jsExecutor and the overlay services are
             // initialized on a fast page load. Reconfigure once more here so the
-            // initial map never misses its Battle Pass or squad overlays.
+            // initial map never misses its quest or squad overlays.
             await ApplyEnhancementSettingsAsync();
             await InjectQuestOverlayAsync();
             await RestoreQuestsAsync(appSettings.latest_map);
-            await InjectBattlePassOverlayAsync();
             await InjectSquadOverlayAsync();
             await InjectPingOverlayAsync();
             await InjectRouteOverlayAsync();
@@ -1489,13 +1458,6 @@ namespace eft_where_am_i
                             else
                                 questRepository.RemoveQuest(appSettings.latest_map, questName);
                         }
-                        break;
-
-                    case "battle-pass-toggle":
-                        bool battlePassVisible = message["checked"]?.Value<bool>() ?? false;
-                        appSettings.battle_pass_visible_per_map ??= new Dictionary<string, bool>();
-                        appSettings.battle_pass_visible_per_map[appSettings.latest_map] = battlePassVisible;
-                        SaveSettings();
                         break;
 
                     case "map-ping-add":

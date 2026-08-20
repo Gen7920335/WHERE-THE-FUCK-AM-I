@@ -635,7 +635,7 @@
   };
 
   viewport.addEventListener('pointerdown', (event) => {
-    if (event.button !== 0 || event.target.closest('button, input, label, a, .panel_top, .terminal-side-panel, .terminal-right-panel, .map-popup, .wtf-battle-pass-marker')) return;
+    if (event.button !== 0 || event.target.closest('button, input, label, a, .panel_top, .terminal-side-panel, .terminal-right-panel, .map-popup')) return;
     view.dragging = true;
     view.pointerId = event.pointerId;
     view.lastX = event.clientX;

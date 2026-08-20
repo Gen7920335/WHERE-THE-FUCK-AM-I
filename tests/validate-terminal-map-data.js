@@ -60,12 +60,8 @@ assert(questFilter?.title === 'Quest', 'Left-panel quest filter must use the gen
 assert(questFilter?.detailTitle === 'The Ticket', 'Right-panel quest list must use the quest name.');
 assert(pageScript.includes('const setQuestSelected ='), 'Quest selection must be independent from left-panel visibility.');
 const enhancementScript = fs.readFileSync(path.join(htmlRoot, 'enhancements.js'), 'utf8');
-assert(enhancementScript.includes('ensureTerminalBattlePassControl'), 'Terminal Loot needs its native-style Battle Pass control integration.');
-assert(
-  enhancementScript.includes('nativeBattlePassTitle')
-    && enhancementScript.includes('usingNativeBattlePassGroup'),
-  'Maps without a Loot section must host the WTFMI document toggle in their native BattlePass group.'
-);
+assert(!/wtf-battle-pass|__wtfBattlePassOverlay|native-battle-pass-hidden/i.test(enhancementScript),
+  'Terminal must not restore the removed custom Battle Pass overlay.');
 assert(
   pageScript.includes(".terminal-side-panel, .terminal-right-panel, .panel_top"),
   'Panel interactions must not bubble into the map-background popup closer.'

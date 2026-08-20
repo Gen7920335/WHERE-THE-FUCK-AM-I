@@ -134,11 +134,6 @@
           pointer-events: none !important;
           visibility: hidden !important;
         }
-        [data-wtf-native-battle-pass-hidden="true"] {
-          display: none !important;
-          pointer-events: none !important;
-          visibility: hidden !important;
-        }
       `;
       (document.head || root).appendChild(style);
     }
@@ -177,12 +172,6 @@
     questLayer: null,
     questPopup: null,
     questPopupMarker: null,
-    battlePass: { map: '', markers: [] },
-    battlePassVisible: false,
-    battlePassLayer: null,
-    battlePassPopup: null,
-    battlePassPopupMarker: null,
-    battlePassPhotoIndex: 0,
     floorEventsInstalled: false,
     squad: { map: '', members: [] },
     squadLayer: null,
@@ -678,112 +667,8 @@
         top: -10000px;
         width: 1px;
       }
-      #wtf-battle-pass-control {
-        cursor: pointer;
-        user-select: none;
-      }
       .map-popup {
         opacity: var(--wtf-popup-opacity, 1) !important;
-      }
-      .wtf-battle-pass-icon-wrap {
-        align-items: center;
-        display: inline-flex !important;
-        height: 20px;
-        justify-content: center;
-        width: 20px;
-      }
-      .wtf-battle-pass-icon-wrap .wtf-blue-cross {
-        height: 13px;
-        width: 13px;
-      }
-      .wtf-battle-pass-icon-wrap .wtf-blue-cross::before {
-        height: 13px;
-        left: 5px;
-        width: 3px;
-      }
-      .wtf-battle-pass-icon-wrap .wtf-blue-cross::after {
-        height: 3px;
-        top: 5px;
-        width: 13px;
-      }
-      .wtf-blue-cross {
-        display: inline-block;
-        flex: 0 0 auto;
-        height: 14px;
-        position: relative;
-        width: 14px;
-        filter:
-          drop-shadow(1px 0 0 #fff)
-          drop-shadow(-1px 0 0 #fff)
-          drop-shadow(0 1px 0 #fff)
-          drop-shadow(0 -1px 0 #fff);
-      }
-      .wtf-blue-cross::before,
-      .wtf-blue-cross::after {
-        background: #075fd1;
-        border-radius: 1px;
-        content: '';
-        position: absolute;
-      }
-      .wtf-blue-cross::before {
-        height: 14px;
-        left: 5px;
-        top: 0;
-        width: 4px;
-      }
-      .wtf-blue-cross::after {
-        height: 4px;
-        left: 0;
-        top: 5px;
-        width: 14px;
-      }
-      .wtf-battle-pass-marker.wtf-coordinate-uncertain .wtf-blue-cross::before,
-      .wtf-battle-pass-marker.wtf-coordinate-uncertain .wtf-blue-cross::after {
-        background: #7b3fc6;
-      }
-      #wtf-battle-pass-layer {
-        inset: 0;
-        overflow: hidden;
-        pointer-events: none !important;
-        position: absolute;
-        z-index: 6;
-      }
-      #wtf-battle-pass-layer[hidden],
-      .wtf-battle-pass-marker[hidden] {
-        display: none !important;
-        visibility: hidden !important;
-        pointer-events: none !important;
-      }
-      .wtf-battle-pass-marker {
-        cursor: pointer;
-        height: 14px;
-        left: 0;
-        pointer-events: auto !important;
-        position: absolute;
-        top: 0;
-        transform: translate(-50%, -50%) scale(var(--wtf-icon-scale, 1));
-        transform-origin: center;
-        user-select: none;
-        width: 14px;
-      }
-      .wtf-battle-pass-marker.wtf-other-floor {
-        opacity: 0.35;
-      }
-      .wtf-battle-pass-marker:focus-visible {
-        outline: 2px solid #e5b35c;
-        outline-offset: 4px;
-      }
-      .wtf-battle-pass-popup.map-popup {
-        box-sizing: border-box;
-        margin: 0;
-        pointer-events: auto;
-        position: absolute;
-        transform: translateX(calc(-50% - 10px)) translateY(calc(-100% - 24px));
-        transform-origin: calc(50% + 10px) calc(100% + 24px);
-        z-index: 30;
-      }
-      .wtf-battle-pass-popup[hidden] {
-        display: none !important;
       }
       .wtf-popup-close {
         align-items: center;
@@ -807,95 +692,8 @@
       .wtf-popup-close:focus-visible {
         color: #e5b35c !important;
       }
-      .map-popup:not(.wtf-battle-pass-popup):not(.wtf-quest-popup) .large.pointer.text-right {
+      .map-popup:not(.wtf-quest-popup) .large.pointer.text-right {
         display: none !important;
-      }
-      .wtf-battle-pass-title {
-        padding-right: 4px;
-      }
-      .wtf-battle-pass-details {
-        white-space: normal;
-      }
-      .wtf-battle-pass-location {
-        color: #d7d0c4;
-        margin-top: 6px;
-        white-space: normal;
-      }
-      .wtf-battle-pass-location-label,
-      .wtf-battle-pass-certainty {
-        color: #a49d90;
-      }
-      .wtf-battle-pass-certainty {
-        font-size: 11px;
-        margin-top: 5px;
-      }
-      .wtf-battle-pass-certainty.wtf-coordinate-certain {
-        color: #4e91ec;
-      }
-      .wtf-battle-pass-certainty.wtf-coordinate-uncertain {
-        color: #a574e8;
-      }
-      .wtf-battle-pass-photo-frame {
-        background: #111;
-        margin-top: 10px;
-        min-height: 180px;
-        overflow: hidden;
-        position: relative;
-      }
-      .wtf-battle-pass-photo {
-        display: block;
-        height: auto;
-        max-height: min(52vh, 520px);
-        object-fit: contain;
-        width: 100%;
-      }
-      .wtf-battle-pass-photo-nav {
-        display: flex;
-        inset: 0;
-        justify-content: space-between;
-        pointer-events: none;
-        position: absolute;
-      }
-      .wtf-battle-pass-photo-nav button {
-        background: linear-gradient(90deg, rgba(0, 0, 0, .72), transparent) !important;
-        border: 0 !important;
-        color: #e5b35c !important;
-        cursor: pointer;
-        font-size: 28px !important;
-        min-width: 42px !important;
-        opacity: .75;
-        padding: 0 8px !important;
-        pointer-events: auto;
-      }
-      .wtf-battle-pass-photo-nav button:last-child {
-        background: linear-gradient(270deg, rgba(0, 0, 0, .72), transparent) !important;
-      }
-      .wtf-battle-pass-photo-nav button:hover {
-        opacity: 1;
-      }
-      .wtf-battle-pass-photo-meta {
-        align-items: center;
-        display: flex;
-        gap: 8px;
-        justify-content: space-between;
-        padding-top: 6px;
-      }
-      .wtf-battle-pass-photo-source {
-        color: #a49d90 !important;
-        font-size: 11px;
-        text-decoration: none;
-      }
-      .wtf-battle-pass-photo-source:hover {
-        color: #e5b35c !important;
-      }
-      .wtf-battle-pass-photo-empty {
-        align-items: center;
-        color: #a49d90;
-        display: flex;
-        justify-content: center;
-        min-height: 180px;
-        padding: 20px;
-        text-align: center;
       }
       #wtf-squad-layer {
         inset: 0;
@@ -1671,144 +1469,6 @@
     }
   };
 
-  const ensureTerminalBattlePassControl = (lootItems) => {
-    let control = document.getElementById('wtf-battle-pass-control');
-    if (!control || control.parentElement !== lootItems || control.tagName !== 'DIV') {
-      control?.remove();
-      control = document.createElement('div');
-      control.id = 'wtf-battle-pass-control';
-      control.className = 'terminal-filter-row';
-      control.tabIndex = 0;
-      control.setAttribute('role', 'checkbox');
-      control.title = 'Toggle Battle Pass document spawns';
-
-      const toggle = (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        setBattlePassVisible(!wtfOverlayState.battlePassVisible, true);
-      };
-      control.addEventListener('click', toggle);
-      control.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' || event.key === ' ') toggle(event);
-      });
-
-      const main = document.createElement('span');
-      main.className = 'terminal-filter-main';
-      const iconWrap = document.createElement('span');
-      iconWrap.className = 'terminal-filter-icon wtf-battle-pass-icon-wrap';
-      const icon = document.createElement('span');
-      icon.className = 'wtf-blue-cross';
-      icon.setAttribute('aria-hidden', 'true');
-      iconWrap.appendChild(icon);
-      const name = document.createElement('span');
-      name.className = 'terminal-filter-name';
-      name.textContent = 'Battle Pass';
-      main.append(iconWrap, name);
-
-      const count = document.createElement('span');
-      count.className = 'terminal-filter-count';
-      count.dataset.wtfBattlePassCount = '';
-      control.append(main, count);
-      lootItems.appendChild(control);
-    }
-
-    const count = control.querySelector('[data-wtf-battle-pass-count]');
-    const countText = String(wtfOverlayState.battlePass.markers?.length || 0);
-    if (count && count.textContent !== countText) count.textContent = countText;
-    if (control !== lootItems.lastElementChild) lootItems.appendChild(control);
-    control.classList.toggle('selected', wtfOverlayState.battlePassVisible);
-    control.classList.toggle('active', wtfOverlayState.battlePassVisible);
-    control.classList.toggle('inactive', !wtfOverlayState.battlePassVisible);
-    control.setAttribute('aria-checked', wtfOverlayState.battlePassVisible ? 'true' : 'false');
-  };
-
-  const ensureBattlePassControl = () => {
-    const leftPanel = document.querySelector('.panel_left');
-    if (!leftPanel) return;
-
-    const terminalLootItems = leftPanel.querySelector('.terminal-filter-section[data-section="loot"] .terminal-filter-items');
-    if (terminalLootItems) {
-      ensureTerminalBattlePassControl(terminalLootItems);
-      return;
-    }
-
-    const groupTitles = [...leftPanel.querySelectorAll('.two-columns > .mb-5 > div:first-child > .bold')];
-    const lootTitle = groupTitles
-      .find((element) => element.textContent.trim().toLowerCase() === 'loot');
-    const nativeBattlePassTitle = groupTitles
-      .find((element) => /^battle\s*pass$/i.test(element.textContent.trim()));
-    const hostTitle = lootTitle || nativeBattlePassTitle;
-    const lootItems = hostTitle?.parentElement?.nextElementSibling;
-    if (!lootItems?.classList.contains('items')) return;
-
-    const usingNativeBattlePassGroup = !lootTitle && Boolean(nativeBattlePassTitle);
-    for (const row of leftPanel.querySelectorAll('[data-wtf-native-battle-pass-hidden="true"]')) {
-      row.removeAttribute('data-wtf-native-battle-pass-hidden');
-    }
-    if (usingNativeBattlePassGroup) {
-      for (const row of lootItems.children) {
-        if (row.id !== 'wtf-battle-pass-control') {
-          row.setAttribute('data-wtf-native-battle-pass-hidden', 'true');
-        }
-      }
-    }
-
-    const scopeAttributes = [...((lootItems.firstElementChild || hostTitle).attributes || [])]
-      .filter((attribute) => attribute.name.startsWith('data-v-'))
-      .map((attribute) => attribute.name);
-    const applyScope = (element) => {
-      for (const attribute of scopeAttributes) element.setAttribute(attribute, '');
-      return element;
-    };
-
-    let control = document.getElementById('wtf-battle-pass-control');
-    if (!control || control.parentElement !== lootItems || control.tagName !== 'DIV') {
-      control?.remove();
-      control = applyScope(document.createElement('div'));
-      control.id = 'wtf-battle-pass-control';
-      control.className = 'd-flex h-space-between mb-5 no-wrap inactive';
-      control.tabIndex = 0;
-      control.setAttribute('role', 'checkbox');
-      control.title = 'Toggle Battle Pass document spawns';
-
-      const toggle = (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        setBattlePassVisible(!wtfOverlayState.battlePassVisible, true);
-      };
-      control.addEventListener('click', toggle);
-      control.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' || event.key === ' ') toggle(event);
-      });
-
-      const label = applyScope(document.createElement('span'));
-      label.className = 'd-flex';
-      const iconWrap = applyScope(document.createElement('div'));
-      iconWrap.className = 'fs-0 wtf-battle-pass-icon-wrap';
-      const icon = document.createElement('span');
-      icon.className = 'wtf-blue-cross';
-      icon.setAttribute('aria-hidden', 'true');
-      iconWrap.appendChild(icon);
-      label.append(iconWrap, document.createTextNode(usingNativeBattlePassGroup ? ' All documents' : ' Battle Pass'));
-
-      const count = applyScope(document.createElement('span'));
-      count.className = 'sub alt';
-      count.dataset.wtfBattlePassCount = '';
-      count.textContent = String(wtfOverlayState.battlePass.markers?.length || 0);
-
-      control.append(label, document.createTextNode('\u00a0 '), count);
-      lootItems.appendChild(control);
-    } else {
-      const count = control.querySelector('[data-wtf-battle-pass-count]');
-      const countText = String(wtfOverlayState.battlePass.markers?.length || 0);
-      if (count && count.textContent !== countText) count.textContent = countText;
-      if (control !== lootItems.lastElementChild) lootItems.appendChild(control);
-    }
-    control.classList.toggle('active', wtfOverlayState.battlePassVisible);
-    control.classList.toggle('inactive', !wtfOverlayState.battlePassVisible);
-    control.setAttribute('aria-checked', wtfOverlayState.battlePassVisible ? 'true' : 'false');
-  };
-
   const pingCopy = (english, korean) => state.language.startsWith('ko') ? korean : english;
 
   const setPingsVisible = (visible, notifyHost) => {
@@ -2155,183 +1815,8 @@
     renderQuestPopup(markerData);
   };
 
-  const closeBattlePassPopup = () => {
-    if (wtfOverlayState.battlePassPopup) {
-      wtfOverlayState.battlePassPopup.hidden = true;
-      wtfOverlayState.battlePassPopup.replaceChildren();
-    }
-    wtfOverlayState.battlePassPopupMarker = null;
-    wtfOverlayState.battlePassPhotoIndex = 0;
-  };
-
-  const updateBattlePassPopupPosition = () => {
-    const popup = wtfOverlayState.battlePassPopup;
-    const marker = wtfOverlayState.battlePassPopupMarker;
-    if (!popup?.isConnected || popup.hidden || !marker?.isConnected) return;
-    popup.style.left = marker.style.left;
-    popup.style.top = marker.style.top;
-  };
-
-  const createBattlePassPhotoView = (markerData) => {
-    const photos = Array.isArray(markerData.photos) ? markerData.photos : [];
-    const frame = applyNativePopupScope(document.createElement('div'));
-    frame.className = 'wtf-battle-pass-photo-frame';
-
-    if (!photos.length) {
-      const empty = applyNativePopupScope(document.createElement('div'));
-      empty.className = 'wtf-battle-pass-photo-empty';
-      empty.textContent = state.language === 'ko'
-        ? '이 지점에 직접 연결된 검증 사진이 아직 없습니다.'
-        : 'No verified photo is linked to this spawn yet.';
-      frame.appendChild(empty);
-      return frame;
-    }
-
-    const photoIndex = Math.min(Math.max(0, wtfOverlayState.battlePassPhotoIndex), photos.length - 1);
-    wtfOverlayState.battlePassPhotoIndex = photoIndex;
-    const photoData = photos[photoIndex] || {};
-    const image = applyNativePopupScope(document.createElement('img'));
-    image.className = 'wtf-battle-pass-photo';
-    image.src = String(photoData.url || '');
-    image.alt = String(photoData.caption || markerData.title || 'Battle Pass spawn');
-    image.addEventListener('error', () => {
-      image.hidden = true;
-      const error = applyNativePopupScope(document.createElement('div'));
-      error.className = 'wtf-battle-pass-photo-empty';
-      error.textContent = state.language === 'ko'
-        ? '사진을 불러오지 못했습니다.'
-        : 'The photo could not be loaded.';
-      frame.appendChild(error);
-    }, { once: true });
-    frame.appendChild(image);
-
-    if (photos.length > 1) {
-      const nav = applyNativePopupScope(document.createElement('div'));
-      nav.className = 'wtf-battle-pass-photo-nav';
-      const previous = applyNativePopupScope(document.createElement('button'));
-      previous.type = 'button';
-      previous.textContent = '‹';
-      previous.title = state.language === 'ko' ? '이전 사진' : 'Previous photo';
-      previous.addEventListener('click', (event) => {
-        event.stopPropagation();
-        wtfOverlayState.battlePassPhotoIndex = (photoIndex - 1 + photos.length) % photos.length;
-        renderBattlePassPopup(markerData);
-      });
-      const next = applyNativePopupScope(document.createElement('button'));
-      next.type = 'button';
-      next.textContent = '›';
-      next.title = state.language === 'ko' ? '다음 사진' : 'Next photo';
-      next.addEventListener('click', (event) => {
-        event.stopPropagation();
-        wtfOverlayState.battlePassPhotoIndex = (photoIndex + 1) % photos.length;
-        renderBattlePassPopup(markerData);
-      });
-      nav.append(previous, next);
-      frame.appendChild(nav);
-    }
-    return frame;
-  };
-
-  const renderBattlePassPopup = (markerData) => {
-    const popup = wtfOverlayState.battlePassPopup;
-    if (!popup) return;
-    popup.replaceChildren();
-
-    const inner = applyNativePopupScope(document.createElement('div'));
-    inner.className = 'inner';
-    const header = applyNativePopupScope(document.createElement('div'));
-    header.className = 'd-flex h-space-between v-start';
-    const titleWrap = applyNativePopupScope(document.createElement('div'));
-    titleWrap.className = 'w-100';
-    const title = applyNativePopupScope(document.createElement('div'));
-    title.className = 'title wtf-battle-pass-title';
-    title.textContent = String(markerData.title || 'Battle Pass document');
-    titleWrap.appendChild(title);
-
-    const close = applyNativePopupScope(document.createElement('button'));
-    close.type = 'button';
-    close.className = 'wtf-popup-close';
-    close.textContent = '×';
-    close.title = state.language === 'ko' ? '닫기' : 'Close';
-    close.setAttribute('aria-label', close.title);
-    close.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      closeBattlePassPopup();
-    });
-    header.append(titleWrap, close);
-
-    const details = applyNativePopupScope(document.createElement('div'));
-    details.className = 'wtf-battle-pass-details';
-    details.textContent = String(markerData.details || '');
-    const location = applyNativePopupScope(document.createElement('div'));
-    location.className = 'wtf-battle-pass-location';
-    const locationLabel = applyNativePopupScope(document.createElement('span'));
-    locationLabel.className = 'wtf-battle-pass-location-label';
-    locationLabel.textContent = state.language === 'ko'
-      ? '\uC704\uCE58 \uC124\uBA85: '
-      : 'Location: ';
-    location.append(locationLabel, String(markerData.locationDescription || ''));
-
-    const certainty = applyNativePopupScope(document.createElement('div'));
-    const coordinateCertain = Boolean(markerData.coordinateCertain);
-    certainty.className = 'wtf-battle-pass-certainty ' + (coordinateCertain
-      ? 'wtf-coordinate-certain'
-      : 'wtf-coordinate-uncertain');
-    certainty.textContent = state.language === 'ko'
-      ? (coordinateCertain ? '\uC88C\uD45C \uD655\uC2E4' : '\uC88C\uD45C \uBD88\uD655\uC2E4')
-      : (coordinateCertain ? 'Coordinate verified' : 'Coordinate uncertain');
-    inner.append(header, location, certainty, details, createBattlePassPhotoView(markerData));
-
-    const photos = Array.isArray(markerData.photos) ? markerData.photos : [];
-    const meta = applyNativePopupScope(document.createElement('div'));
-    meta.className = 'wtf-battle-pass-photo-meta';
-    const counter = applyNativePopupScope(document.createElement('span'));
-    counter.className = 'sub alt';
-    counter.textContent = photos.length
-      ? `${wtfOverlayState.battlePassPhotoIndex + 1} / ${photos.length}`
-      : '0 / 0';
-    const source = applyNativePopupScope(document.createElement('a'));
-    source.className = 'wtf-battle-pass-photo-source';
-    source.href = String(markerData.photoSourceUrl || 'https://github.com/Perofunyang/battlepass_interactive_map');
-    source.target = '_blank';
-    source.rel = 'noopener noreferrer';
-    source.textContent = state.language === 'ko' ? '사진 출처' : 'Photo source';
-    meta.append(counter, source);
-    inner.appendChild(meta);
-    popup.appendChild(inner);
-    popup.hidden = false;
-    updateBattlePassPopupPosition();
-  };
-
-  const ensureBattlePassPopup = () => {
-    const mapContainer = document.querySelector('.map-cont');
-    if (!mapContainer) return null;
-    let popup = wtfOverlayState.battlePassPopup;
-    if (!popup?.isConnected || popup.parentElement !== mapContainer) {
-      popup?.remove();
-      popup = applyNativePopupScope(document.createElement('div'));
-      popup.className = 'map-popup wtf-battle-pass-popup';
-      popup.hidden = true;
-      popup.setAttribute('role', 'dialog');
-      popup.addEventListener('pointerdown', (event) => event.stopPropagation());
-      popup.addEventListener('mousedown', (event) => event.stopPropagation());
-      popup.addEventListener('click', (event) => event.stopPropagation());
-      mapContainer.appendChild(popup);
-      wtfOverlayState.battlePassPopup = popup;
-    }
-    return popup;
-  };
-
-  const openBattlePassPopup = (markerData, marker) => {
-    ensureBattlePassPopup();
-    wtfOverlayState.battlePassPopupMarker = marker;
-    wtfOverlayState.battlePassPhotoIndex = 0;
-    renderBattlePassPopup(markerData);
-  };
-
   const ensureNativeQuestPopupCloseButton = () => {
-    for (const popup of document.querySelectorAll('.map-popup:not(.wtf-battle-pass-popup):not(.wtf-quest-popup)')) {
+    for (const popup of document.querySelectorAll('.map-popup:not(.wtf-quest-popup)')) {
       const nativeSizeToggle = popup.querySelector('.large.pointer.text-right');
       nativeSizeToggle?.setAttribute('aria-hidden', 'true');
       const controls = nativeSizeToggle?.parentElement || popup.querySelector('.ml-15.self-start');
@@ -2417,7 +1902,7 @@
       marker.appendChild(glyph);
       overlay.appendChild(marker);
     }
-    scheduleBattlePassPositionUpdate();
+    scheduleOverlayPositionUpdate();
   };
 
   const ensureQuestLayer = () => {
@@ -2437,12 +1922,11 @@
     return true;
   };
 
-  const updateBattlePassPositions = () => {
+  const updateOverlayPositions = () => {
     wtfOverlayState.updateFrame = 0;
-    const overlay = wtfOverlayState.battlePassLayer;
     const mapWrap = wtfOverlayState.mapWrap;
-    const mapContainer = overlay?.parentElement;
-    if (!overlay?.isConnected || !mapWrap?.isConnected || !mapContainer) return;
+    const mapContainer = mapWrap?.closest('.map-cont');
+    if (!mapWrap?.isConnected || !mapContainer) return;
 
     const computed = getComputedStyle(mapWrap);
     const matrix = parseMapTransform(computed.transform);
@@ -2454,9 +1938,8 @@
     const width = mapWrap.offsetWidth || Number.parseFloat(computed.width) || 0;
     const height = mapWrap.offsetHeight || Number.parseFloat(computed.height) || 0;
 
-    for (const marker of document.querySelectorAll('.wtf-quest-marker, .wtf-battle-pass-marker, .wtf-squad-marker, .wtf-ping-marker, .wtf-route-node')) {
+    for (const marker of document.querySelectorAll('.wtf-quest-marker, .wtf-squad-marker, .wtf-ping-marker, .wtf-route-node')) {
       if (marker.parentElement !== wtfOverlayState.questLayer
-          && marker.parentElement !== overlay
           && marker.parentElement !== wtfOverlayState.squadLayer
           && marker.parentElement !== wtfOverlayState.pingLayer
           && marker.parentElement !== wtfOverlayState.routeLayer) continue;
@@ -2471,12 +1954,11 @@
     }
     updateRouteLines();
     updateQuestPopupPosition();
-    updateBattlePassPopupPosition();
   };
 
-  const scheduleBattlePassPositionUpdate = () => {
+  const scheduleOverlayPositionUpdate = () => {
     if (wtfOverlayState.updateFrame) return;
-    wtfOverlayState.updateFrame = requestAnimationFrame(updateBattlePassPositions);
+    wtfOverlayState.updateFrame = requestAnimationFrame(updateOverlayPositions);
   };
 
   const mapPercentFromClientPoint = (mapContainer, mapWrap, clientX, clientY) => {
@@ -2563,7 +2045,7 @@
     updatePingFloorOpacity();
     ensurePingControl();
     ensureClearPingsButton();
-    scheduleBattlePassPositionUpdate();
+    scheduleOverlayPositionUpdate();
   };
 
   const installPingPlacement = (mapContainer, mapWrap) => {
@@ -2573,7 +2055,7 @@
     }
     const handler = (event) => {
       if (!event.altKey || event.button !== 0
-          || event.target.closest('.panel_top, .panel_left, .panel_right, button, input, label, a, .map-popup, .wtf-quest-marker, .wtf-battle-pass-marker')) return;
+          || event.target.closest('.panel_top, .panel_left, .panel_right, button, input, label, a, .map-popup, .wtf-quest-marker')) return;
       const nearbyPing = nearestOverlayMarker('.wtf-ping-marker[data-owned="true"]', event.clientX, event.clientY);
       if (nearbyPing?.dataset.id) {
         event.preventDefault();
@@ -2702,7 +2184,7 @@
       layer.appendChild(marker);
     }
     ensureRouteControl();
-    scheduleBattlePassPositionUpdate();
+    scheduleOverlayPositionUpdate();
   };
 
   const installRoutePlacement = (mapContainer, mapWrap) => {
@@ -2713,7 +2195,7 @@
     }
     const isInteractiveUi = target => target.closest(
       '.panel_top, .panel_left, .panel_right, button, input, label, a, .map-popup, '
-      + '.wtf-quest-marker, .wtf-battle-pass-marker, .wtf-ping-marker'
+      + '.wtf-quest-marker, .wtf-ping-marker'
     );
     const handler = event => {
       if (event.button !== 1 || isInteractiveUi(event.target)) return;
@@ -2790,33 +2272,17 @@
     return shortMatch ? Number(shortMatch[1]) : null;
   };
 
-  const updateBattlePassFloorOpacity = () => {
-    const floorInputs = Array.from(document.querySelectorAll('.no-wrap input[name="layers"]'));
-    const selectedInput = floorInputs.find((input) => input.checked || input.getAttribute('aria-checked') === 'true');
-    const selectedFloor = floorInputs.length > 1 ? readFloorLevel(selectedInput) : null;
-
-    for (const marker of document.querySelectorAll('.wtf-battle-pass-marker')) {
-      const markerFloor = Number(marker.dataset.floor);
-      const isOtherFloor = selectedFloor !== null
-        && Number.isFinite(markerFloor)
-        && markerFloor !== selectedFloor;
-      marker.classList.toggle('wtf-other-floor', isOtherFloor);
-    }
-  };
-
   const installFloorEvents = () => {
     if (wtfOverlayState.floorEventsInstalled) return;
     wtfOverlayState.floorEventsInstalled = true;
     document.addEventListener('change', (event) => {
       if (event.target instanceof Element && event.target.matches('.no-wrap input[name="layers"]')) {
-        requestAnimationFrame(updateBattlePassFloorOpacity);
         requestAnimationFrame(updatePingFloorOpacity);
         requestAnimationFrame(updateRouteFloorOpacity);
       }
     });
     document.addEventListener('click', (event) => {
       if (event.target instanceof Element && event.target.closest('.no-wrap input[name="layers"], .no-wrap label')) {
-        requestAnimationFrame(updateBattlePassFloorOpacity);
         requestAnimationFrame(updatePingFloorOpacity);
       }
     });
@@ -2827,111 +2293,17 @@
     wtfOverlayState.mapObserver?.disconnect();
     wtfOverlayState.resizeObserver?.disconnect();
     wtfOverlayState.mapWrap = mapWrap;
-    wtfOverlayState.mapObserver = new MutationObserver(scheduleBattlePassPositionUpdate);
+    wtfOverlayState.mapObserver = new MutationObserver(scheduleOverlayPositionUpdate);
     wtfOverlayState.mapObserver.observe(mapWrap, {
       attributes: true,
       attributeFilter: ['style', 'class']
     });
     if (window.ResizeObserver) {
-      wtfOverlayState.resizeObserver = new ResizeObserver(scheduleBattlePassPositionUpdate);
+      wtfOverlayState.resizeObserver = new ResizeObserver(scheduleOverlayPositionUpdate);
       wtfOverlayState.resizeObserver.observe(mapContainer);
       wtfOverlayState.resizeObserver.observe(mapWrap);
     }
-    scheduleBattlePassPositionUpdate();
-  };
-
-  const renderBattlePassMarkers = () => {
-    const overlay = wtfOverlayState.battlePassLayer;
-    if (!overlay) return;
-    closeBattlePassPopup();
-    overlay.replaceChildren();
-    overlay.hidden = !wtfOverlayState.battlePassVisible;
-
-    const markerDataList = wtfOverlayState.battlePass.markers || [];
-    const collisionGroups = new Map();
-    for (const markerData of markerDataList) {
-      const key = `${Number(markerData.left).toFixed(6)}|${Number(markerData.top).toFixed(6)}|${markerData.floor ?? ''}`;
-      const group = collisionGroups.get(key) || [];
-      group.push(markerData);
-      collisionGroups.set(key, group);
-    }
-    const collisionOffsets = new Map();
-    for (const group of collisionGroups.values()) {
-      if (group.length < 2) continue;
-      const radius = Math.max(9, Math.min(16, 7 + group.length));
-      group.forEach((markerData, index) => {
-        const angle = (-Math.PI / 2) + ((Math.PI * 2 * index) / group.length);
-        collisionOffsets.set(markerData, {
-          x: Math.cos(angle) * radius,
-          y: Math.sin(angle) * radius
-        });
-      });
-    }
-
-    for (const markerData of markerDataList) {
-      const marker = document.createElement('div');
-      const coordinateCertain = Boolean(markerData.coordinateCertain);
-      marker.className = 'wtf-battle-pass-marker ' + (coordinateCertain
-        ? 'wtf-coordinate-certain'
-        : 'wtf-coordinate-uncertain');
-      marker.dataset.left = String(markerData.left);
-      marker.dataset.top = String(markerData.top);
-      marker.dataset.elevation = String(markerData.elevation ?? '');
-      marker.dataset.floor = String(markerData.floor ?? '');
-      const collisionOffset = collisionOffsets.get(markerData);
-      marker.dataset.spreadX = String(collisionOffset?.x || 0);
-      marker.dataset.spreadY = String(collisionOffset?.y || 0);
-      marker.title = [markerData.title, markerData.locationDescription, markerData.details]
-        .filter(Boolean)
-        .join(' · ');
-      marker.setAttribute('role', 'button');
-      marker.setAttribute('aria-label', marker.title);
-      marker.tabIndex = 0;
-      const stopMarkerEvent = (event) => event.stopPropagation();
-      marker.addEventListener('pointerdown', stopMarkerEvent);
-      marker.addEventListener('mousedown', stopMarkerEvent);
-      marker.addEventListener('dblclick', stopMarkerEvent);
-      marker.addEventListener('click', (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        openBattlePassPopup(markerData, marker);
-      });
-      marker.addEventListener('keydown', (event) => {
-        if (event.key !== 'Enter' && event.key !== ' ') return;
-        event.preventDefault();
-        event.stopPropagation();
-        openBattlePassPopup(markerData, marker);
-      });
-
-      const cross = document.createElement('span');
-      cross.className = 'wtf-blue-cross';
-      cross.setAttribute('aria-hidden', 'true');
-      marker.appendChild(cross);
-      overlay.appendChild(marker);
-    }
-    updateBattlePassFloorOpacity();
-    scheduleBattlePassPositionUpdate();
-  };
-
-  const ensureBattlePassLayer = () => {
-    const mapContainer = document.querySelector('.map-cont');
-    const mapWrap = mapContainer?.querySelector('.map-wrap');
-    if (!mapContainer || !mapWrap) return false;
-
-    let created = false;
-    if (!wtfOverlayState.battlePassLayer?.isConnected || wtfOverlayState.battlePassLayer.parentElement !== mapContainer) {
-      wtfOverlayState.battlePassLayer?.remove();
-      const overlay = document.createElement('div');
-      overlay.id = 'wtf-battle-pass-layer';
-      overlay.setAttribute('aria-hidden', 'true');
-      mapContainer.appendChild(overlay);
-      wtfOverlayState.battlePassLayer = overlay;
-      created = true;
-    }
-
-    observeMapTransform(mapContainer, mapWrap);
-    if (created) renderBattlePassMarkers();
-    return true;
+    scheduleOverlayPositionUpdate();
   };
 
   const renderSquadMarkers = () => {
@@ -2963,7 +2335,7 @@
       marker.append(direction, label);
       overlay.appendChild(marker);
     }
-    scheduleBattlePassPositionUpdate();
+    scheduleOverlayPositionUpdate();
   };
 
   const ensureSquadLayer = () => {
@@ -2981,27 +2353,6 @@
     }
     observeMapTransform(mapContainer, mapWrap);
     return true;
-  };
-
-  const setBattlePassVisible = (visible, notifyHost) => {
-    wtfOverlayState.battlePassVisible = Boolean(visible);
-    if (wtfOverlayState.battlePassLayer) {
-      wtfOverlayState.battlePassLayer.hidden = !wtfOverlayState.battlePassVisible;
-    }
-    if (!wtfOverlayState.battlePassVisible) closeBattlePassPopup();
-    const control = document.getElementById('wtf-battle-pass-control');
-    if (control) {
-      control.classList.toggle('active', wtfOverlayState.battlePassVisible);
-      control.classList.toggle('inactive', !wtfOverlayState.battlePassVisible);
-      control.classList.toggle('selected', wtfOverlayState.battlePassVisible);
-      control.setAttribute('aria-checked', wtfOverlayState.battlePassVisible ? 'true' : 'false');
-    }
-    if (notifyHost) {
-      window.chrome?.webview?.postMessage(JSON.stringify({
-        action: 'battle-pass-toggle',
-        checked: wtfOverlayState.battlePassVisible
-      }));
-    }
   };
 
   const hideCommercialAndPaidUi = () => {
@@ -3066,9 +2417,6 @@
     syncQuestRequirementsPanel();
     ensureQuestLayer();
     ensureQuestPopup();
-    ensureBattlePassControl();
-    ensureBattlePassLayer();
-    ensureBattlePassPopup();
     ensureNativeQuestPopupCloseButton();
     ensureSquadLayer();
     ensurePingControl();
@@ -3076,7 +2424,6 @@
     ensurePingLayer();
     ensureRouteControl();
     ensureRouteLayer();
-    updateBattlePassFloorOpacity();
     updatePingFloorOpacity();
     updateRouteFloorOpacity();
   };
@@ -3096,35 +2443,14 @@
       childList: true,
       subtree: true
     });
-    window.addEventListener('resize', scheduleBattlePassPositionUpdate, { passive: true });
+    window.addEventListener('resize', scheduleOverlayPositionUpdate, { passive: true });
     window.addEventListener('resize', applyQuestRequirementsPanelLayout, { passive: true });
     window.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape' && wtfOverlayState.battlePassPopup && !wtfOverlayState.battlePassPopup.hidden) {
-        closeBattlePassPopup();
-      }
       if (event.key === 'Escape' && wtfOverlayState.questPopup && !wtfOverlayState.questPopup.hidden) {
         closeQuestPopup();
       }
     });
     scheduleWtfEnhancementHydration();
-  };
-
-  window.__wtfBattlePassOverlay = {
-    configure(snapshot = {}, visible = false) {
-      wtfOverlayState.battlePass = {
-        map: String(snapshot.map || ''),
-        markers: Array.isArray(snapshot.markers) ? snapshot.markers : []
-      };
-      wtfOverlayState.battlePassVisible = Boolean(visible);
-      installWtfOverlayStyles();
-      installFloorEvents();
-      ensureBattlePassControl();
-      ensureBattlePassLayer();
-      ensureBattlePassPopup();
-      renderBattlePassMarkers();
-      setBattlePassVisible(visible, false);
-      startWtfEnhancementObserver();
-    }
   };
 
   window.__wtfQuestOverlay = {

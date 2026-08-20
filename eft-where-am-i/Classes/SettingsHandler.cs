@@ -319,7 +319,6 @@ namespace eft_where_am_i.Classes
         public double quest_requirements_panel_width { get; set; } = 360;
         public double quest_requirements_panel_height { get; set; } = 520;
         public bool quest_requirements_panel_collapsed { get; set; } = false;
-        public Dictionary<string, bool> battle_pass_visible_per_map { get; set; } = new Dictionary<string, bool>();
         public List<MapPing> map_pings { get; set; } = new List<MapPing>();
         public Dictionary<string, bool> ping_visible_per_map { get; set; } = new Dictionary<string, bool>();
         public List<MapRouteNode> map_route_nodes { get; set; } = new List<MapRouteNode>();

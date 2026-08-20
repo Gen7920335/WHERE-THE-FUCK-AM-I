@@ -9,7 +9,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
 
     <!-- 버전을 여기서만 관리 -->
-    <Version>1.1.5</Version>
+    <Version>1.1.6</Version>
     <AssemblyName>WHERE THE FUCK AM I</AssemblyName>
     <AssemblyTitle>WHERE THE FUCK AM I</AssemblyTitle>
     <Product>WHERE THE FUCK AM I</Product>
@@ -65,9 +65,6 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="html\quest-marker-locations.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="html\battle-pass-locations.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="html\panel.html">
