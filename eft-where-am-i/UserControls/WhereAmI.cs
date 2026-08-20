@@ -170,7 +170,8 @@ namespace eft_where_am_i
                     await webView2_panel_ui.ExecuteScriptAsync(
                         $"setScaleControls({appSettings.font_scale.ToString(System.Globalization.CultureInfo.InvariantCulture)}, " +
                         $"{appSettings.icon_scale.ToString(System.Globalization.CultureInfo.InvariantCulture)}, " +
-                        $"{appSettings.popup_opacity.ToString(System.Globalization.CultureInfo.InvariantCulture)})");
+                        $"{appSettings.popup_opacity.ToString(System.Globalization.CultureInfo.InvariantCulture)}, " +
+                        $"{appSettings.route_line_width.ToString(System.Globalization.CultureInfo.InvariantCulture)})");
                 }
                 catch (Exception ex)
                 {
@@ -402,7 +403,8 @@ namespace eft_where_am_i
                         await webView2_panel_ui.ExecuteScriptAsync(
                             $"setScaleControls({appSettings.font_scale.ToString(System.Globalization.CultureInfo.InvariantCulture)}, " +
                             $"{appSettings.icon_scale.ToString(System.Globalization.CultureInfo.InvariantCulture)}, " +
-                            $"{appSettings.popup_opacity.ToString(System.Globalization.CultureInfo.InvariantCulture)})");
+                            $"{appSettings.popup_opacity.ToString(System.Globalization.CultureInfo.InvariantCulture)}, " +
+                            $"{appSettings.route_line_width.ToString(System.Globalization.CultureInfo.InvariantCulture)})");
 
                         // 디버그 모드 플래그 전송
 #if DEBUG
@@ -557,6 +559,17 @@ namespace eft_where_am_i
                         await ApplyEnhancementSettingsAsync();
                         break;
 
+                    case "route-line-width-preview":
+                        appSettings.route_line_width = Math.Clamp(message["width"]?.Value<double>() ?? 1.5, 0.5, 8.0);
+                        await ApplyEnhancementSettingsAsync();
+                        break;
+
+                    case "route-line-width-changed":
+                        appSettings.route_line_width = Math.Clamp(message["width"]?.Value<double>() ?? 1.5, 0.5, 8.0);
+                        SaveSettings();
+                        await ApplyEnhancementSettingsAsync();
+                        break;
+
                     case "theme-updated":
                         if (!string.IsNullOrEmpty(theme))
                         {
@@ -682,6 +695,7 @@ namespace eft_where_am_i
                 fontScale = appSettings.font_scale,
                 iconScale = appSettings.icon_scale,
                 popupOpacity = appSettings.popup_opacity,
+                routeLineWidth = appSettings.route_line_width,
                 questRequirementsPanel = new
                 {
                     mode = appSettings.quest_requirements_panel_mode,

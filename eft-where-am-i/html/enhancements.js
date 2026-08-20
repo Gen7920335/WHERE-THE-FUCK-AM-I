@@ -8,6 +8,7 @@
     fontScale: 1,
     iconScale: 1,
     popupOpacity: 1,
+    routeLineWidth: 1.5,
     questRequirementsPanel: {
       mode: 'right',
       x: 0,
@@ -114,6 +115,7 @@
     root.style.setProperty('--wtf-font-scale', String(state.fontScale));
     root.style.setProperty('--wtf-icon-scale', String(state.iconScale));
     root.style.setProperty('--wtf-popup-opacity', String(state.popupOpacity));
+    root.style.setProperty('--wtf-route-line-width', `${state.routeLineWidth}px`);
 
     let style = document.getElementById('wtf-enhancement-styles');
     if (!style) {
@@ -150,6 +152,7 @@
     state.fontScale = clamp(settings.fontScale, 0.5, 1.5, 1);
     state.iconScale = clamp(settings.iconScale, 0.5, 6.5, 1);
     state.popupOpacity = clamp(settings.popupOpacity, 0.3, 1, 1);
+    state.routeLineWidth = clamp(settings.routeLineWidth, 0.5, 8, 1.5);
     const panel = settings.questRequirementsPanel || {};
     const mode = String(panel.mode || 'right').toLowerCase();
     state.questRequirementsPanel = {
@@ -881,7 +884,7 @@
         stroke: var(--wtf-participant-color, #ff3b30);
         stroke-dasharray: 4 5;
         stroke-linecap: round;
-        stroke-width: 1.5;
+        stroke-width: var(--wtf-route-line-width, 1.5px);
       }
       .wtf-route-line.wtf-other-floor { opacity: .32; }
       .wtf-route-node {

@@ -16,11 +16,29 @@
       width: 100vw;
       overflow: hidden; /* 스크롤바 방지 */
     }
-    .scale-stack { display: grid; gap: .15rem; padding-inline: .4rem; white-space: nowrap; }
-    .scale-control { display: flex; align-items: center; justify-content: center; gap: .35rem; min-width: 0; }
-    .scale-control label { min-width: 4.5rem; }
-    .scale-control input { width: min(8rem, 42%); min-width: 4rem; padding: 0; accent-color: #8d7a50; }
-    .scale-control output { min-width: 3.2rem; font-variant-numeric: tabular-nums; text-align: right; }
+    .scale-stack {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: .1rem .4rem;
+      padding-inline: .3rem;
+      white-space: nowrap;
+    }
+    .scale-control { display: flex; align-items: center; justify-content: stretch; gap: .2rem; min-width: 0; }
+    .scale-control label {
+      flex: 0 1 auto;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-size: clamp(.6rem, .55vw, .75rem) !important;
+    }
+    .scale-control input { flex: 1 1 2.5rem; width: 100%; min-width: 2.25rem; padding: 0; accent-color: #8d7a50; }
+    .scale-control output {
+      flex: 0 0 2.7rem;
+      min-width: 2.7rem;
+      font-size: clamp(.6rem, .55vw, .75rem) !important;
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+    }
   </style>
 </head>
 <body class="flex items-center justify-center bg-gray-200 w-full h-full">
@@ -166,6 +184,11 @@
         <input id="iconScaleSlider" type="range" min="50" max="650" step="5" value="100" oninput="previewIconScale()" onchange="commitIconScale()">
         <output id="iconScaleValue" for="iconScaleSlider" class="text-xs lg:text-sm xl:text-base font-medium">100%</output>
       </div>
+      <div class="scale-control">
+        <label id="routeLineWidthLabel" for="routeLineWidthSlider" class="text-xs lg:text-sm xl:text-base font-medium">Route Width</label>
+        <input id="routeLineWidthSlider" type="range" min="0.5" max="8" step="0.5" value="1.5" oninput="previewRouteLineWidth()" onchange="commitRouteLineWidth()">
+        <output id="routeLineWidthValue" for="routeLineWidthSlider" class="text-xs lg:text-sm xl:text-base font-medium">1.5px</output>
+      </div>
     </section>
   </div>
 
@@ -201,6 +224,7 @@
       document.getElementById('popupOpacityLabel').textContent = i18next.t('popupOpacityLabel');
       document.getElementById('fontScaleLabel').textContent = i18next.t('fontScaleLabel');
       document.getElementById('iconScaleLabel').textContent = i18next.t('iconScaleLabel');
+      document.getElementById('routeLineWidthLabel').textContent = i18next.t('routeLineWidthLabel');
     }
 
     function setTheme(theme) {
@@ -353,16 +377,19 @@
       }
     }
 
-    function setScaleControls(fontScale, iconScale, popupOpacity) {
+    function setScaleControls(fontScale, iconScale, popupOpacity, routeLineWidth) {
       const fontPercent = Math.min(150, Math.max(50, Math.round((Number(fontScale) || 1) * 100)));
       const iconPercent = Math.min(650, Math.max(50, Math.round((Number(iconScale) || 1) * 100)));
       const popupPercent = Math.min(100, Math.max(30, Math.round((Number(popupOpacity) || 1) * 100)));
+      const lineWidth = Math.min(8, Math.max(0.5, Number(routeLineWidth) || 1.5));
       document.getElementById('popupOpacitySlider').value = popupPercent;
       document.getElementById('popupOpacityValue').textContent = popupPercent + '%';
       document.getElementById('fontScaleSlider').value = fontPercent;
       document.getElementById('fontScaleValue').textContent = fontPercent + '%';
       document.getElementById('iconScaleSlider').value = iconPercent;
       document.getElementById('iconScaleValue').textContent = iconPercent + '%';
+      document.getElementById('routeLineWidthSlider').value = lineWidth;
+      document.getElementById('routeLineWidthValue').textContent = lineWidth.toFixed(1) + 'px';
     }
 
     function previewPopupOpacity() {
@@ -396,6 +423,17 @@
     function commitIconScale() {
       const percent = Number(document.getElementById('iconScaleSlider').value);
       window.chrome.webview.postMessage(JSON.stringify({ action: 'icon-scale-changed', scale: percent / 100 }));
+    }
+
+    function previewRouteLineWidth() {
+      const width = Number(document.getElementById('routeLineWidthSlider').value);
+      document.getElementById('routeLineWidthValue').textContent = width.toFixed(1) + 'px';
+      window.chrome.webview.postMessage(JSON.stringify({ action: 'route-line-width-preview', width }));
+    }
+
+    function commitRouteLineWidth() {
+      const width = Number(document.getElementById('routeLineWidthSlider').value);
+      window.chrome.webview.postMessage(JSON.stringify({ action: 'route-line-width-changed', width }));
     }
 
     // C#에서 호출: 디버그 모드 설정 (Floor DB Editor 버튼 표시/숨김)
