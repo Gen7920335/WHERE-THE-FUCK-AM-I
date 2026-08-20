@@ -177,7 +177,7 @@
     questLayer: null,
     questPopup: null,
     questPopupMarker: null,
-    nativeQuestVisibility: null,
+    nativeQuestFilterGuardId: 0,
     floorEventsInstalled: false,
     squad: { map: '', members: [] },
     squadLayer: null,
@@ -1945,6 +1945,45 @@
     button.disabled = !(wtfOverlayState.pings.pings?.length > 0);
   };
 
+  const ensureClearRouteButton = () => {
+    const topPanel = document.querySelector('.panel_top');
+    if (!topPanel) return;
+    let button = document.getElementById('wtf-clear-route-button');
+    if (!button || button.parentElement !== topPanel) {
+      button?.remove();
+      button = document.createElement('button');
+      button.id = 'wtf-clear-route-button';
+      button.type = 'button';
+      const nativeButton = topPanel.querySelector('button');
+      if (nativeButton) {
+        button.className = nativeButton.className;
+        for (const attribute of nativeButton.attributes) {
+          if (attribute.name.startsWith('data-v-')) button.setAttribute(attribute.name, '');
+        }
+      }
+      button.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (!(wtfOverlayState.route.nodes?.length > 0)) return;
+        const confirmed = window.confirm(pingCopy(
+          'Delete every route node on this map?',
+          '이 지도의 경로 노드를 전부 삭제할까요?'
+        ));
+        if (confirmed) {
+          window.chrome?.webview?.postMessage(JSON.stringify({ action: 'map-route-nodes-clear' }));
+        }
+      });
+      const pingButton = document.getElementById('wtf-clear-pings-button');
+      const status = topPanel.querySelector('.terminal-status');
+      if (pingButton?.parentElement === topPanel) pingButton.after(button);
+      else if (status) status.before(button);
+      else topPanel.appendChild(button);
+    }
+    const buttonText = pingCopy('Delete all route nodes', '경로 전부 삭제');
+    if (button.textContent !== buttonText) button.textContent = buttonText;
+    button.disabled = !(wtfOverlayState.route.nodes?.length > 0);
+  };
+
   const getLayoutOffset = (element, ancestor) => {
     let left = 0;
     let top = 0;
@@ -2090,10 +2129,103 @@
     }
   };
 
+  const findNativeQuestVisibilityRow = () => {
+    const iconRow = document.querySelector(
+      '.panel_left path[d^="m253.943,502.885"]'
+    )?.closest('.items > div');
+    if (iconRow) return iconRow;
+
+    const normalize = (value) => String(value || '')
+      .replace(/\s+/g, '')
+      .toLowerCase();
+    const isQuestLabel = (value) => {
+      const normalized = normalize(value).replace(/\d+$/, '');
+      return normalized.includes('quest') || normalized.includes('퀘스트');
+    };
+
+    for (const section of document.querySelectorAll('.panel_left .two-columns > div')) {
+      const heading = section.querySelector(':scope > div:first-child .bold');
+      if (!isQuestLabel(heading?.textContent)) continue;
+      const rows = [...section.querySelectorAll(':scope > .items > div')];
+      return rows.find((row) => {
+        const label = row.querySelector(':scope > span:first-child') || row;
+        return isQuestLabel(label.textContent);
+      }) || rows[0] || null;
+    }
+    return null;
+  };
+
+  const findNativeQuestFilterController = () => {
+    for (const panel of document.querySelectorAll('.panel_left')) {
+      let component = panel.__vueParentComponent;
+      for (let depth = 0; component && depth < 5; depth += 1, component = component.parent) {
+        const selectedMap = component.props?.selectedSubCategoriesMap;
+        const toggle = component.vnode?.props?.onToggleSubCategory;
+        if (selectedMap && typeof toggle === 'function') {
+          return {
+            active: Boolean(selectedMap.Quests_Quest),
+            disable: () => toggle('Quests', 'Quest', false)
+          };
+        }
+      }
+    }
+    return null;
+  };
+
+  const forceNativeQuestFilterOff = () => {
+    const guardId = ++wtfOverlayState.nativeQuestFilterGuardId;
+    const leftPanel = document.querySelector('.panel_left');
+    let frameCount = 0;
+    let togglePending = false;
+    let observer = null;
+    const stop = () => observer?.disconnect();
+    const enforce = () => {
+      if (guardId !== wtfOverlayState.nativeQuestFilterGuardId) {
+        stop();
+        return;
+      }
+      const controller = findNativeQuestFilterController();
+      if (controller) {
+        if (!controller.active) {
+          togglePending = false;
+        } else if (!togglePending) {
+          togglePending = true;
+          controller.disable();
+        }
+        return;
+      }
+      const row = findNativeQuestVisibilityRow();
+      if (!row) return;
+      if (row.classList.contains('inactive')) {
+        togglePending = false;
+      } else if (!togglePending) {
+        togglePending = true;
+        row.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      }
+    };
+    const poll = () => {
+      enforce();
+      frameCount += 1;
+      if (frameCount <= 90) requestAnimationFrame(poll);
+      else stop();
+    };
+    if (leftPanel) {
+      observer = new MutationObserver(() => enforce());
+      observer.observe(leftPanel, {
+        attributes: true,
+        attributeFilter: ['class'],
+        childList: true,
+        subtree: true
+      });
+    }
+    requestAnimationFrame(poll);
+  };
+
   const openNativeQuestMarkerDetails = (markerData) => {
     if (!markerData?.questId || !markerData?.markerUid) return;
+    forceNativeQuestFilterOff();
     const url = new URL(location.href);
-    url.searchParams.set('view', String(markerData.questId));
+    url.searchParams.delete('view');
     url.searchParams.set('obj', String(markerData.markerUid));
     history.pushState(history.state, '', url);
     window.dispatchEvent(new PopStateEvent('popstate', { state: history.state }));
@@ -2116,9 +2248,7 @@
     overlay.replaceChildren();
 
     const pinnedQuestUids = getPinnedQuestUids();
-    const nativeQuestView = new URLSearchParams(location.search).get('view') || '';
     const markerDataList = (wtfOverlayState.quest.markers || [])
-      .filter((markerData) => markerData.questId !== nativeQuestView)
       .filter((markerData) => pinnedQuestUids.has(String(markerData.questId))
         || wtfOverlayState.questPins.has(normalizeQuestName(markerData.quest)));
 
@@ -2172,47 +2302,6 @@
     }
     updateQuestMarkerFloorOpacity();
     scheduleOverlayPositionUpdate();
-  };
-
-  const findNativeQuestVisibilityRow = () => {
-    const normalize = (value) => String(value || '')
-      .replace(/\s+/g, '')
-      .toLowerCase();
-    const questLabels = new Set(['quest', 'quests', '퀘스트']);
-
-    for (const section of document.querySelectorAll('.panel_left .two-columns > div')) {
-      const heading = section.querySelector(':scope > div:first-child .bold');
-      if (!questLabels.has(normalize(heading?.textContent))) continue;
-      const rows = [...section.querySelectorAll(':scope > .items > div')];
-      return rows.find((row) => {
-        const label = row.querySelector(':scope > span:first-child') || row;
-        return questLabels.has(normalize(label.textContent).replace(/\d+$/, ''));
-      }) || rows[0] || null;
-    }
-
-    return [...document.querySelectorAll('.panel_left .items > div')].find((row) => {
-      const label = row.querySelector(':scope > span:first-child') || row;
-      return questLabels.has(normalize(label.textContent).replace(/\d+$/, ''));
-    }) || null;
-  };
-
-  const closeNativeQuestMarkerDetails = () => {
-    const url = new URL(location.href);
-    if (!url.searchParams.has('view') && !url.searchParams.has('obj')) return;
-    url.searchParams.delete('view');
-    url.searchParams.delete('obj');
-    history.replaceState(history.state, '', url);
-    window.dispatchEvent(new PopStateEvent('popstate', { state: history.state }));
-  };
-
-  const syncNativeQuestVisibility = () => {
-    const row = findNativeQuestVisibilityRow();
-    if (!row) return;
-    const visible = !row.classList.contains('inactive');
-    const wasVisible = wtfOverlayState.nativeQuestVisibility;
-    wtfOverlayState.nativeQuestVisibility = visible;
-    if (wtfOverlayState.questLayer) wtfOverlayState.questLayer.hidden = !visible;
-    if (!visible && wasVisible !== false) closeNativeQuestMarkerDetails();
   };
 
   const ensureQuestLayer = () => {
@@ -2506,6 +2595,7 @@
       layer.appendChild(marker);
     }
     ensureRouteControl();
+    ensureClearRouteButton();
     scheduleOverlayPositionUpdate();
   };
 
@@ -2740,13 +2830,13 @@
     addNativeQuestCheckboxes();
     syncQuestRequirementsPanel();
     ensureQuestLayer();
-    syncNativeQuestVisibility();
     ensureNativeQuestPopupCloseButton();
     ensureSquadLayer();
     ensurePingControl();
     ensureClearPingsButton();
     ensurePingLayer();
     ensureRouteControl();
+    ensureClearRouteButton();
     ensureRouteLayer();
     updatePingFloorOpacity();
     updateRouteFloorOpacity();
@@ -2861,6 +2951,7 @@
       ensureRouteLayer();
       renderRouteNodes();
       ensureRouteControl();
+      ensureClearRouteButton();
       installFloorEvents();
       startWtfEnhancementObserver();
     }

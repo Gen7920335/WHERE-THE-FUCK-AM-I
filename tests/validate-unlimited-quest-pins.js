@@ -8,9 +8,10 @@ const rows = Array.from({ length: questCount }, (_, index) =>
 ).join('');
 const dom = new JSDOM(
   `<body>
+    <div class="panel_top"><button type="button">Native</button><span class="terminal-status"></span></div>
     <div class="panel_left"><div class="two-columns"><div>
-      <div><div class="bold">Quests</div></div>
-      <div class="items"><div id="native-quest-visibility" class="d-flex"><span>Quest</span></div></div>
+      <div><div class="bold">임무 위치</div></div>
+      <div class="items"><div id="native-quest-visibility" class="d-flex"><span><svg><path d="m253.943,502.885 test"></path></svg>목표</span></div></div>
     </div></div></div>
     <div class="map-cont"><div class="map-wrap" style="width: 5500px; height: 4200px"></div></div>
     <div class="no-wrap"><input name="layers" value="Ground" checked><input name="layers" value="Level 2"></div>
@@ -43,6 +44,35 @@ window.ResizeObserver = class ResizeObserver {
   observe() {}
   disconnect() {}
 };
+window.confirm = () => true;
+const nativeQuestVisibility = window.document.getElementById('native-quest-visibility');
+const nativeQuestFilterState = { Quests_Quest: true };
+let nativeQuestFilterToggleCount = 0;
+window.document.querySelector('.panel_left').__vueParentComponent = {
+  props: { selectedSubCategoriesMap: nativeQuestFilterState },
+  vnode: {
+    props: {
+      onToggleSubCategory(category, subCategory) {
+        if (category !== 'Quests' || subCategory !== 'Quest') {
+          throw new Error(`Unexpected native filter key: ${category}_${subCategory}`);
+        }
+        nativeQuestFilterToggleCount += 1;
+        delete nativeQuestFilterState.Quests_Quest;
+        nativeQuestVisibility.classList.add('inactive');
+      }
+    }
+  },
+  parent: null
+};
+nativeQuestVisibility.addEventListener('click', () => {
+  nativeQuestVisibility.classList.toggle('inactive');
+});
+window.addEventListener('popstate', () => {
+  if (new window.URL(window.location.href).searchParams.has('obj')) {
+    nativeQuestFilterState.Quests_Quest = true;
+    nativeQuestVisibility.classList.remove('inactive');
+  }
+});
 const messages = [];
 window.chrome = { webview: { postMessage: (message) => messages.push(JSON.parse(message)) } };
 
@@ -123,6 +153,19 @@ setTimeout(async () => {
   if (!routeMessage || Math.abs(routeMessage.left - 2) > 1e-8 || Math.abs(routeMessage.top - 2) > 1e-8) {
     throw new Error(`Wheel-click on quest marker did not preserve the exact click point: ${JSON.stringify(routeMessage)}`);
   }
+  window.__wtfRouteOverlay.configure({
+    map: 'lab',
+    maxNodes: 20,
+    localNodeCount: 1,
+    nodes: [{ id: 'route-1', map: 'lab', left: 2, top: 2, createdAt: 1 }]
+  });
+  const clearMessageCount = messages.length;
+  window.document.getElementById('wtf-clear-route-button').click();
+  const clearMessage = messages.slice(clearMessageCount)
+    .find((message) => message.action === 'map-route-nodes-clear');
+  if (!clearMessage) {
+    throw new Error('The top route clear-all button did not request a current-map clear.');
+  }
   const markerElements = [...window.document.querySelectorAll('.wtf-quest-marker')];
   if (!markerElements[0].classList.contains('wtf-other-floor')
       || markerElements[1].classList.contains('wtf-other-floor')
@@ -152,25 +195,28 @@ setTimeout(async () => {
 
   const firstMarker = window.document.querySelector('.wtf-quest-marker');
   firstMarker.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+  await new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
+  await new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
   const query = new window.URL(window.location.href).searchParams;
-  if (query.get('view') !== 'q0' || query.get('obj') !== 'm0'
+  if (query.has('view') || query.get('obj') !== 'm0'
       || window.document.querySelector('.wtf-quest-popup')) {
     throw new Error(`Native details routing failed: ${window.location.href}`);
   }
-  const nativeQuestVisibility = window.document.getElementById('native-quest-visibility');
-  nativeQuestVisibility.classList.add('inactive');
-  await new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
-  await new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
-  const hiddenQuery = new window.URL(window.location.href).searchParams;
-  if (!window.document.getElementById('wtf-quest-layer').hidden
-      || hiddenQuery.has('view') || hiddenQuery.has('obj')) {
-    throw new Error(`Disabled native quest visibility revived a selected marker: ${window.location.href}`);
+  if (window.document.querySelectorAll('.wtf-quest-marker').length !== questCount) {
+    throw new Error('The selected pinned marker disappeared while native details were open.');
   }
+  if (!nativeQuestVisibility.classList.contains('inactive')) {
+    throw new Error('Opening native quest details re-enabled every native quest marker.');
+  }
+  if (nativeQuestFilterState.Quests_Quest || nativeQuestFilterToggleCount < 1) {
+    throw new Error('The native Vue quest-filter controller was not switched off.');
+  }
+  nativeQuestFilterState.Quests_Quest = true;
   nativeQuestVisibility.classList.remove('inactive');
   await new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
   await new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
-  if (window.document.getElementById('wtf-quest-layer').hidden) {
-    throw new Error('Quest overlay did not follow the re-enabled native quest visibility state.');
+  if (!nativeQuestVisibility.classList.contains('inactive')) {
+    throw new Error('A delayed native quest-filter reactivation escaped the guard.');
   }
   window.history.replaceState({}, '', '/maps/lab');
   window.dispatchEvent(new window.PopStateEvent('popstate'));

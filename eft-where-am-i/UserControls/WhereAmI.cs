@@ -960,6 +960,13 @@ namespace eft_where_am_i
                 && string.Equals(node.id, routeNodeId, StringComparison.OrdinalIgnoreCase));
         }
 
+        private void RemoveSavedRouteNodes(string map)
+        {
+            appSettings.map_route_nodes ??= new List<MapRouteNode>();
+            appSettings.map_route_nodes.RemoveAll(node =>
+                string.Equals(node.map, map, StringComparison.OrdinalIgnoreCase));
+        }
+
         private void PublishSavedPingsToSquad()
         {
             if (!squadNetworkService.IsConnected)
@@ -1577,6 +1584,26 @@ namespace eft_where_am_i
                         RemoveSavedRouteNode(appSettings.latest_map, routeNodeId);
                         SaveSettings();
                         squadNetworkService.DeleteRouteNode(appSettings.latest_map, routeNodeId);
+                        await InjectRouteOverlayAsync();
+                        break;
+
+                    case "map-route-nodes-clear":
+                        appSettings.map_route_nodes ??= new List<MapRouteNode>();
+                        List<string> currentMapRouteNodeIds = appSettings.map_route_nodes
+                            .Where(node => string.Equals(
+                                node.map,
+                                appSettings.latest_map,
+                                StringComparison.OrdinalIgnoreCase))
+                            .Select(node => node.id)
+                            .Where(id => !string.IsNullOrWhiteSpace(id))
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .ToList();
+                        RemoveSavedRouteNodes(appSettings.latest_map);
+                        SaveSettings();
+                        foreach (string currentMapRouteNodeId in currentMapRouteNodeIds)
+                        {
+                            squadNetworkService.DeleteRouteNode(appSettings.latest_map, currentMapRouteNodeId);
+                        }
                         await InjectRouteOverlayAsync();
                         break;
 
