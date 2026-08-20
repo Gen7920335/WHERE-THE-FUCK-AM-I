@@ -7,7 +7,15 @@ const rows = Array.from({ length: questCount }, (_, index) =>
   `<div class="no-wrap d-flex" data-quest-uid="q${index}"><span>Quest ${index}</span></div>`
 ).join('');
 const dom = new JSDOM(
-  `<body><div class="map-cont"><div class="map-wrap"></div></div><div class="no-wrap"><input name="layers" value="Ground" checked><input name="layers" value="Level 2"></div><div class="items scroll">${rows}</div></body>`,
+  `<body>
+    <div class="panel_left"><div class="two-columns"><div>
+      <div><div class="bold">Quests</div></div>
+      <div class="items"><div id="native-quest-visibility" class="d-flex"><span>Quest</span></div></div>
+    </div></div></div>
+    <div class="map-cont"><div class="map-wrap" style="width: 5500px; height: 4200px"></div></div>
+    <div class="no-wrap"><input name="layers" value="Ground" checked><input name="layers" value="Level 2"></div>
+    <div class="items scroll">${rows}</div>
+  </body>`,
   {
     runScripts: 'dangerously',
     url: 'https://tarkov-market.com/maps/lab',
@@ -103,6 +111,18 @@ setTimeout(async () => {
   if (Number(reducedMarkerScale) !== 0.5) {
     throw new Error(`Expected native marker scale floor 0.5 below base zoom, got ${reducedMarkerScale}.`);
   }
+  mapWrap.style.transform = 'matrix(1, 0, 0, 1, 0, 0)';
+  const routeMessageCount = messages.length;
+  window.document.querySelector('.wtf-quest-marker').dispatchEvent(new window.MouseEvent('pointerdown', {
+    bubbles: true,
+    button: 1,
+    clientX: 110,
+    clientY: 84
+  }));
+  const routeMessage = messages.slice(routeMessageCount).find((message) => message.action === 'map-route-node-add');
+  if (!routeMessage || Math.abs(routeMessage.left - 2) > 1e-8 || Math.abs(routeMessage.top - 2) > 1e-8) {
+    throw new Error(`Wheel-click on quest marker did not preserve the exact click point: ${JSON.stringify(routeMessage)}`);
+  }
   const markerElements = [...window.document.querySelectorAll('.wtf-quest-marker')];
   if (!markerElements[0].classList.contains('wtf-other-floor')
       || markerElements[1].classList.contains('wtf-other-floor')
@@ -136,6 +156,21 @@ setTimeout(async () => {
   if (query.get('view') !== 'q0' || query.get('obj') !== 'm0'
       || window.document.querySelector('.wtf-quest-popup')) {
     throw new Error(`Native details routing failed: ${window.location.href}`);
+  }
+  const nativeQuestVisibility = window.document.getElementById('native-quest-visibility');
+  nativeQuestVisibility.classList.add('inactive');
+  await new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
+  await new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
+  const hiddenQuery = new window.URL(window.location.href).searchParams;
+  if (!window.document.getElementById('wtf-quest-layer').hidden
+      || hiddenQuery.has('view') || hiddenQuery.has('obj')) {
+    throw new Error(`Disabled native quest visibility revived a selected marker: ${window.location.href}`);
+  }
+  nativeQuestVisibility.classList.remove('inactive');
+  await new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
+  await new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
+  if (window.document.getElementById('wtf-quest-layer').hidden) {
+    throw new Error('Quest overlay did not follow the re-enabled native quest visibility state.');
   }
   window.history.replaceState({}, '', '/maps/lab');
   window.dispatchEvent(new window.PopStateEvent('popstate'));

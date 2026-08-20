@@ -177,6 +177,7 @@
     questLayer: null,
     questPopup: null,
     questPopupMarker: null,
+    nativeQuestVisibility: null,
     floorEventsInstalled: false,
     squad: { map: '', members: [] },
     squadLayer: null,
@@ -2173,6 +2174,47 @@
     scheduleOverlayPositionUpdate();
   };
 
+  const findNativeQuestVisibilityRow = () => {
+    const normalize = (value) => String(value || '')
+      .replace(/\s+/g, '')
+      .toLowerCase();
+    const questLabels = new Set(['quest', 'quests', '퀘스트']);
+
+    for (const section of document.querySelectorAll('.panel_left .two-columns > div')) {
+      const heading = section.querySelector(':scope > div:first-child .bold');
+      if (!questLabels.has(normalize(heading?.textContent))) continue;
+      const rows = [...section.querySelectorAll(':scope > .items > div')];
+      return rows.find((row) => {
+        const label = row.querySelector(':scope > span:first-child') || row;
+        return questLabels.has(normalize(label.textContent).replace(/\d+$/, ''));
+      }) || rows[0] || null;
+    }
+
+    return [...document.querySelectorAll('.panel_left .items > div')].find((row) => {
+      const label = row.querySelector(':scope > span:first-child') || row;
+      return questLabels.has(normalize(label.textContent).replace(/\d+$/, ''));
+    }) || null;
+  };
+
+  const closeNativeQuestMarkerDetails = () => {
+    const url = new URL(location.href);
+    if (!url.searchParams.has('view') && !url.searchParams.has('obj')) return;
+    url.searchParams.delete('view');
+    url.searchParams.delete('obj');
+    history.replaceState(history.state, '', url);
+    window.dispatchEvent(new PopStateEvent('popstate', { state: history.state }));
+  };
+
+  const syncNativeQuestVisibility = () => {
+    const row = findNativeQuestVisibilityRow();
+    if (!row) return;
+    const visible = !row.classList.contains('inactive');
+    const wasVisible = wtfOverlayState.nativeQuestVisibility;
+    wtfOverlayState.nativeQuestVisibility = visible;
+    if (wtfOverlayState.questLayer) wtfOverlayState.questLayer.hidden = !visible;
+    if (!visible && wasVisible !== false) closeNativeQuestMarkerDetails();
+  };
+
   const ensureQuestLayer = () => {
     const mapContainer = document.querySelector('.map-cont');
     const mapWrap = mapContainer?.querySelector('.map-wrap');
@@ -2475,7 +2517,7 @@
     }
     const isInteractiveUi = target => target.closest(
       '.panel_top, .panel_left, .panel_right, button, input, label, a, .map-popup, '
-      + '.wtf-quest-marker, .wtf-ping-marker'
+      + '.wtf-ping-marker'
     );
     const handler = event => {
       if (event.button !== 1 || isInteractiveUi(event.target)) return;
@@ -2698,6 +2740,7 @@
     addNativeQuestCheckboxes();
     syncQuestRequirementsPanel();
     ensureQuestLayer();
+    syncNativeQuestVisibility();
     ensureNativeQuestPopupCloseButton();
     ensureSquadLayer();
     ensurePingControl();
