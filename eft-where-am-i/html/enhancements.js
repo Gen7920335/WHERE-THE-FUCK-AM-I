@@ -189,7 +189,7 @@
     pings: { map: '', pings: [] },
     pingsVisible: true,
     pingLayer: null,
-    route: { map: '', nodes: [], maxNodes: 10 },
+    route: { map: '', nodes: [], maxNodes: 20, localNodeCount: 0 },
     routeVisible: true,
     routeLayer: null,
     mapWrap: null,
@@ -211,6 +211,40 @@
     localizedTextOriginals: new WeakMap(),
     updateFrame: 0,
     hydrateFrame: 0
+  };
+
+  const participantPalette = [
+    { color: '#ff3b30', glow: 'rgba(255, 59, 48, .9)' },
+    { color: '#ffd60a', glow: 'rgba(255, 214, 10, .9)' },
+    { color: '#30d158', glow: 'rgba(48, 209, 88, .9)' },
+    { color: '#00c7a5', glow: 'rgba(0, 199, 165, .9)' },
+    { color: '#9a6a3a', glow: 'rgba(154, 106, 58, .9)' }
+  ];
+  const participantSlotByCreator = new Map();
+
+  const participantKey = item => String(item?.creatorId || item?.creatorName || 'local').trim().toLowerCase();
+  const resolveParticipantSlot = item => {
+    const explicit = Math.trunc(Number(item?.participantSlot));
+    const key = participantKey(item);
+    if (explicit >= 1 && explicit <= participantPalette.length) {
+      participantSlotByCreator.set(key, explicit);
+      return explicit;
+    }
+    if (participantSlotByCreator.has(key)) return participantSlotByCreator.get(key);
+    const used = new Set(participantSlotByCreator.values());
+    const slot = Array.from({ length: participantPalette.length }, (_, index) => index + 1)
+      .find(value => !used.has(value)) || 1;
+    participantSlotByCreator.set(key, slot);
+    return slot;
+  };
+
+  const applyParticipantColor = (element, item) => {
+    const slot = resolveParticipantSlot(item);
+    const palette = participantPalette[slot - 1];
+    element.dataset.participantSlot = String(slot);
+    element.style.setProperty('--wtf-participant-color', palette.color);
+    element.style.setProperty('--wtf-participant-glow', palette.glow);
+    return slot;
   };
 
   window.__wtfSetKoreanLocalization = (catalog = {}) => {
@@ -950,7 +984,7 @@
       }
       .wtf-ping-marker::before,
       .wtf-ping-marker::after {
-        border: 2px solid #ffb129;
+        border: 2px solid var(--wtf-participant-color, #ff3b30);
         border-radius: 50%;
         box-sizing: border-box;
         content: '';
@@ -960,8 +994,8 @@
         transform: translate(-50%, -50%);
       }
       .wtf-ping-marker::before {
-        background: #ffb129;
-        box-shadow: 0 0 8px rgba(255, 177, 41, .95);
+        background: var(--wtf-participant-color, #ff3b30);
+        box-shadow: 0 0 8px var(--wtf-participant-glow, rgba(255, 59, 48, .95));
         height: 8px;
         width: 8px;
       }
@@ -973,7 +1007,7 @@
       .wtf-ping-name {
         background: rgba(0, 0, 0, .76);
         border-radius: 2px;
-        color: #ffd992;
+        color: var(--wtf-participant-color, #ffd992);
         font: 700 10px/1.2 Arial, sans-serif;
         left: 50%;
         max-width: 130px;
@@ -990,10 +1024,10 @@
         user-select: none;
       }
       .wtf-ping-dot {
-        background: #ffb129;
-        border: 2px solid #6f4a0c;
+        background: conic-gradient(#ff3b30 0 20%, #ffd60a 20% 40%, #30d158 40% 60%, #00c7a5 60% 80%, #9a6a3a 80%);
+        border: 1px solid rgba(255, 255, 255, .75);
         border-radius: 50%;
-        box-shadow: 0 0 4px rgba(255, 177, 41, .8);
+        box-shadow: 0 0 4px rgba(48, 209, 88, .8);
         box-sizing: border-box;
         display: inline-block;
         height: 12px;
@@ -1021,17 +1055,18 @@
       }
       .wtf-route-line {
         fill: none;
-        stroke: rgba(102, 190, 255, .48);
+        opacity: .48;
+        stroke: var(--wtf-participant-color, #ff3b30);
         stroke-dasharray: 4 5;
         stroke-linecap: round;
         stroke-width: 1.5;
       }
       .wtf-route-line.wtf-other-floor { opacity: .32; }
       .wtf-route-node {
-        background: #66beff;
+        background: var(--wtf-participant-color, #ff3b30);
         border: 1px solid rgba(225, 246, 255, .95);
         border-radius: 50%;
-        box-shadow: 0 0 4px rgba(102, 190, 255, .8);
+        box-shadow: 0 0 4px var(--wtf-participant-glow, rgba(255, 59, 48, .8));
         box-sizing: border-box;
         cursor: context-menu;
         height: 7px;
@@ -1044,15 +1079,19 @@
         width: 7px;
       }
       .wtf-route-node.wtf-other-floor { opacity: .32; }
+      .wtf-route-node[data-owned="false"] {
+        cursor: default;
+        pointer-events: none !important;
+      }
       #wtf-route-control {
         cursor: pointer;
         user-select: none;
       }
       .wtf-route-dot {
-        background: #66beff;
+        background: conic-gradient(#ff3b30 0 20%, #ffd60a 20% 40%, #30d158 40% 60%, #00c7a5 60% 80%, #9a6a3a 80%);
         border: 1px solid #d7f2ff;
         border-radius: 50%;
-        box-shadow: 0 0 3px rgba(102, 190, 255, .7);
+        box-shadow: 0 0 3px rgba(48, 209, 88, .7);
         box-sizing: border-box;
         display: inline-block;
         height: 8px;
@@ -1952,7 +1991,7 @@
       pingControl.after(control);
     }
     const count = control.querySelector('[data-wtf-route-count]');
-    const countText = `${wtfOverlayState.route.nodes?.length || 0}/${wtfOverlayState.route.maxNodes || 10}`;
+    const countText = `${wtfOverlayState.route.localNodeCount || 0}/${wtfOverlayState.route.maxNodes || 20}`;
     if (count && count.textContent !== countText) count.textContent = countText;
     setRouteVisible(wtfOverlayState.routeVisible, false);
   };
@@ -2511,7 +2550,9 @@
       marker.dataset.left = String(ping.left);
       marker.dataset.top = String(ping.top);
       marker.dataset.floor = ping.floor === null || ping.floor === undefined ? '' : String(ping.floor);
-      marker.title = String(ping.creatorName || pingCopy('Ping', '핑'));
+      marker.dataset.owned = ping.creatorId ? 'false' : 'true';
+      const participantSlot = applyParticipantColor(marker, ping);
+      marker.title = `${participantSlot}P · ${String(ping.creatorName || pingCopy('Ping', '핑'))}`;
       marker.setAttribute('aria-hidden', 'true');
       const label = document.createElement('span');
       label.className = 'wtf-ping-name';
@@ -2533,7 +2574,7 @@
     const handler = (event) => {
       if (!event.altKey || event.button !== 0
           || event.target.closest('.panel_top, .panel_left, .panel_right, button, input, label, a, .map-popup, .wtf-quest-marker, .wtf-battle-pass-marker')) return;
-      const nearbyPing = nearestOverlayMarker('.wtf-ping-marker', event.clientX, event.clientY);
+      const nearbyPing = nearestOverlayMarker('.wtf-ping-marker[data-owned="true"]', event.clientX, event.clientY);
       if (nearbyPing?.dataset.id) {
         event.preventDefault();
         event.stopImmediatePropagation();
@@ -2620,12 +2661,24 @@
     svg.setAttribute('aria-hidden', 'true');
     layer.appendChild(svg);
     const nodes = wtfOverlayState.route.nodes || [];
-    for (let index = 1; index < nodes.length; index += 1) {
-      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      line.classList.add('wtf-route-line');
-      line.dataset.from = String(nodes[index - 1].id || '');
-      line.dataset.to = String(nodes[index].id || '');
-      svg.appendChild(line);
+    const nodesByParticipant = new Map();
+    for (const node of nodes) {
+      const key = node.creatorId
+        ? `player-${String(node.creatorId).toLowerCase()}`
+        : `local-slot-${resolveParticipantSlot(node)}`;
+      if (!nodesByParticipant.has(key)) nodesByParticipant.set(key, []);
+      nodesByParticipant.get(key).push(node);
+    }
+    for (const participantNodes of nodesByParticipant.values()) {
+      participantNodes.sort((left, right) => Number(left.createdAt || 0) - Number(right.createdAt || 0));
+      for (let index = 1; index < participantNodes.length; index += 1) {
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.classList.add('wtf-route-line');
+        line.dataset.from = String(participantNodes[index - 1].id || '');
+        line.dataset.to = String(participantNodes[index].id || '');
+        applyParticipantColor(line, participantNodes[index]);
+        svg.appendChild(line);
+      }
     }
     for (const node of nodes) {
       const marker = document.createElement('div');
@@ -2634,14 +2687,18 @@
       marker.dataset.left = String(node.left);
       marker.dataset.top = String(node.top);
       marker.dataset.floor = node.floor === null || node.floor === undefined ? '' : String(node.floor);
-      marker.title = pingCopy('Right-click to delete this route node', '우클릭으로 경로 노드 삭제');
-      marker.addEventListener('contextmenu', event => {
-        event.preventDefault();
-        event.stopPropagation();
-        window.chrome?.webview?.postMessage(JSON.stringify({
-          action: 'map-route-node-delete', id: marker.dataset.id
-        }));
-      });
+      marker.dataset.owned = node.creatorId ? 'false' : 'true';
+      const participantSlot = applyParticipantColor(marker, node);
+      marker.title = `${participantSlot}P · ${String(node.creatorName || pingCopy('Route', '경로'))}`;
+      if (!node.creatorId) {
+        marker.addEventListener('contextmenu', event => {
+          event.preventDefault();
+          event.stopPropagation();
+          window.chrome?.webview?.postMessage(JSON.stringify({
+            action: 'map-route-node-delete', id: marker.dataset.id
+          }));
+        });
+      }
       layer.appendChild(marker);
     }
     ensureRouteControl();
@@ -2662,15 +2719,15 @@
       if (event.button !== 1 || isInteractiveUi(event.target)) return;
       event.preventDefault();
       event.stopImmediatePropagation();
-      const nearbyNode = nearestOverlayMarker('.wtf-route-node', event.clientX, event.clientY);
+      const nearbyNode = nearestOverlayMarker('.wtf-route-node[data-owned="true"]', event.clientX, event.clientY);
       if (nearbyNode?.dataset.id) {
         window.chrome?.webview?.postMessage(JSON.stringify({
           action: 'map-route-node-delete', id: nearbyNode.dataset.id
         }));
         return;
       }
-      const maxNodes = Number(wtfOverlayState.route.maxNodes) || 10;
-      if ((wtfOverlayState.route.nodes?.length || 0) >= maxNodes) {
+      const maxNodes = Number(wtfOverlayState.route.maxNodes) || 20;
+      if ((Number(wtfOverlayState.route.localNodeCount) || 0) >= maxNodes) {
         window.alert(pingCopy(
           `A route can contain up to ${maxNodes} nodes.`,
           `경로 노드는 최대 ${maxNodes}개까지 배치할 수 있습니다.`
@@ -3128,8 +3185,9 @@
     configure(snapshot = {}) {
       wtfOverlayState.route = {
         map: String(snapshot.map || ''),
-        nodes: Array.isArray(snapshot.nodes) ? snapshot.nodes.slice(0, 10) : [],
-        maxNodes: Math.min(10, Math.max(1, Number(snapshot.maxNodes) || 10))
+        nodes: Array.isArray(snapshot.nodes) ? snapshot.nodes.slice(0, 100) : [],
+        maxNodes: Math.min(20, Math.max(1, Number(snapshot.maxNodes) || 20)),
+        localNodeCount: Math.max(0, Number(snapshot.localNodeCount) || 0)
       };
       wtfOverlayState.routeVisible = snapshot.visible !== false;
       installWtfOverlayStyles();

@@ -75,6 +75,7 @@ namespace eft_where_am_i
         private System.Windows.Forms.Timer? responsiveMapZoomTimer;
         private bool responsiveMapZoomUpdateRunning;
         private bool squadPingsPublished;
+        private bool squadRoutesPublished;
 
         private static bool IsLocalTerminalMap(string? mapName) =>
             string.Equals(mapName, "terminal", StringComparison.OrdinalIgnoreCase);
@@ -93,6 +94,8 @@ namespace eft_where_am_i
             squadNetworkService.PingReceived += OnSquadPingReceived;
             squadNetworkService.PingDeleted += OnSquadPingDeleted;
             squadNetworkService.PingsCleared += OnSquadPingsCleared;
+            squadNetworkService.RouteNodeReceived += OnSquadRouteNodeReceived;
+            squadNetworkService.RouteNodeDeleted += OnSquadRouteNodeDeleted;
             settingsHandler = SettingsHandler.Instance;             // 싱글톤 인스턴스 사용
             settingsHandler.SettingsChanged += OnSettingsChanged;   // 세팅 변경될 때마다 호출됨
             LoadSettings();                                         // 동기작업
@@ -788,7 +791,15 @@ namespace eft_where_am_i
                 pings = appSettings.map_pings
                     .Where(ping => string.Equals(ping.map, appSettings.latest_map, StringComparison.OrdinalIgnoreCase))
                     .OrderBy(ping => ping.createdAt)
-                    .Select(ping => ping.Copy())
+                    .Select(ping =>
+                    {
+                        MapPing copy = ping.Copy();
+                        if (string.IsNullOrWhiteSpace(copy.creatorId))
+                        {
+                            copy.participantSlot = squadNetworkService.LocalParticipantSlot;
+                        }
+                        return copy;
+                    })
                     .ToList()
             };
             string snapshotJson = Newtonsoft.Json.JsonConvert.SerializeObject(snapshot);
@@ -810,11 +821,22 @@ namespace eft_where_am_i
             {
                 map = appSettings.latest_map,
                 visible,
-                maxNodes = 10,
+                maxNodes = 20,
+                localNodeCount = appSettings.map_route_nodes.Count(node =>
+                    string.Equals(node.map, appSettings.latest_map, StringComparison.OrdinalIgnoreCase)
+                    && string.IsNullOrWhiteSpace(node.creatorId)),
                 nodes = appSettings.map_route_nodes
                     .Where(node => string.Equals(node.map, appSettings.latest_map, StringComparison.OrdinalIgnoreCase))
                     .OrderBy(node => node.createdAt)
-                    .Select(node => node.Copy())
+                    .Select(node =>
+                    {
+                        MapRouteNode copy = node.Copy();
+                        if (string.IsNullOrWhiteSpace(copy.creatorId))
+                        {
+                            copy.participantSlot = squadNetworkService.LocalParticipantSlot;
+                        }
+                        return copy;
+                    })
                     .ToList()
             };
             string snapshotJson = Newtonsoft.Json.JsonConvert.SerializeObject(snapshot);
@@ -884,6 +906,35 @@ namespace eft_where_am_i
             }));
         }
 
+        private void OnSquadRouteNodeReceived(MapRouteNode node)
+        {
+            if (IsDisposed || !IsHandleCreated || node == null)
+            {
+                return;
+            }
+            BeginInvoke(new Action(async () =>
+            {
+                UpsertSavedRouteNode(node);
+                SaveSettings();
+                await InjectRouteOverlayAsync();
+            }));
+        }
+
+        private void OnSquadRouteNodeDeleted(string map, string routeNodeId)
+        {
+            if (IsDisposed || !IsHandleCreated || string.IsNullOrWhiteSpace(map)
+                || string.IsNullOrWhiteSpace(routeNodeId))
+            {
+                return;
+            }
+            BeginInvoke(new Action(async () =>
+            {
+                RemoveSavedRouteNode(map, routeNodeId);
+                SaveSettings();
+                await InjectRouteOverlayAsync();
+            }));
+        }
+
         private void UpsertSavedPing(MapPing ping)
         {
             appSettings.map_pings ??= new List<MapPing>();
@@ -914,6 +965,29 @@ namespace eft_where_am_i
                 && string.Equals(ping.id, pingId, StringComparison.OrdinalIgnoreCase));
         }
 
+        private void UpsertSavedRouteNode(MapRouteNode node)
+        {
+            appSettings.map_route_nodes ??= new List<MapRouteNode>();
+            int index = appSettings.map_route_nodes.FindIndex(value =>
+                string.Equals(value.id, node.id, StringComparison.OrdinalIgnoreCase));
+            if (index >= 0)
+            {
+                appSettings.map_route_nodes[index] = node.Copy();
+            }
+            else
+            {
+                appSettings.map_route_nodes.Add(node.Copy());
+            }
+        }
+
+        private void RemoveSavedRouteNode(string map, string routeNodeId)
+        {
+            appSettings.map_route_nodes ??= new List<MapRouteNode>();
+            appSettings.map_route_nodes.RemoveAll(node =>
+                string.Equals(node.map, map, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(node.id, routeNodeId, StringComparison.OrdinalIgnoreCase));
+        }
+
         private void PublishSavedPingsToSquad()
         {
             if (!squadNetworkService.IsConnected)
@@ -921,9 +995,23 @@ namespace eft_where_am_i
                 return;
             }
             appSettings.map_pings ??= new List<MapPing>();
-            foreach (MapPing ping in appSettings.map_pings)
+            foreach (MapPing ping in appSettings.map_pings.Where(value => string.IsNullOrWhiteSpace(value.creatorId)))
             {
                 squadNetworkService.PublishPing(ping);
+            }
+        }
+
+        private void PublishSavedRouteNodesToSquad()
+        {
+            if (!squadNetworkService.IsConnected)
+            {
+                return;
+            }
+            appSettings.map_route_nodes ??= new List<MapRouteNode>();
+            foreach (MapRouteNode node in appSettings.map_route_nodes
+                .Where(value => string.IsNullOrWhiteSpace(value.creatorId)))
+            {
+                squadNetworkService.PublishRouteNode(node);
             }
         }
 
@@ -943,10 +1031,16 @@ namespace eft_where_am_i
                         PublishSavedPingsToSquad();
                         squadPingsPublished = true;
                     }
+                    if (!squadRoutesPublished)
+                    {
+                        PublishSavedRouteNodesToSquad();
+                        squadRoutesPublished = true;
+                    }
                 }
                 else
                 {
                     squadPingsPublished = false;
+                    squadRoutesPublished = false;
                 }
                 await InjectSquadOverlayAsync();
                 await InjectPingOverlayAsync();
@@ -1419,6 +1513,7 @@ namespace eft_where_am_i
                             creatorName = string.IsNullOrWhiteSpace(appSettings.squad_name)
                                 ? Environment.UserName
                                 : appSettings.squad_name.Trim(),
+                            participantSlot = squadNetworkService.LocalParticipantSlot,
                             left = pingLeft,
                             top = pingTop,
                             floor = message["floor"]?.Type == JTokenType.Integer
@@ -1462,8 +1557,9 @@ namespace eft_where_am_i
                     case "map-route-node-add":
                         appSettings.map_route_nodes ??= new List<MapRouteNode>();
                         int currentRouteNodeCount = appSettings.map_route_nodes.Count(node =>
-                            string.Equals(node.map, appSettings.latest_map, StringComparison.OrdinalIgnoreCase));
-                        if (currentRouteNodeCount >= 10)
+                            string.Equals(node.map, appSettings.latest_map, StringComparison.OrdinalIgnoreCase)
+                            && string.IsNullOrWhiteSpace(node.creatorId));
+                        if (currentRouteNodeCount >= 20)
                         {
                             break;
                         }
@@ -1474,18 +1570,24 @@ namespace eft_where_am_i
                         {
                             break;
                         }
-                        appSettings.map_route_nodes.Add(new MapRouteNode
+                        var routeNode = new MapRouteNode
                         {
                             id = Guid.NewGuid().ToString("N"),
                             map = appSettings.latest_map,
+                            creatorName = string.IsNullOrWhiteSpace(appSettings.squad_name)
+                                ? Environment.UserName
+                                : appSettings.squad_name.Trim(),
+                            participantSlot = squadNetworkService.LocalParticipantSlot,
                             left = routeLeft,
                             top = routeTop,
                             floor = message["floor"]?.Type == JTokenType.Integer
                                 ? message["floor"]?.Value<int>()
                                 : null,
                             createdAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
-                        });
+                        };
+                        appSettings.map_route_nodes.Add(routeNode);
                         SaveSettings();
+                        squadNetworkService.PublishRouteNode(routeNode);
                         await InjectRouteOverlayAsync();
                         break;
 
@@ -1495,11 +1597,9 @@ namespace eft_where_am_i
                         {
                             break;
                         }
-                        appSettings.map_route_nodes ??= new List<MapRouteNode>();
-                        appSettings.map_route_nodes.RemoveAll(node =>
-                            string.Equals(node.map, appSettings.latest_map, StringComparison.OrdinalIgnoreCase)
-                            && string.Equals(node.id, routeNodeId, StringComparison.OrdinalIgnoreCase));
+                        RemoveSavedRouteNode(appSettings.latest_map, routeNodeId);
                         SaveSettings();
+                        squadNetworkService.DeleteRouteNode(appSettings.latest_map, routeNodeId);
                         await InjectRouteOverlayAsync();
                         break;
 

@@ -15,13 +15,16 @@ namespace eft_where_am_i.Classes
         private readonly string localPlayerId = Guid.NewGuid().ToString("N");
         private readonly ConcurrentDictionary<string, SquadPosition> positions = new(StringComparer.OrdinalIgnoreCase);
         private readonly ConcurrentDictionary<string, MapPing> pings = new(StringComparer.OrdinalIgnoreCase);
+        private readonly ConcurrentDictionary<string, MapRouteNode> routeNodes = new(StringComparer.OrdinalIgnoreCase);
         private readonly ConcurrentDictionary<string, PeerConnection> hostPeers = new(StringComparer.OrdinalIgnoreCase);
+        private readonly object participantSlotLock = new();
         private CancellationTokenSource? cancellation;
         private TcpListener? listener;
         private PeerConnection? serverConnection;
         private string password = string.Empty;
         private string localName = "Player";
         private string hostName = "Host";
+        private int localParticipantSlot = 1;
         private bool disposed;
 
         public event Action<string>? StatusChanged;
@@ -30,10 +33,13 @@ namespace eft_where_am_i.Classes
         public event Action<MapPing>? PingReceived;
         public event Action<string, string>? PingDeleted;
         public event Action<string>? PingsCleared;
+        public event Action<MapRouteNode>? RouteNodeReceived;
+        public event Action<string, string>? RouteNodeDeleted;
 
         public bool IsHost { get; private set; }
         public bool IsConnected { get; private set; }
         public int Port { get; private set; }
+        public int LocalParticipantSlot => Math.Clamp(localParticipantSlot, 1, 5);
         public string ModeLabel => !IsConnected ? "Disconnected" : IsHost ? "Host" : "Client";
 
         public async Task StartHostAsync(int port, string sessionPassword, string displayName)
@@ -44,6 +50,7 @@ namespace eft_where_am_i.Classes
             cancellation = new CancellationTokenSource();
             password = sessionPassword;
             localName = NormalizeName(displayName);
+            localParticipantSlot = 1;
             Port = port;
             IsHost = true;
             IsConnected = true;
@@ -67,6 +74,7 @@ namespace eft_where_am_i.Classes
             cancellation = new CancellationTokenSource();
             password = sessionPassword;
             localName = NormalizeName(displayName);
+            localParticipantSlot = 2;
             Port = port;
 
             var client = new TcpClient(AddressFamily.InterNetwork);
@@ -125,8 +133,57 @@ namespace eft_where_am_i.Classes
             MapPing ping = source.Copy();
             ping.creatorId = localPlayerId;
             ping.creatorName = localName;
+            ping.participantSlot = LocalParticipantSlot;
             pings[ping.id] = ping;
             var message = new SquadNetworkMessage { type = "ping-upsert", ping = ping };
+            if (IsHost)
+            {
+                _ = BroadcastAsync(message, null, cancellation?.Token ?? CancellationToken.None);
+            }
+            else if (serverConnection != null)
+            {
+                _ = SafeSendAsync(serverConnection, message, cancellation?.Token ?? CancellationToken.None);
+            }
+        }
+
+        public void PublishRouteNode(MapRouteNode source)
+        {
+            if (!IsConnected || source == null || !IsValidRouteNode(source))
+            {
+                return;
+            }
+
+            MapRouteNode node = source.Copy();
+            node.creatorId = localPlayerId;
+            node.creatorName = localName;
+            node.participantSlot = LocalParticipantSlot;
+            routeNodes[node.id] = node;
+            var message = new SquadNetworkMessage { type = "route-node-upsert", routeNode = node };
+            if (IsHost)
+            {
+                _ = BroadcastAsync(message, null, cancellation?.Token ?? CancellationToken.None);
+            }
+            else if (serverConnection != null)
+            {
+                _ = SafeSendAsync(serverConnection, message, cancellation?.Token ?? CancellationToken.None);
+            }
+        }
+
+        public void DeleteRouteNode(string map, string routeNodeId)
+        {
+            string normalizedMap = NormalizeMap(map);
+            if (!IsConnected || normalizedMap.Length == 0 || !IsValidPingId(routeNodeId))
+            {
+                return;
+            }
+
+            RemoveRouteNode(normalizedMap, routeNodeId);
+            var message = new SquadNetworkMessage
+            {
+                type = "route-node-delete",
+                map = normalizedMap,
+                routeNodeId = routeNodeId
+            };
             if (IsHost)
             {
                 _ = BroadcastAsync(message, null, cancellation?.Token ?? CancellationToken.None);
@@ -223,11 +280,13 @@ namespace eft_where_am_i.Classes
             hostPeers.Clear();
             positions.Clear();
             pings.Clear();
+            routeNodes.Clear();
             cancellation?.Dispose();
             cancellation = null;
             IsConnected = false;
             IsHost = false;
             Port = 0;
+            localParticipantSlot = 1;
             if (!disposed)
             {
                 RaiseStatus("Disconnected");
@@ -282,6 +341,27 @@ namespace eft_where_am_i.Classes
                     throw new InvalidOperationException("Duplicate player ID.");
                 }
 
+                lock (participantSlotLock)
+                {
+                    var usedSlots = hostPeers.Values
+                        .Where(value => !ReferenceEquals(value, peer))
+                        .Select(value => value.ParticipantSlot)
+                        .Where(value => value > 0)
+                        .ToHashSet();
+                    peer.ParticipantSlot = Enumerable.Range(2, 4)
+                        .FirstOrDefault(slot => !usedSlots.Contains(slot));
+                    if (peer.ParticipantSlot == 0)
+                    {
+                        peer.ParticipantSlot = 5;
+                    }
+                }
+
+                await peer.SendAsync(new SquadNetworkMessage
+                {
+                    type = "participant-slot",
+                    participantSlot = peer.ParticipantSlot
+                }, token);
+
                 foreach (SquadPosition position in positions.Values)
                 {
                     await peer.SendAsync(new SquadNetworkMessage { type = "position", position = position }, token);
@@ -289,6 +369,10 @@ namespace eft_where_am_i.Classes
                 foreach (MapPing ping in pings.Values.OrderBy(value => value.createdAt))
                 {
                     await peer.SendAsync(new SquadNetworkMessage { type = "ping-upsert", ping = ping.Copy() }, token);
+                }
+                foreach (MapRouteNode node in routeNodes.Values.OrderBy(value => value.createdAt))
+                {
+                    await peer.SendAsync(new SquadNetworkMessage { type = "route-node-upsert", routeNode = node.Copy() }, token);
                 }
 
                 RaiseStatus($"{peer.Name} joined");
@@ -344,6 +428,7 @@ namespace eft_where_am_i.Classes
                     MapPing ping = message.ping.Copy();
                     ping.creatorId = peer.PlayerId;
                     ping.creatorName = peer.Name;
+                    ping.participantSlot = peer.ParticipantSlot;
                     pings[ping.id] = ping;
                     PingReceived?.Invoke(ping.Copy());
                     await BroadcastAsync(new SquadNetworkMessage { type = "ping-upsert", ping = ping }, peer.PlayerId, token);
@@ -367,6 +452,34 @@ namespace eft_where_am_i.Classes
                         type = "ping-delete",
                         map = map,
                         pingId = message.pingId
+                    }, null, token);
+                }
+                else if (message.type == "route-node-upsert" && message.routeNode != null
+                    && IsValidRouteNode(message.routeNode))
+                {
+                    MapRouteNode node = message.routeNode.Copy();
+                    node.creatorId = peer.PlayerId;
+                    node.creatorName = peer.Name;
+                    node.participantSlot = peer.ParticipantSlot;
+                    routeNodes[node.id] = node;
+                    RouteNodeReceived?.Invoke(node.Copy());
+                    await BroadcastAsync(new SquadNetworkMessage
+                    {
+                        type = "route-node-upsert",
+                        routeNode = node
+                    }, peer.PlayerId, token);
+                }
+                else if (message.type == "route-node-delete" && IsValidPingId(message.routeNodeId))
+                {
+                    string map = NormalizeMap(message.map);
+                    if (map.Length == 0) continue;
+                    RemoveRouteNode(map, message.routeNodeId);
+                    RouteNodeDeleted?.Invoke(map, message.routeNodeId);
+                    await BroadcastAsync(new SquadNetworkMessage
+                    {
+                        type = "route-node-delete",
+                        map = map,
+                        routeNodeId = message.routeNodeId
                     }, null, token);
                 }
             }
@@ -416,6 +529,25 @@ namespace eft_where_am_i.Classes
                         if (map.Length == 0) continue;
                         RemovePing(map, message.pingId);
                         PingDeleted?.Invoke(map, message.pingId);
+                    }
+                    else if (message.type == "participant-slot")
+                    {
+                        localParticipantSlot = Math.Clamp(message.participantSlot, 1, 5);
+                        RaiseStatus($"Assigned as {localParticipantSlot}P");
+                    }
+                    else if (message.type == "route-node-upsert" && message.routeNode != null
+                        && IsValidRouteNode(message.routeNode))
+                    {
+                        MapRouteNode node = message.routeNode.Copy();
+                        routeNodes[node.id] = node;
+                        RouteNodeReceived?.Invoke(node.Copy());
+                    }
+                    else if (message.type == "route-node-delete" && IsValidPingId(message.routeNodeId))
+                    {
+                        string map = NormalizeMap(message.map);
+                        if (map.Length == 0) continue;
+                        RemoveRouteNode(map, message.routeNodeId);
+                        RouteNodeDeleted?.Invoke(map, message.routeNodeId);
                     }
                 }
             }
@@ -467,6 +599,15 @@ namespace eft_where_am_i.Classes
             }
         }
 
+        private void RemoveRouteNode(string map, string routeNodeId)
+        {
+            if (routeNodes.TryGetValue(routeNodeId, out MapRouteNode? node)
+                && string.Equals(node.map, map, StringComparison.OrdinalIgnoreCase))
+            {
+                routeNodes.TryRemove(routeNodeId, out _);
+            }
+        }
+
         private static bool IsValidPingId(string? pingId) =>
             !string.IsNullOrWhiteSpace(pingId) && pingId.Length <= 80;
 
@@ -478,6 +619,15 @@ namespace eft_where_am_i.Classes
             && double.IsFinite(ping.top)
             && ping.left >= 0 && ping.left <= 100
             && ping.top >= 0 && ping.top <= 100;
+
+        private static bool IsValidRouteNode(MapRouteNode node) =>
+            !string.IsNullOrWhiteSpace(node.id)
+            && node.id.Length <= 80
+            && NormalizeMap(node.map).Length > 0
+            && double.IsFinite(node.left)
+            && double.IsFinite(node.top)
+            && node.left >= 0 && node.left <= 100
+            && node.top >= 0 && node.top <= 100;
 
         private static string NormalizeMap(string? map)
         {
@@ -674,6 +824,7 @@ namespace eft_where_am_i.Classes
 
             public string PlayerId { get; }
             public string Name { get; }
+            public int ParticipantSlot { get; set; }
 
             public async Task SendAsync(SquadNetworkMessage message, CancellationToken token)
             {

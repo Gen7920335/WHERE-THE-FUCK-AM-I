@@ -17,14 +17,17 @@ assert.match(network, /type\s*=\s*"ping-upsert"/, 'squad ping upsert message is 
 assert.match(network, /type\s*=\s*"ping-clear"/, 'squad ping clear message is missing');
 assert.match(network, /type\s*=\s*"ping-delete"/, 'individual squad ping deletion is missing');
 assert.match(network, /ping\.creatorId\s*=\s*peer\.PlayerId/, 'host must authenticate the ping creator');
+assert.match(network, /ping\.participantSlot\s*=\s*peer\.ParticipantSlot/, 'host must authenticate the ping participant slot');
 assert.match(host, /case\s+"map-ping-add"/, 'map-to-host ping creation is missing');
 assert.match(host, /case\s+"map-pings-toggle"/, 'visibility persistence is missing');
 assert.match(host, /case\s+"map-pings-clear"/, 'delete-all persistence is missing');
 assert.match(overlay, /id\s*=\s*'wtf-ping-control'/, 'left visibility control is missing');
 assert.match(overlay, /id\s*=\s*'wtf-clear-pings-button'/, 'top delete-all control is missing');
 assert.match(overlay, /event\.altKey/, 'ping placement must not steal ordinary map clicks');
-assert.match(overlay, /nearestOverlayMarker\('\.wtf-ping-marker'/, 'repeating Alt-click near a ping must delete it');
+assert.match(overlay, /nearestOverlayMarker\('\.wtf-ping-marker\[data-owned="true"\]'/, 'repeating Alt-click near an owned ping must delete it');
 assert.match(overlay, /action:\s*'map-ping-delete'/, 'nearby ping deletion must reach the host');
+assert.match(overlay, /participantPalette\s*=\s*\[[\s\S]*#ff3b30[\s\S]*#ffd60a[\s\S]*#30d158[\s\S]*#00c7a5[\s\S]*#9a6a3a/, '1P through 5P need distinct fixed colors without blue or purple');
+assert.match(overlay, /applyParticipantColor\(marker, ping\)/, 'ping color must come from its participant slot');
 assert.doesNotMatch(overlay, /setTimeout\([^)]*ping/i, 'pings must not expire on a timer');
 
 const roundTrip = ({ width, height, originX, originY, layoutX, layoutY, matrix, left, top }) => {

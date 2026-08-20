@@ -7,6 +7,9 @@ namespace eft_where_am_i.Classes
     {
         public string id { get; set; } = string.Empty;
         public string map { get; set; } = string.Empty;
+        public string creatorId { get; set; } = string.Empty;
+        public string creatorName { get; set; } = string.Empty;
+        public int participantSlot { get; set; }
         public double left { get; set; }
         public double top { get; set; }
         public int? floor { get; set; }
@@ -16,6 +19,9 @@ namespace eft_where_am_i.Classes
         {
             id = id,
             map = map,
+            creatorId = creatorId,
+            creatorName = creatorName,
+            participantSlot = participantSlot,
             left = left,
             top = top,
             floor = floor,
@@ -29,6 +35,7 @@ namespace eft_where_am_i.Classes
         public string map { get; set; } = string.Empty;
         public string creatorId { get; set; } = string.Empty;
         public string creatorName { get; set; } = string.Empty;
+        public int participantSlot { get; set; }
         public double left { get; set; }
         public double top { get; set; }
         public int? floor { get; set; }
@@ -40,6 +47,7 @@ namespace eft_where_am_i.Classes
             map = map,
             creatorId = creatorId,
             creatorName = creatorName,
+            participantSlot = participantSlot,
             left = left,
             top = top,
             floor = floor,
@@ -177,9 +185,12 @@ namespace eft_where_am_i.Classes
         public string type { get; set; } = string.Empty;
         public SquadPosition? position { get; set; }
         public MapPing? ping { get; set; }
+        public MapRouteNode? routeNode { get; set; }
         public string map { get; set; } = string.Empty;
         public string pingId { get; set; } = string.Empty;
+        public string routeNodeId { get; set; } = string.Empty;
         public string playerId { get; set; } = string.Empty;
+        public int participantSlot { get; set; }
     }
 
     internal sealed class SquadHandshakeMessage
