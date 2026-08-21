@@ -122,10 +122,30 @@
       style = document.createElement('style');
       style.id = 'wtf-enhancement-styles';
       style.textContent = `
-        .panel_top,
+        .panel_top {
+          box-sizing: border-box;
+          max-width: calc(100vw - 30px);
+          zoom: var(--wtf-top-ui-scale, var(--wtf-ui-scale));
+        }
         .panel_left,
         .panel_right {
-          zoom: var(--wtf-ui-scale);
+          box-sizing: border-box;
+          zoom: var(--wtf-side-ui-scale, var(--wtf-ui-scale));
+        }
+        .panel_top > :first-child {
+          align-items: center;
+          display: flex !important;
+          flex-wrap: wrap !important;
+          max-width: 100%;
+        }
+        .panel_top > :first-child > * {
+          flex: 0 0 auto !important;
+          min-width: max-content;
+        }
+        .panel_top button,
+        .panel_top input,
+        .panel_top label {
+          white-space: nowrap;
         }
         .marker {
           scale: var(--wtf-icon-scale);
@@ -139,6 +159,7 @@
       `;
       (document.head || root).appendChild(style);
     }
+    scheduleResponsivePanelLayout();
   };
 
   const requestMarkerRedraw = () => {
@@ -189,6 +210,7 @@
     pingLayer: null,
     route: { map: '', nodes: [], maxNodes: 20, localNodeCount: 0 },
     routeVisible: true,
+    panelLayoutFrame: 0,
     routeLayer: null,
     mapWrap: null,
     domObserver: null,
@@ -211,6 +233,56 @@
     localizedTextOriginals: new WeakMap(),
     updateFrame: 0,
     hydrateFrame: 0
+  };
+
+  const numericCssVariable = (root, name, fallback) => {
+    const value = Number.parseFloat(getComputedStyle(root).getPropertyValue(name));
+    return Number.isFinite(value) && value > 0 ? value : fallback;
+  };
+
+  const applyResponsivePanelLayout = () => {
+    wtfOverlayState.panelLayoutFrame = 0;
+    const root = document.documentElement;
+    const topPanel = document.querySelector('.panel_top');
+    const leftPanel = document.querySelector('.panel_left');
+    const rightPanel = document.querySelector('.panel_right');
+    const mapContainer = document.querySelector('.map-cont');
+    if (!root) return;
+
+    const viewportWidth = Math.max(0, document.documentElement.clientWidth || window.innerWidth || 0);
+    const currentTopScale = numericCssVariable(root, '--wtf-top-ui-scale', state.uiScale);
+    const currentSideScale = numericCssVariable(root, '--wtf-side-ui-scale', state.uiScale);
+    let topScale = state.uiScale;
+    let sideScale = state.uiScale;
+
+    if (topPanel && viewportWidth > 0) {
+      const topWidth = topPanel.getBoundingClientRect().width / currentTopScale;
+      if (topWidth > 0) {
+        topScale = Math.min(topScale, Math.max(0.65, (viewportWidth - 30) / topWidth));
+      }
+      topPanel.style.maxWidth = `${Math.max(1, (viewportWidth - 30) / topScale)}px`;
+    }
+
+    if (leftPanel && rightPanel && mapContainer) {
+      const mapWidth = mapContainer.getBoundingClientRect().width;
+      const leftWidth = leftPanel.getBoundingClientRect().width / currentSideScale;
+      const rightWidth = rightPanel.getBoundingClientRect().width / currentSideScale;
+      const basePanelWidth = leftWidth + rightWidth;
+      const minimumMapWidth = 260;
+      const panelMarginsAndGap = 30;
+      if (mapWidth > 0 && basePanelWidth > 0) {
+        const maximumSideScale = (mapWidth - minimumMapWidth - panelMarginsAndGap) / basePanelWidth;
+        sideScale = Math.min(sideScale, Math.max(0.65, maximumSideScale));
+      }
+    }
+
+    root.style.setProperty('--wtf-top-ui-scale', String(topScale));
+    root.style.setProperty('--wtf-side-ui-scale', String(sideScale));
+  };
+
+  const scheduleResponsivePanelLayout = () => {
+    if (wtfOverlayState.panelLayoutFrame) return;
+    wtfOverlayState.panelLayoutFrame = requestAnimationFrame(applyResponsivePanelLayout);
   };
 
   const tarkovMarketQuestIconPath = 'm253.943,502.885c-66.495,0-129.01-25.895-176.029-72.913C30.895,382.953,5,320.438,5,253.943S30.895,124.933,77.914,77.914,187.448,5,253.943,5s129.01,25.895,176.029,72.914c47.019,47.019,72.913,109.534,72.913,176.029s-25.895,129.01-72.913,176.029c-47.02,47.019-109.534,72.913-176.029,72.913Zm0-437.885c-104.184,0-188.943,84.759-188.943,188.943s84.759,188.942,188.943,188.942,188.942-84.759,188.942-188.942-84.759-188.943-188.942-188.943Zm40,289.2h-80v70h80v-70Zm0-269.75h-80v250.265h80V84.449Z';
@@ -1666,6 +1738,7 @@
 
     if (desired) wtfOverlayState.questPins.set(key, questName);
     else wtfOverlayState.questPins.delete(key);
+    if (desired) forceNativeQuestFilterOff();
     syncNativeQuestCheckbox(row, checkbox);
     syncQuestRequirementsPanel();
     renderQuestMarkers();
@@ -2133,8 +2206,9 @@
   };
 
   const findNativeQuestVisibilityRow = () => {
-    const iconRow = document.querySelector(
-      '.panel_left path[d^="m253.943,502.885"]'
+    const iconRow = (
+      document.querySelector('.panel_left .icon_quest')
+      || document.querySelector('.panel_left path[d^="m253.943,502.885"]')
     )?.closest('.items > div');
     if (iconRow) return iconRow;
 
@@ -2143,7 +2217,10 @@
       .toLowerCase();
     const isQuestLabel = (value) => {
       const normalized = normalize(value).replace(/\d+$/, '');
-      return normalized.includes('quest') || normalized.includes('퀘스트');
+      return normalized.includes('quest')
+        || normalized.includes('mission')
+        || normalized.includes('퀘스트')
+        || normalized.includes('임무');
     };
 
     for (const section of document.querySelectorAll('.panel_left .two-columns > div')) {
@@ -2843,6 +2920,7 @@
     ensureRouteLayer();
     updatePingFloorOpacity();
     updateRouteFloorOpacity();
+    scheduleResponsivePanelLayout();
   };
 
   const scheduleWtfEnhancementHydration = () => {
@@ -2862,6 +2940,7 @@
     });
     window.addEventListener('resize', scheduleOverlayPositionUpdate, { passive: true });
     window.addEventListener('resize', applyQuestRequirementsPanelLayout, { passive: true });
+    window.addEventListener('resize', scheduleResponsivePanelLayout, { passive: true });
     window.addEventListener('keydown', (event) => {
       if (event.key === 'Escape' && wtfOverlayState.questPopup && !wtfOverlayState.questPopup.hidden) {
         closeQuestPopup();
@@ -2897,6 +2976,7 @@
       addNativeQuestCheckboxes();
       syncQuestRequirementsPanel();
       renderQuestMarkers();
+      if (wtfOverlayState.questPins.size) forceNativeQuestFilterOff();
       loadLiveQuestMarkers();
     },
     debugSnapshot() {

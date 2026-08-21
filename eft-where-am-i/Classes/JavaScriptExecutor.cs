@@ -791,7 +791,8 @@ namespace eft_where_am_i.Classes
 
         /// <summary>
         /// 패널이 현재 숨겨져 있는지 확인합니다.
-        /// 버튼 텍스트가 "Show panels"를 포함하면 패널이 숨겨진 상태입니다.
+        /// 원본 패널의 collapsed 클래스를 우선 사용하고, 패널 DOM이 아직 준비되지
+        /// 않은 경우에만 버튼 텍스트를 보조 판정으로 사용합니다.
         /// </summary>
         public async Task<bool> IsPanelHiddenAsync()
         {
@@ -802,11 +803,24 @@ namespace eft_where_am_i.Classes
 
                 string script = $@"
                 (function() {{
+                    var leftPanel = document.querySelector('.panel_left');
+                    var rightPanel = document.querySelector('.panel_right');
+                    if (leftPanel || rightPanel) {{
+                        var isCollapsed = Boolean(
+                            leftPanel && leftPanel.classList.contains('collapsed')
+                            || rightPanel && rightPanel.classList.contains('collapsed')
+                        );
+                        return isCollapsed ? 'true' : 'false';
+                    }}
+
                     var btn = document.querySelector({JsLiteral(Constants.HIDE_SHOW_PANNE_BUTTON_SELECTOR)});
                     if (!btn) return 'false';
 
                     var text = (btn.textContent || '').toLowerCase();
-                    var isHidden = text.includes('show pannels') || text.includes('show panels') || text.includes('show panel');
+                    var isHidden = text.includes('show pannels')
+                        || text.includes('show panels')
+                        || text.includes('show panel')
+                        || text.includes('패널 표시');
                     return isHidden ? 'true' : 'false';
                 }})()";
 
