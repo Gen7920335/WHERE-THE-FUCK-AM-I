@@ -812,6 +812,23 @@
         position: absolute;
         z-index: 7;
       }
+      .wtf-quest-zone-canvas {
+        height: 100%;
+        inset: 0;
+        overflow: hidden;
+        pointer-events: none !important;
+        position: absolute;
+        width: 100%;
+      }
+      .wtf-quest-zone {
+        fill-opacity: .22;
+        pointer-events: none !important;
+        stroke-linejoin: round;
+        stroke-width: 1.4;
+      }
+      .wtf-quest-zone.wtf-other-floor {
+        opacity: .2;
+      }
       .wtf-quest-marker {
         align-items: center;
         cursor: pointer;
@@ -1789,7 +1806,7 @@
     value && typeof value === 'object' && 'value' in value ? value.value : value
   );
 
-  const projectLiveQuestMarker = (mapSlug, x, y) => {
+  const projectLiveQuestMarker = (mapSlug, x, y, allowOutside = false) => {
     const definition = tarkovMarketMapDefinitions[String(mapSlug || '').toLowerCase()];
     x = Number(x);
     y = Number(y);
@@ -1803,8 +1820,8 @@
     const mapY = Math.round((definition.yOffset - (rotatedY * definition.ratio)) * 10000) / 10000;
     const left = (mapX / definition.width) * 100;
     const top = (mapY / definition.height) * 100;
-    if (!Number.isFinite(left) || !Number.isFinite(top)
-      || left < 0 || left > 100 || top < 0 || top > 100) return null;
+    if (!Number.isFinite(left) || !Number.isFinite(top)) return null;
+    if (!allowOutside && (left < 0 || left > 100 || top < 0 || top > 100)) return null;
     return { left, top };
   };
 
@@ -1844,22 +1861,32 @@
         || marker?.subCategory !== 'Quest'
         || !marker?.questUid
         || !marker?.geometry) continue;
-      const point = projectLiveQuestMarker(mapSlug, marker.geometry.x, marker.geometry.y);
-      if (!point) continue;
       const quest = questsByUid.get(String(marker.questUid));
       const questName = questDisplayNameFromLiveData(quest);
-      markers.push({
+      const common = {
         markerUid: String(marker.uid || ''),
         questId: String(marker.questUid),
         quest: questName,
         objective: String(marker.name || marker.desc || ''),
         questStepUids: Array.isArray(marker.questStepUids) ? [...marker.questStepUids] : [],
-        left: point.left,
-        top: point.top,
         level: marker.level === null || marker.level === undefined ? null : Number(marker.level),
         storyline: quest?.type === 'Storyline',
         requiredForKappa: Boolean(quest?.requiredForKappa)
-      });
+      };
+      const polygon = Array.isArray(marker.geometry.points)
+        ? marker.geometry.points
+          .map((coordinate) => Array.isArray(coordinate) && coordinate.length >= 2
+            ? projectLiveQuestMarker(mapSlug, coordinate[0], coordinate[1], true)
+            : null)
+          .filter(Boolean)
+        : [];
+      if (polygon.length >= 3) {
+        markers.push({ ...common, kind: 'zone', points: polygon });
+        continue;
+      }
+      const point = projectLiveQuestMarker(mapSlug, marker.geometry.x, marker.geometry.y);
+      if (!point) continue;
+      markers.push({ ...common, kind: 'point', left: point.left, top: point.top });
     }
     return { map: mapSlug, markers, questCount: quests.length };
   };
@@ -2564,7 +2591,7 @@
 
   const updateQuestMarkerFloorOpacity = () => {
     const selectedFloor = selectedPingFloor();
-    for (const marker of document.querySelectorAll('.wtf-quest-marker')) {
+    for (const marker of document.querySelectorAll('.wtf-quest-marker, .wtf-quest-zone')) {
       const markerFloor = Number(marker.dataset.floor);
       const hasFloor = marker.dataset.floor !== '' && Number.isFinite(markerFloor);
       marker.classList.toggle('wtf-other-floor', selectedFloor !== null
@@ -2582,7 +2609,30 @@
       .filter((markerData) => pinnedQuestUids.has(String(markerData.questId))
         || wtfOverlayState.questPins.has(normalizeQuestName(markerData.quest)));
 
-    for (const markerData of markerDataList) {
+    const zoneDataList = markerDataList.filter((markerData) => markerData.kind === 'zone');
+    if (zoneDataList.length) {
+      const zoneCanvas = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      zoneCanvas.classList.add('wtf-quest-zone-canvas');
+      zoneCanvas.setAttribute('aria-hidden', 'true');
+      zoneCanvas.setAttribute('preserveAspectRatio', 'none');
+      for (const markerData of zoneDataList) {
+        const zone = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+        zone.classList.add('wtf-quest-zone');
+        zone.dataset.floor = markerData.level === null || markerData.level === undefined
+          ? ''
+          : String(markerData.level);
+        zone.dataset.questUid = String(markerData.questId || '');
+        zone.dataset.markerUid = String(markerData.markerUid || '');
+        zone.__wtfQuestPoints = markerData.points;
+        const color = liveQuestMarkerColor(markerData);
+        zone.setAttribute('fill', color);
+        zone.setAttribute('stroke', color);
+        zoneCanvas.appendChild(zone);
+      }
+      overlay.appendChild(zoneCanvas);
+    }
+
+    for (const markerData of markerDataList.filter((candidate) => candidate.kind !== 'zone')) {
       const marker = document.createElement('div');
       marker.className = 'wtf-quest-marker';
       marker.dataset.left = String(markerData.left);
@@ -2672,20 +2722,41 @@
     const nativeQuestMarkerScale = currentZoom >= baseZoom
       ? 1
       : Math.max(0.5, Math.sqrt(currentZoom / baseZoom));
+    const screenPoint = (left, top) => {
+      const localX = (Number(left) / 100) * width;
+      const localY = (Number(top) / 100) * height;
+      const relativeX = localX - originX;
+      const relativeY = localY - originY;
+      return {
+        x: layout.left + originX + (matrix.a * relativeX) + (matrix.c * relativeY) + matrix.e,
+        y: layout.top + originY + (matrix.b * relativeX) + (matrix.d * relativeY) + matrix.f
+      };
+    };
+
+    const zoneCanvas = wtfOverlayState.questLayer?.querySelector('.wtf-quest-zone-canvas');
+    if (zoneCanvas) {
+      const canvasWidth = Math.max(1, mapContainer.clientWidth || mapContainer.offsetWidth || 1);
+      const canvasHeight = Math.max(1, mapContainer.clientHeight || mapContainer.offsetHeight || 1);
+      zoneCanvas.setAttribute('viewBox', `0 0 ${canvasWidth} ${canvasHeight}`);
+      for (const zone of zoneCanvas.querySelectorAll('.wtf-quest-zone')) {
+        const points = Array.isArray(zone.__wtfQuestPoints) ? zone.__wtfQuestPoints : [];
+        zone.setAttribute('points', points.map((point) => {
+          const screen = screenPoint(point.left, point.top);
+          return `${screen.x},${screen.y}`;
+        }).join(' '));
+      }
+    }
 
     for (const marker of document.querySelectorAll('.wtf-quest-marker, .wtf-squad-marker, .wtf-ping-marker, .wtf-route-node')) {
       if (marker.parentElement !== wtfOverlayState.questLayer
           && marker.parentElement !== wtfOverlayState.squadLayer
           && marker.parentElement !== wtfOverlayState.pingLayer
           && marker.parentElement !== wtfOverlayState.routeLayer) continue;
-      const localX = (Number(marker.dataset.left) / 100) * width;
-      const localY = (Number(marker.dataset.top) / 100) * height;
-      const relativeX = localX - originX;
-      const relativeY = localY - originY;
+      const screen = screenPoint(marker.dataset.left, marker.dataset.top);
       const spreadX = Number(marker.dataset.spreadX) || 0;
       const spreadY = Number(marker.dataset.spreadY) || 0;
-      marker.style.left = (layout.left + originX + (matrix.a * relativeX) + (matrix.c * relativeY) + matrix.e + spreadX) + 'px';
-      marker.style.top = (layout.top + originY + (matrix.b * relativeX) + (matrix.d * relativeY) + matrix.f + spreadY) + 'px';
+      marker.style.left = (screen.x + spreadX) + 'px';
+      marker.style.top = (screen.y + spreadY) + 'px';
       if (marker.classList.contains('wtf-quest-marker')) {
         marker.style.setProperty(
           '--wtf-quest-marker-scale',

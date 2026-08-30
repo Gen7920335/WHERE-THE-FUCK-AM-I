@@ -682,17 +682,16 @@ namespace eft_where_am_i
                 return;
             }
 
-            // 퀘스트 컨테이너 로드 대기 (DOM 준비 완료까지 대기)
-            bool containerReady = await jsExecutor.WaitForQuestContainerAsync(15000);
-
             // 패널 상태 복원: 저장된 값이 있으면 그 상태로, 없으면 첫 실행이므로 열려 있는 상태로 맞춤
             await RestorePanelVisibilityAsync(appSettings.latest_map);
 
-            if (containerReady)
-            {
-                await InjectQuestOverlayAsync();
-                await RestoreQuestsAsync(appSettings.latest_map);
-            }
+            // The native quest list is lazy-rendered only after its text/category is
+            // opened.  Pinned markers must not depend on that interaction: the WTFMI
+            // overlay reads Tarkov-Market's live store directly and can be restored as
+            // soon as navigation completes.  DOM hydration will add checkboxes later
+            // if/when the native list is opened.
+            await InjectQuestOverlayAsync();
+            await RestoreQuestsAsync(appSettings.latest_map);
 
             await InjectSquadOverlayAsync();
             await InjectPingOverlayAsync();
@@ -1119,16 +1118,11 @@ namespace eft_where_am_i
             // SPA 라우팅으로 맵이 실제 변경된 경우에만 각종 초기화 작업 재개
             if (jsExecutor != null)
             {
-                bool containerReady = await jsExecutor.WaitForQuestContainerAsync(15000);
-
                 await RestorePanelVisibilityAsync(appSettings.latest_map);
 
-                if (containerReady)
-                {
-                    await jsExecutor.ExecuteScriptAsync(Constants.ADD_DIRECTION_INDICATORS_SCRIPT);
-                    await InjectQuestOverlayAsync();
-                    await RestoreQuestsAsync(appSettings.latest_map);
-                }
+                await jsExecutor.ExecuteScriptAsync(Constants.ADD_DIRECTION_INDICATORS_SCRIPT);
+                await InjectQuestOverlayAsync();
+                await RestoreQuestsAsync(appSettings.latest_map);
 
                 await InjectSquadOverlayAsync();
                 await InjectPingOverlayAsync();
