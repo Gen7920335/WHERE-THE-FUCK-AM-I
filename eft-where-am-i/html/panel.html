@@ -39,6 +39,44 @@
       font-variant-numeric: tabular-nums;
       text-align: right;
     }
+    html.portrait-mode body > .grid {
+      grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+      column-gap: .5rem !important;
+    }
+    html.portrait-mode button {
+      font-size: 50% !important;
+      line-height: 1.1 !important;
+      padding: .125rem .25rem !important;
+      width: 50% !important;
+    }
+    html.portrait-mode .scale-stack {
+      grid-column: 4 / 6 !important;
+      column-gap: .75rem;
+      padding-inline: .5rem;
+    }
+    html.portrait-mode .scale-control input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+      flex-basis: 5.5rem;
+      height: 1.35rem;
+      min-width: 4.5rem;
+    }
+    html.portrait-mode .scale-control input[type="range"]::-webkit-slider-runnable-track {
+      background: #b8ad95;
+      border-radius: 999px;
+      height: .42rem;
+    }
+    html.portrait-mode .scale-control input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      background: #8d7a50;
+      border: 1px solid #55492f;
+      border-radius: 50%;
+      height: 1.1rem;
+      margin-top: -.34rem;
+      width: 1.1rem;
+    }
   </style>
 </head>
 <body class="flex items-center justify-center bg-gray-200 w-full h-full">
@@ -193,6 +231,10 @@
   </div>
 
   <script>
+    function setPortraitMode(enabled) {
+      document.documentElement.classList.toggle('portrait-mode', Boolean(enabled));
+    }
+
     i18next
       .use(i18nextHttpBackend)
       .init({

@@ -127,6 +127,14 @@
           max-width: calc(100vw - 30px);
           zoom: var(--wtf-top-ui-scale, var(--wtf-ui-scale));
         }
+        .panel_top.desktop-panel {
+          display: block !important;
+        }
+        .mobile-map-ui {
+          display: none !important;
+          pointer-events: none !important;
+          visibility: hidden !important;
+        }
         .panel_left,
         .panel_right {
           box-sizing: border-box;
@@ -146,6 +154,105 @@
         .panel_top input,
         .panel_top label {
           white-space: nowrap;
+        }
+        #wtf-portrait-panel-shell {
+          background: rgba(11, 12, 12, .94);
+          border: 1px solid rgba(129, 117, 91, .72);
+          box-shadow: 0 8px 24px rgba(0, 0, 0, .62);
+          box-sizing: border-box;
+          display: none;
+          pointer-events: none;
+          position: absolute;
+          z-index: 19;
+        }
+        #wtf-portrait-panel-shell[hidden] {
+          display: none !important;
+        }
+        html[data-wtf-layout="portrait"] #wtf-portrait-panel-shell {
+          display: block;
+          height: var(--wtf-portrait-panel-height);
+          left: var(--wtf-portrait-panel-left);
+          top: var(--wtf-portrait-panel-top);
+          width: var(--wtf-portrait-panel-width);
+        }
+        html[data-wtf-layout="portrait"] .panel_left,
+        html[data-wtf-layout="portrait"] .panel_right {
+          background: rgba(11, 12, 12, .9) !important;
+          bottom: auto !important;
+          box-sizing: border-box !important;
+          height: var(--wtf-portrait-panel-height) !important;
+          margin: 0 !important;
+          max-height: var(--wtf-portrait-panel-height) !important;
+          overflow-x: hidden !important;
+          overflow-y: auto !important;
+          right: auto !important;
+          top: var(--wtf-portrait-panel-top) !important;
+          zoom: 1 !important;
+        }
+        html[data-wtf-layout="portrait"] .panel_left {
+          border-right: 1px solid rgba(129, 117, 91, .55);
+          left: var(--wtf-portrait-panel-left) !important;
+          padding: 8px 6px 8px 8px;
+          width: var(--wtf-portrait-left-width) !important;
+        }
+        html[data-wtf-layout="portrait"] .panel_right {
+          align-items: stretch !important;
+          display: flex !important;
+          flex-direction: column !important;
+          left: var(--wtf-portrait-right-left) !important;
+          overflow-y: hidden !important;
+          padding: 8px 8px 8px 6px;
+          width: var(--wtf-portrait-right-width) !important;
+        }
+        html[data-wtf-layout="portrait"] .panel_left > *,
+        html[data-wtf-layout="portrait"] .panel_right > * {
+          box-sizing: border-box !important;
+          flex: 0 0 auto;
+          max-width: none !important;
+          zoom: var(--wtf-portrait-content-scale);
+        }
+        html[data-wtf-layout="portrait"] .panel_left > * {
+          width: var(--wtf-portrait-left-content-width) !important;
+        }
+        html[data-wtf-layout="portrait"] .panel_right > * {
+          width: var(--wtf-portrait-right-content-width) !important;
+        }
+        html[data-wtf-layout="portrait"] .panel_right .tools_quests .items.scroll {
+          flex: 1 1 auto !important;
+          height: auto !important;
+          max-width: none !important;
+          max-height: none !important;
+          min-height: 0 !important;
+          overscroll-behavior: contain;
+          overflow-y: auto !important;
+          width: 100% !important;
+        }
+        html[data-wtf-layout="portrait"] .panel_right > .tools_quests {
+          display: flex !important;
+          flex: 0 0 var(--wtf-portrait-quest-height, 200px) !important;
+          flex-direction: column !important;
+          height: var(--wtf-portrait-quest-height, 200px) !important;
+          max-height: var(--wtf-portrait-quest-height, 200px) !important;
+          min-height: 0 !important;
+          overflow: hidden !important;
+        }
+        html[data-wtf-layout="portrait"] .panel_right > .tools_quests > .quests-content {
+          display: flex !important;
+          flex: 1 1 auto !important;
+          height: auto !important;
+          min-height: 0 !important;
+          overflow: hidden !important;
+        }
+        html[data-wtf-layout="portrait"] .panel_right > .tools_quests > .quests-content > :not(.quests-details-col) {
+          display: flex !important;
+          flex: 1 1 auto !important;
+          flex-direction: column !important;
+          min-height: 0 !important;
+          overflow: hidden !important;
+        }
+        html[data-wtf-layout="portrait"][data-wtf-panels-collapsed="true"] .panel_left,
+        html[data-wtf-layout="portrait"][data-wtf-panels-collapsed="true"] .panel_right {
+          display: none !important;
         }
         .marker {
           scale: var(--wtf-icon-scale);
@@ -211,6 +318,7 @@
     route: { map: '', nodes: [], maxNodes: 20, localNodeCount: 0 },
     routeVisible: true,
     panelLayoutFrame: 0,
+    portraitPanelShell: null,
     routeLayer: null,
     mapWrap: null,
     domObserver: null,
@@ -240,6 +348,52 @@
     return Number.isFinite(value) && value > 0 ? value : fallback;
   };
 
+  const ensurePortraitPanelShell = (mapContainer) => {
+    let shell = wtfOverlayState.portraitPanelShell;
+    if (!shell || !shell.isConnected) {
+      shell = document.getElementById('wtf-portrait-panel-shell');
+    }
+    if (!shell) {
+      shell = document.createElement('div');
+      shell.id = 'wtf-portrait-panel-shell';
+      shell.hidden = true;
+      shell.setAttribute('aria-hidden', 'true');
+      mapContainer.appendChild(shell);
+    } else if (shell.parentElement !== mapContainer) {
+      mapContainer.appendChild(shell);
+    }
+    wtfOverlayState.portraitPanelShell = shell;
+    return shell;
+  };
+
+  const applyPortraitQuestScrollHeight = (rightPanel, panelHeight, contentScale, root) => {
+    const questPanel = Array.from(rightPanel.children)
+      .find(element => element.classList?.contains('tools_quests'));
+    if (!questPanel) return;
+
+    const panelStyle = getComputedStyle(rightPanel);
+    const padding = Number.parseFloat(panelStyle.paddingTop || '0')
+      + Number.parseFloat(panelStyle.paddingBottom || '0');
+    const marginHeight = (element) => {
+      const style = getComputedStyle(element);
+      return (
+        Number.parseFloat(style.marginTop || '0')
+        + Number.parseFloat(style.marginBottom || '0')
+      ) * contentScale;
+    };
+    const fixedPhysicalHeight = Array.from(rightPanel.children)
+      .filter(element => element !== questPanel)
+      .reduce((total, element) => total + element.getBoundingClientRect().height + marginHeight(element), 0);
+    const availablePhysicalHeight = Math.max(
+      80,
+      panelHeight - padding - fixedPhysicalHeight - marginHeight(questPanel)
+    );
+    root.style.setProperty(
+      '--wtf-portrait-quest-height',
+      `${availablePhysicalHeight / contentScale}px`
+    );
+  };
+
   const applyResponsivePanelLayout = () => {
     wtfOverlayState.panelLayoutFrame = 0;
     const root = document.documentElement;
@@ -250,34 +404,99 @@
     if (!root) return;
 
     const viewportWidth = Math.max(0, document.documentElement.clientWidth || window.innerWidth || 0);
+    const viewportHeight = Math.max(0, document.documentElement.clientHeight || window.innerHeight || 0);
+    const portrait = viewportHeight > viewportWidth;
     const currentTopScale = numericCssVariable(root, '--wtf-top-ui-scale', state.uiScale);
     const currentSideScale = numericCssVariable(root, '--wtf-side-ui-scale', state.uiScale);
     let topScale = state.uiScale;
     let sideScale = state.uiScale;
 
+    root.dataset.wtfLayout = portrait ? 'portrait' : 'landscape';
+
     if (topPanel && viewportWidth > 0) {
       const topWidth = topPanel.getBoundingClientRect().width / currentTopScale;
       if (topWidth > 0) {
-        topScale = Math.min(topScale, Math.max(0.65, (viewportWidth - 30) / topWidth));
+        const maximumTopScale = portrait ? 1.15 : state.uiScale;
+        const minimumTopScale = portrait ? 0.5 : 0.65;
+        const fittedTopScale = Math.min(
+          topScale,
+          maximumTopScale,
+          Math.max(minimumTopScale, (viewportWidth - 30) / topWidth)
+        );
+        topScale = portrait
+          ? clamp(fittedTopScale * 0.5, 0.35, 0.65, 0.5)
+          : fittedTopScale;
       }
       topPanel.style.maxWidth = `${Math.max(1, (viewportWidth - 30) / topScale)}px`;
     }
+    root.style.setProperty('--wtf-top-ui-scale', String(topScale));
 
     if (leftPanel && rightPanel && mapContainer) {
-      const mapWidth = mapContainer.getBoundingClientRect().width;
-      const leftWidth = leftPanel.getBoundingClientRect().width / currentSideScale;
-      const rightWidth = rightPanel.getBoundingClientRect().width / currentSideScale;
-      const basePanelWidth = leftWidth + rightWidth;
-      const minimumMapWidth = 260;
-      const panelMarginsAndGap = 30;
-      if (mapWidth > 0 && basePanelWidth > 0) {
-        const maximumSideScale = (mapWidth - minimumMapWidth - panelMarginsAndGap) / basePanelWidth;
-        sideScale = Math.min(sideScale, Math.max(0.65, maximumSideScale));
+      const mapRect = mapContainer.getBoundingClientRect();
+      const shell = ensurePortraitPanelShell(mapContainer);
+      const panelsCollapsed = leftPanel.classList.contains('collapsed')
+        || rightPanel.classList.contains('collapsed');
+      root.dataset.wtfPanelsCollapsed = panelsCollapsed ? 'true' : 'false';
+
+      if (portrait && mapRect.width > 0 && mapRect.height > 0) {
+        const panelLeft = Math.min(12, Math.max(6, mapRect.width * 0.02));
+        const panelWidth = Math.max(1, mapRect.width - panelLeft * 2);
+        const leftWidth = panelWidth * 0.25;
+        const rightWidth = panelWidth - leftWidth;
+        const topRect = topPanel?.getBoundingClientRect();
+        const topClearance = Math.max(
+          8,
+          topRect?.height > 0 ? topRect.bottom - mapRect.top + 8 : 76
+        );
+        const panelBottom = 12;
+        const availableHeight = Math.max(180, mapRect.height - topClearance - panelBottom);
+        const panelHeight = Math.min(availableHeight, Math.min(480, Math.max(260, mapRect.height * 0.34)));
+        const panelTop = Math.max(topClearance, mapRect.height - panelHeight - panelBottom);
+        const automaticPortraitScale = clamp(mapRect.width / 980, 0.72, 1, 0.85);
+        const portraitContentScale = clamp(
+          automaticPortraitScale * state.uiScale,
+          0.65,
+          1.15,
+          automaticPortraitScale
+        );
+
+        sideScale = 1;
+        root.style.setProperty('--wtf-portrait-panel-left', `${panelLeft}px`);
+        root.style.setProperty('--wtf-portrait-panel-top', `${panelTop}px`);
+        root.style.setProperty('--wtf-portrait-panel-width', `${panelWidth}px`);
+        root.style.setProperty('--wtf-portrait-panel-height', `${panelHeight}px`);
+        root.style.setProperty('--wtf-portrait-left-width', `${leftWidth}px`);
+        root.style.setProperty('--wtf-portrait-right-left', `${panelLeft + leftWidth}px`);
+        root.style.setProperty('--wtf-portrait-right-width', `${rightWidth}px`);
+        root.style.setProperty('--wtf-portrait-content-scale', String(portraitContentScale));
+        root.style.setProperty(
+          '--wtf-portrait-left-content-width',
+          `${Math.max(1, leftWidth - 15) / portraitContentScale}px`
+        );
+        root.style.setProperty(
+          '--wtf-portrait-right-content-width',
+          `${Math.max(1, rightWidth - 14) / portraitContentScale}px`
+        );
+        applyPortraitQuestScrollHeight(rightPanel, panelHeight, portraitContentScale, root);
+        shell.hidden = panelsCollapsed;
+      } else {
+        shell.hidden = true;
+        const mapWidth = mapRect.width;
+        const leftWidth = leftPanel.getBoundingClientRect().width / currentSideScale;
+        const rightWidth = rightPanel.getBoundingClientRect().width / currentSideScale;
+        const basePanelWidth = leftWidth + rightWidth;
+        const minimumMapWidth = 260;
+        const panelMarginsAndGap = 30;
+        if (mapWidth > 0 && basePanelWidth > 0) {
+          const maximumSideScale = (mapWidth - minimumMapWidth - panelMarginsAndGap) / basePanelWidth;
+          sideScale = Math.min(sideScale, Math.max(0.65, maximumSideScale));
+        }
       }
     }
 
     root.style.setProperty('--wtf-top-ui-scale', String(topScale));
     root.style.setProperty('--wtf-side-ui-scale', String(sideScale));
+    applyQuestRequirementsPanelLayout();
   };
 
   const scheduleResponsivePanelLayout = () => {
@@ -1029,14 +1248,29 @@
     if (!panel) return;
     const layout = state.questRequirementsPanel;
     const mode = layout.mode;
+    const topPanelRect = document.querySelector('.panel_top')?.getBoundingClientRect();
     const leftPanelRect = document.querySelector('.panel_left')?.getBoundingClientRect();
     const rightPanelRect = document.querySelector('.panel_right')?.getBoundingClientRect();
-    const leftBoundary = leftPanelRect?.width > 0 ? leftPanelRect.right + 10 : 10;
-    const rightBoundary = rightPanelRect?.width > 0 ? rightPanelRect.left - 10 : window.innerWidth - 10;
+    const portrait = document.documentElement?.dataset.wtfLayout === 'portrait';
+    const leftBoundary = portrait
+      ? 10
+      : leftPanelRect?.width > 0 ? leftPanelRect.right + 10 : 10;
+    const rightBoundary = portrait
+      ? window.innerWidth - 10
+      : rightPanelRect?.width > 0 ? rightPanelRect.left - 10 : window.innerWidth - 10;
     const centerWidth = Math.max(260, rightBoundary - leftBoundary);
     const width = Math.min(layout.width, mode === 'bottom' ? centerWidth : Math.max(260, window.innerWidth - 20));
-    const dockTop = rightPanelRect?.height > 0 ? Math.max(10, rightPanelRect.top) : 72;
-    const height = Math.min(layout.height, Math.max(120, window.innerHeight - dockTop - 10));
+    const portraitPanelTop = Math.min(
+      leftPanelRect?.height > 0 ? leftPanelRect.top : Number.POSITIVE_INFINITY,
+      rightPanelRect?.height > 0 ? rightPanelRect.top : Number.POSITIVE_INFINITY
+    );
+    const dockTop = portrait && topPanelRect?.height > 0
+      ? topPanelRect.bottom + 10
+      : rightPanelRect?.height > 0 ? Math.max(10, rightPanelRect.top) : 72;
+    const dockBottom = portrait && Number.isFinite(portraitPanelTop)
+      ? Math.max(dockTop + 120, portraitPanelTop - 10)
+      : window.innerHeight - 10;
+    const height = Math.min(layout.height, Math.max(120, dockBottom - dockTop));
 
     panel.classList.toggle('wtf-collapsed', layout.collapsed);
     panel.dataset.mode = mode;
@@ -1050,7 +1284,9 @@
 
     if (mode === 'bottom') {
       panel.style.left = `${leftBoundary + centerWidth / 2}px`;
-      panel.style.bottom = '10px';
+      panel.style.bottom = portrait && Number.isFinite(portraitPanelTop)
+        ? `${Math.max(10, window.innerHeight - portraitPanelTop + 10)}px`
+        : '10px';
       panel.style.transform = 'translateX(-50%)';
     } else if (mode === 'floating') {
       const x = Math.min(Math.max(0, layout.x), Math.max(0, window.innerWidth - width));
@@ -1060,7 +1296,9 @@
       panel.style.left = `${x}px`;
       panel.style.top = `${y}px`;
     } else {
-      panel.style.right = rightPanelRect?.width > 0
+      panel.style.right = portrait
+        ? '10px'
+        : rightPanelRect?.width > 0
         ? `${Math.max(10, window.innerWidth - rightPanelRect.left + 10)}px`
         : '10px';
       panel.style.top = `${dockTop}px`;
@@ -1340,6 +1578,15 @@
 
   const syncQuestRequirementsPanel = () => {
     let identityChanged = false;
+    for (const marker of wtfOverlayState.quest.markers || []) {
+      const name = resolveCanonicalQuestName(marker?.quest);
+      const key = normalizeQuestName(name);
+      const id = String(marker?.questId || '');
+      if (!key || !id) continue;
+      const previous = wtfOverlayState.questIdentityCache.get(key);
+      if (previous?.id !== id || previous?.name !== name) identityChanged = true;
+      wtfOverlayState.questIdentityCache.set(key, { id, name });
+    }
     for (const row of document.querySelectorAll('div.items.scroll div.no-wrap.d-flex[data-quest-uid]')) {
       const name = getCanonicalQuestName(row);
       const key = normalizeQuestName(name);
@@ -1624,12 +1871,14 @@
         : window.__wtfQuestLiveSource;
       return { source, label: 'test-live-store' };
     }
-    const moduleUrls = [...document.querySelectorAll('script[type="module"][src]')]
+    const moduleUrls = [...document.querySelectorAll('script[src]')]
       .map((script) => script.src)
       .filter((url) => {
         try {
           const parsed = new URL(url, location.href);
-          return parsed.origin === location.origin && parsed.pathname.includes('/_nuxt');
+          return parsed.origin === location.origin
+            && parsed.pathname.includes('/_nuxt')
+            && parsed.pathname.endsWith('.js');
         } catch {
           return false;
         }
@@ -1700,6 +1949,7 @@
         if (!snapshot.markers.length) throw new Error(`No live quest markers were returned for ${mapSlug}.`);
         wtfOverlayState.quest = snapshot;
         wtfOverlayState.liveQuestError = '';
+        syncQuestRequirementsPanel();
         renderQuestMarkers();
         reportLiveQuestStatus('ready', { questCount: snapshot.questCount });
       } catch (error) {

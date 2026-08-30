@@ -72,6 +72,8 @@ namespace eft_where_am_i
         private SquadForm? squadForm;
         private System.Windows.Forms.Timer? responsiveMapZoomTimer;
         private bool responsiveMapZoomUpdateRunning;
+        private bool panelUiReady;
+        private bool? lastPanelPortraitMode;
         private bool squadPingsPublished;
         private bool squadRoutesPublished;
 
@@ -86,6 +88,7 @@ namespace eft_where_am_i
         {
             InitializeComponent();
             InitializeResponsiveMapZoom();
+            SizeChanged += WhereAmI_SizeChanged;
             squadNetworkService = new SquadNetworkService();
             squadNetworkService.PositionsChanged += OnSquadPositionsChanged;
             squadNetworkService.StatusChanged += OnSquadStatusChanged;
@@ -412,6 +415,8 @@ namespace eft_where_am_i
 #else
                         await webView2_panel_ui.ExecuteScriptAsync("setDebugMode(false)");
 #endif
+                        panelUiReady = true;
+                        await ApplyPanelOrientationAsync(force: true);
                     }
                     catch (Exception ex)
                     {
@@ -420,6 +425,36 @@ namespace eft_where_am_i
                     }
                 }
             };
+        }
+
+        private async void WhereAmI_SizeChanged(object? sender, EventArgs e)
+        {
+            await ApplyPanelOrientationAsync();
+        }
+
+        private async Task ApplyPanelOrientationAsync(bool force = false)
+        {
+            if (!panelUiReady || IsDisposed || webView2_panel_ui.CoreWebView2 == null)
+            {
+                return;
+            }
+
+            bool portrait = ClientSize.Height > ClientSize.Width;
+            if (!force && lastPanelPortraitMode == portrait)
+            {
+                return;
+            }
+
+            try
+            {
+                await webView2_panel_ui.ExecuteScriptAsync(
+                    $"setPortraitMode({portrait.ToString().ToLowerInvariant()})");
+                lastPanelPortraitMode = portrait;
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("ResponsiveLayout", $"Top panel portrait layout failed: {ex.Message}");
+            }
         }
 
         // 메시지 수신 핸들러

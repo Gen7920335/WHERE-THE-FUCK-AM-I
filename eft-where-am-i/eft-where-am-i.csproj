@@ -9,7 +9,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
 
     <!-- 버전을 여기서만 관리 -->
-    <Version>1.1.11</Version>
+    <Version>1.1.12</Version>
     <AssemblyName>WHERE THE FUCK AM I</AssemblyName>
     <AssemblyTitle>WHERE THE FUCK AM I</AssemblyTitle>
     <Product>WHERE THE FUCK AM I</Product>
@@ -27,10 +27,10 @@
   <ItemGroup>
     <PackageReference Include="Microsoft-WindowsAPICodePack-Core" Version="1.1.5" />
     <PackageReference Include="Microsoft-WindowsAPICodePack-Shell" Version="1.1.5" />
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.5" />
-    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3856.49" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.11" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4129.50" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.50.3" />
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
   </ItemGroup>
 
   <ItemGroup>
