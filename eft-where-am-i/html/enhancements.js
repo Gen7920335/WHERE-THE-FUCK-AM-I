@@ -406,6 +406,7 @@
     const viewportWidth = Math.max(0, document.documentElement.clientWidth || window.innerWidth || 0);
     const viewportHeight = Math.max(0, document.documentElement.clientHeight || window.innerHeight || 0);
     const portrait = viewportHeight > viewportWidth;
+    const previousLayout = root.dataset.wtfLayout || '';
     const currentTopScale = numericCssVariable(root, '--wtf-top-ui-scale', state.uiScale);
     const currentSideScale = numericCssVariable(root, '--wtf-side-ui-scale', state.uiScale);
     let topScale = state.uiScale;
@@ -481,6 +482,24 @@
         shell.hidden = panelsCollapsed;
       } else {
         shell.hidden = true;
+        if (previousLayout === 'portrait') {
+          // Tarkov-Market writes an inline max-height from the panel's current
+          // top position. In portrait mode that position is near the bottom of
+          // the viewport; keeping the value after returning to landscape can
+          // produce a negative max-height and leave the scrolled panel above
+          // the visible map. Restore the native landscape baseline first.
+          leftPanel.scrollTop = 0;
+          rightPanel.scrollTop = 0;
+          leftPanel.style.removeProperty('max-height');
+          rightPanel.style.removeProperty('max-height');
+          for (const scrollArea of [
+            ...leftPanel.querySelectorAll('.scroll'),
+            ...rightPanel.querySelectorAll('.scroll')
+          ]) {
+            scrollArea.scrollTop = 0;
+            scrollArea.style.removeProperty('max-height');
+          }
+        }
         const mapWidth = mapRect.width;
         const leftWidth = leftPanel.getBoundingClientRect().width / currentSideScale;
         const rightWidth = rightPanel.getBoundingClientRect().width / currentSideScale;
@@ -634,7 +653,16 @@
     Optional: '선택',
     Completed: '완료',
     Failed: '실패',
-    'Required for Kappa': 'Kappa 필수'
+    'Required for Kappa': 'Kappa 필수',
+    Hide: '숨기기',
+    Complete: '완료 처리',
+    Wiki: '위키',
+    'Wrong spot? Suggest a move': '위치가 잘못됐나요? 이동 제안',
+    "Something's off? Suggest a fix": '내용이 이상한가요? 수정 제안',
+    'The OLI manifest is on the cube-shaped information desk in the back of the OLI store.':
+      'OLI 화물 목록은 OLI 매장 안쪽의 정육면체 모양 안내 데스크 위에 있음',
+    'Top of the escalator after the main entrance to the OLI store':
+      'OLI 매장 정문으로 들어가 에스컬레이터를 올라간 지점'
   }));
 
   const translateLocationNames = (value) => {
@@ -1325,8 +1353,10 @@
     panel.querySelector('[data-dock="bottom"]')?.classList.toggle('wtf-active', mode === 'bottom');
     const collapseButton = panel.querySelector('[data-action="collapse"]');
     if (collapseButton) {
-      collapseButton.textContent = layout.collapsed ? '+' : '−';
-      collapseButton.title = layout.collapsed ? questPanelCopy('expand') : questPanelCopy('collapse');
+      const collapseText = layout.collapsed ? '+' : '−';
+      const collapseTitle = layout.collapsed ? questPanelCopy('expand') : questPanelCopy('collapse');
+      if (collapseButton.textContent !== collapseText) collapseButton.textContent = collapseText;
+      if (collapseButton.title !== collapseTitle) collapseButton.title = collapseTitle;
     }
   };
 
@@ -1594,31 +1624,41 @@
   };
 
   const syncQuestRequirementsPanel = () => {
-    let identityChanged = false;
-    for (const marker of wtfOverlayState.quest.markers || []) {
-      const name = resolveCanonicalQuestName(marker?.quest);
-      const key = normalizeQuestName(name);
-      const id = String(marker?.questId || '');
-      if (!key || !id) continue;
-      const previous = wtfOverlayState.questIdentityCache.get(key);
-      if (previous?.id !== id || previous?.name !== name) identityChanged = true;
-      wtfOverlayState.questIdentityCache.set(key, { id, name });
-    }
+    const previousIdentityCache = wtfOverlayState.questIdentityCache;
+    const nextIdentityCache = new Map(previousIdentityCache);
+    const pinnedUidSignature = (cache) => [...wtfOverlayState.questPins.keys()]
+      .sort()
+      .map((key) => `${key}:${String(cache.get(key)?.id || '')}`)
+      .join('|');
+    const previousPinnedUidSignature = pinnedUidSignature(previousIdentityCache);
+
+    // Native rows may briefly contain stale/localized identity data while the
+    // Tarkov-Market store is hydrating. Merge them first, then let the live
+    // marker store be authoritative. Compare only the final snapshots: comparing
+    // each intermediate write made one key oscillate native -> live -> native on
+    // every MutationObserver hydration and continuously rebuilt the marker layer.
     for (const row of document.querySelectorAll('div.items.scroll div.no-wrap.d-flex[data-quest-uid]')) {
       const name = getCanonicalQuestName(row);
       const key = normalizeQuestName(name);
       const id = row.dataset.questUid || '';
       if (key && id) {
-        const previous = wtfOverlayState.questIdentityCache.get(key);
-        if (previous?.id !== id || previous?.name !== name) identityChanged = true;
-        wtfOverlayState.questIdentityCache.set(key, { id, name });
+        nextIdentityCache.set(key, { id, name });
       }
     }
-    const quests = [...wtfOverlayState.questIdentityCache.entries()]
+    for (const marker of wtfOverlayState.quest.markers || []) {
+      const name = resolveCanonicalQuestName(marker?.quest);
+      const key = normalizeQuestName(name);
+      const id = String(marker?.questId || '');
+      if (!key || !id) continue;
+      nextIdentityCache.set(key, { id, name });
+    }
+
+    wtfOverlayState.questIdentityCache = nextIdentityCache;
+    const quests = [...nextIdentityCache.entries()]
       .filter(([key]) => wtfOverlayState.questPins.has(key))
       .map(([, quest]) => quest);
     const key = quests.map((quest) => `${quest.id}:${quest.name}`).join('|');
-    if (identityChanged) renderQuestMarkers();
+    if (previousPinnedUidSignature !== pinnedUidSignature(nextIdentityCache)) renderQuestMarkers();
     if (key === wtfOverlayState.questSelectionKey) return;
     wtfOverlayState.questSelectionKey = key;
     wtfOverlayState.selectedQuests = quests;
