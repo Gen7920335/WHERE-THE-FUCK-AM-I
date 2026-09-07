@@ -60,8 +60,9 @@ namespace eft_where_am_i
 
         private async Task InitializeWebViewUI()
         {
-            // 고유한 사용자 데이터 폴더 생성 (임시 폴더 + GUID 사용)
-            string userDataFolder = Path.Combine(Path.GetTempPath(), "MyAppWebView2_Settings", Guid.NewGuid().ToString());
+            string userDataFolder = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "WHERE-THE-FUCK-AM-I", "WebView2", "Settings");
             CoreWebView2Environment env = null;
             try
             {
