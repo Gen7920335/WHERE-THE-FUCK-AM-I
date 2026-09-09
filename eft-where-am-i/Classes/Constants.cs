@@ -90,18 +90,69 @@ namespace eft_where_am_i.Classes
         );
     }
 
-    function getHeadingDegrees(value) {
+    // Same world-to-map basis as TarkovMarketMapProjection, in image pixels
+    // (not percentages: rectangular maps must not distort the heading).
+    const mapRotations = {
+        factory: 0, customs: 90, interchange: 90, woods: 90,
+        shoreline: 90, reserve: 105, lighthouse: 90, streets: 90,
+        lab: 180, 'ground-zero': 90, labyrinth: 180, icebreaker: 90
+    };
+
+    function transformVector(element, vector, inverse = false) {
+        const text = getComputedStyle(element).transform || 'none';
+        let a = 1, b = 0, c = 0, d = 1;
+        const matrix = text.match(/^matrix\(([^)]+)\)$/);
+        const rotation = text.match(/rotate\(([-.\d]+)deg\)/);
+        if (matrix) {
+            [a, b, c, d] = matrix[1].split(',').map(Number);
+        } else if (rotation) {
+            const angle = Number(rotation[1]) * Math.PI / 180;
+            a = d = Math.cos(angle); b = Math.sin(angle); c = -b;
+        }
+        const determinant = a * d - b * c;
+        if (!Number.isFinite(determinant) || Math.abs(determinant) < 1e-10) return null;
+        return inverse
+            ? { x: (d * vector.x - c * vector.y) / determinant, y: (-b * vector.x + a * vector.y) / determinant }
+            : { x: a * vector.x + c * vector.y, y: b * vector.x + d * vector.y };
+    }
+
+    function getHeadingDegrees(value, marker) {
         const parts = (value || '').trim().split('_');
         if (parts.length < 3) return null;
 
-        const quat = parts[2].split(',').map(Number);
+        const quat = parts[2].replace(/\.png$/i, '').split(',').map(Number);
         if (quat.length < 4 || !quat.slice(0, 4).every(Number.isFinite)) return null;
 
-        // 쿼터니언 → forward → deg
-        const x = quat[0], y = quat[1], z = quat[2], w = quat[3];
+        const norm = Math.hypot(...quat.slice(0, 4));
+        if (norm < 1e-10) return null;
+        const [x, y, z, w] = quat.slice(0, 4).map(component => component / norm);
         const fx = 2 * (x * z + w * y);
         const fz = 1 - 2 * (x * x + y * y);
-        return Math.atan2(fx, fz) * 180 / Math.PI;
+        if (Math.hypot(fx, fz) < 1e-8) return null;
+        const slug = location.pathname.split('/').filter(Boolean).pop();
+        const rotation = mapRotations[slug];
+        if (rotation === undefined) return null;
+        const radians = rotation * Math.PI / 180;
+        let forward = {
+            x: -(fz * Math.cos(radians) + fx * Math.sin(radians)),
+            y: fz * Math.sin(radians) - fx * Math.cos(radians)
+        };
+        const container = marker.closest('.map-cont') || document.body;
+        const scene = container.querySelector('.map-scene') || container.querySelector('.map-wrap');
+        // Project through the visible map once, then undo the marker's own
+        // parent chain. Works with screen-space and legacy in-scene markers,
+        // including native player rotation already present on the parent.
+        for (let node = scene; node && node !== container; node = node.parentElement) {
+            forward = transformVector(node, forward);
+            if (!forward) return null;
+        }
+        const chain = [];
+        for (let node = marker; node && node !== container; node = node.parentElement) chain.push(node);
+        for (const node of chain.reverse()) {
+            forward = transformVector(node, forward, true);
+            if (!forward) return null;
+        }
+        return (Math.atan2(forward.x, -forward.y) * 180 / Math.PI + 360) % 360;
     }
 
     function updateTriangle(marker) {
@@ -115,7 +166,8 @@ namespace eft_where_am_i.Classes
 
         // 새 UI에서는 위치 입력창과 마커가 서로 다른 레이어에 있습니다.
         const inputEl = marker.querySelector('input[type=text]') || getPositionInput();
-        const degrees = inputEl ? getHeadingDegrees(inputEl.value) : null;
+        const degrees = inputEl ? getHeadingDegrees(inputEl.value, marker) : null;
+        triangle.hidden = degrees === null;
         if (degrees !== null) {
             const transform = `translate(-50%, -65%) rotate(${degrees}deg)`;
             if (triangle.style.transform !== transform) triangle.style.setProperty('transform', transform, 'important');
@@ -156,6 +208,10 @@ namespace eft_where_am_i.Classes
     const container = document.body;
     const observer = new MutationObserver(mutations => {
         for (const mutation of mutations) {
+            if (mutation.type === 'attributes') {
+                if (mutation.target.matches('.marker, .map-scene, .map-wrap')) updateAllMarkers();
+                continue;
+            }
             if (mutation.type === 'childList') {
                 mutation.addedNodes.forEach(node => {
                     if (!(node instanceof HTMLElement)) return;
@@ -178,13 +234,16 @@ namespace eft_where_am_i.Classes
     window.__eftWhereAmIMarkerObserver = observer;
 
     observer.observe(container, {
+        attributes: true,
+        attributeFilter: ['style'],
         childList: true,
         subtree: true,
     });
 
     initMarkers();
     // SPA 렌더링 지연에 대비해 한 번 더 초기화
-    setTimeout(initMarkers, 2000);
+    clearTimeout(window.__eftWhereAmIHeadingInitTimer);
+    window.__eftWhereAmIHeadingInitTimer = setTimeout(initMarkers, 2000);
 })();";
 
         /// <summary>

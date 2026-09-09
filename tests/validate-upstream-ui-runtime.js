@@ -26,7 +26,7 @@ const inputScript = executor.slice(executor.indexOf('public async Task<bool> Ens
     <div class="panel_left"></div><div class="panel_right"><div class="wtf-squad-panel">WTFMI squad</div></div>
     <div id="map"><div class="map-scene"><div class="marker" id="player"></div></div>
     <div class="marker" data-terminal-managed="true" id="terminal"></div></div>
-    <div class="footer-wrap maps-site-chrome"></div></body>`, {runScripts:'dangerously', pretendToBeVisual:true});
+    <div class="footer-wrap maps-site-chrome"></div></body>`, {runScripts:'dangerously', pretendToBeVisual:true,url:'https://tarkov-market.com/maps/woods'});
   const w = dom.window, d = w.document;
   const tick = () => new Promise(resolve => setTimeout(resolve, 25));
   assert.equal(d.querySelector(selector('HIDE_SHOW_PANEL_BUTTON_SELECTOR')).id, 'panels');
@@ -61,7 +61,7 @@ const inputScript = executor.slice(executor.indexOf('public async Task<bool> Ens
   w.eval(heading);
   await tick();
   const triangle = d.querySelector('#player .triangle-indicator');
-  assert.ok(triangle.style.transform.includes('89.999'), triangle.style.transform);
+  assert.ok(triangle.style.transform.includes('rotate(270deg)'), triangle.style.transform);
   assert.equal(triangle.style.getPropertyPriority('transform'),'important','heading must override the base CSS transform');
   assert.equal(d.querySelector('#terminal .triangle-indicator'),null);
   assert.equal(d.querySelector('.map-scene > .triangle-indicator'),null,'map layers are not player markers');
@@ -71,13 +71,13 @@ const inputScript = executor.slice(executor.indexOf('public async Task<bool> Ens
   assert.equal(d.querySelectorAll('#player .triangle-indicator').length,1);
   d.querySelector('#map-position-file').value = 'stamp_0,0,0_0,0,0,1_0';
   d.querySelector('#map-position-file').dispatchEvent(new w.Event('input'));
-  assert.ok(triangle.style.transform.includes('rotate(0deg)'));
+  assert.ok(triangle.style.transform.includes('rotate(180deg)'));
   const replacement = d.querySelector('.position-controls').cloneNode(true);
   replacement.querySelector('input').value = 'stamp_0,0,0_0,1,0,0_0';
   d.querySelector('.position-controls').replaceWith(replacement);
   await tick();
   replacement.querySelector('input').dispatchEvent(new w.Event('change'));
-  assert.ok(triangle.style.transform.includes('rotate(180deg)'),'SPA input replacement must bind heading updates');
+  assert.ok(triangle.style.transform.includes('rotate(0deg)'),'SPA input replacement must bind heading updates');
   const cleanup = script('DEAD_ZONE_AUTO_PAN_SCRIPT');
   w.eval(cleanup); w.eval(cleanup);
   await tick();
