@@ -11,7 +11,7 @@ const settingsPage = read('eft-where-am-i/UserControls/SettingPage.cs');
 
 assert.match(
   constants,
-  /WHERE_AM_I_INPUT_SELECTOR\s*=\s*"\.panel_top \.d-flex\.ml-15 > input\[type=\\"text\\"\], #terminalLocationInput"/,
+  /WHERE_AM_I_INPUT_SELECTOR\s*=\s*"#map-position-file, "[\s\S]*?\.position-controls[\s\S]*?#terminalLocationInput"/,
   'the dedicated Tarkov-Market and Terminal location inputs must be selected directly'
 );
 assert.doesNotMatch(constants, /WHERE_AM_I_BUTTON_SELECTOR/, 'the obsolete positional button selector must stay removed');

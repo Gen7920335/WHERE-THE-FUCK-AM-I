@@ -135,6 +135,13 @@ namespace eft_where_am_i.Classes
                     }});
 
                     if (!button) {{
+                        button = panel.querySelector(
+                            '.toolbar-group.primary-tools > button:first-child, ' +
+                            '.d-flex.ml-15 > button'
+                        );
+                    }}
+
+                    if (!button) {{
                         var rotateButton = buttons.find(function(candidate) {{
                             var label = ((candidate.getAttribute('aria-label') || '') + ' ' +
                                 (candidate.getAttribute('title') || '')).toLowerCase();
@@ -855,6 +862,16 @@ namespace eft_where_am_i.Classes
 
                 string script = $@"
                 (function() {{
+                    var btn = document.querySelector({JsLiteral(Constants.HIDE_SHOW_PANEL_BUTTON_SELECTOR)});
+                    if (btn) {{
+                        var label = ((btn.getAttribute('aria-label') || '') + ' ' +
+                            (btn.getAttribute('title') || '') + ' ' +
+                            (btn.textContent || '')).toLowerCase();
+                        if (label.includes('show panel') || label.includes('show pannels') || label.includes('패널 표시')) return 'true';
+                        if (label.includes('hide panel') || label.includes('hide pannels') || label.includes('패널 숨기기')) return 'false';
+                        var pressed = btn.getAttribute('aria-pressed');
+                        if (pressed !== null) return pressed.toLowerCase() === 'false' ? 'true' : 'false';
+                    }}
                     var leftPanel = document.querySelector('.panel_left');
                     var rightPanel = document.querySelector('.panel_right');
                     if (leftPanel || rightPanel) {{
@@ -865,15 +882,7 @@ namespace eft_where_am_i.Classes
                         return isCollapsed ? 'true' : 'false';
                     }}
 
-                    var btn = document.querySelector({JsLiteral(Constants.HIDE_SHOW_PANNE_BUTTON_SELECTOR)});
-                    if (!btn) return 'false';
-
-                    var text = (btn.textContent || '').toLowerCase();
-                    var isHidden = text.includes('show pannels')
-                        || text.includes('show panels')
-                        || text.includes('show panel')
-                        || text.includes('패널 표시');
-                    return isHidden ? 'true' : 'false';
+                    return 'false';
                 }})()";
 
                 string result = await webView.CoreWebView2.ExecuteScriptAsync(script);
@@ -904,7 +913,7 @@ namespace eft_where_am_i.Classes
 
                     string script = $@"
                     (function() {{
-                        var btn = document.querySelector({JsLiteral(Constants.HIDE_SHOW_PANNE_BUTTON_SELECTOR)});
+                        var btn = document.querySelector({JsLiteral(Constants.HIDE_SHOW_PANEL_BUTTON_SELECTOR)});
                         if (!btn) return 'not-found';
                         btn.click();
                         return 'clicked';

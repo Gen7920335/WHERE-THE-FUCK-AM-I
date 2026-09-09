@@ -2,11 +2,22 @@ namespace eft_where_am_i.Classes
 {
     public class Constants
     {   
-        public const string HIDE_SHOW_PANNE_BUTTON_SELECTOR = "#__nuxt > div > div > div.page-content > div > div > div.panel_top > div > div.mr-15 > button, #terminalPanelToggle";
+        public const string HIDE_SHOW_PANEL_BUTTON_SELECTOR =
+            ".panel_top button[aria-label=\"Hide panels\"], " +
+            ".panel_top button[aria-label=\"Show panels\"], " +
+            ".panel_top .toolbar-group.view-tools > .hint-root:first-child > button, " +
+            ".panel_top > div > div.mr-15 > button, #terminalPanelToggle";
 
-        public const string FULL_SCREEN_BUTTON_SELECTOR = "#__nuxt > div > div > div.page-content > div > div > div.panel_top.desktop-panel > div > div:nth-child(3) > button, #terminalFullScreen";
+        public const string FULL_SCREEN_BUTTON_SELECTOR =
+            ".panel_top button[aria-label=\"Full screen\"], " +
+            ".panel_top button[aria-label=\"Exit full screen\"], " +
+            ".panel_top .toolbar-group.view-tools > .hint-root:nth-child(2) > button, " +
+            ".panel_top.desktop-panel > div > div:nth-child(3) > button, #terminalFullScreen";
 
-        public const string WHERE_AM_I_INPUT_SELECTOR = ".panel_top .d-flex.ml-15 > input[type=\"text\"], #terminalLocationInput";
+        public const string WHERE_AM_I_INPUT_SELECTOR =
+            "#map-position-file, " +
+            ".panel_top .position-controls > input[type=\"text\"], " +
+            ".panel_top .d-flex.ml-15 > input[type=\"text\"], #terminalLocationInput";
 
         /*
          * The following code (ADD_DIRECTION_INDICATORS_SCRIPT) is from 'Tarkov-Client' by 'byeong1'
@@ -71,60 +82,77 @@ namespace eft_where_am_i.Classes
         document.head.appendChild(style);
     }
 
-    function addTriangleToMarker(marker) {
-        if (marker.dataset && marker.dataset.terminalManaged === 'true') {
-            return;
-        }
-        if (marker.querySelector('.triangle-indicator')) {
-            return;
-        }
+    function getPositionInput() {
+        return document.querySelector(
+            '#map-position-file, ' +
+            '.panel_top .position-controls > input[type=text], ' +
+            '.panel_top .d-flex.ml-15 > input[type=text]'
+        );
+    }
 
-        const triangle = document.createElement('div');
-        triangle.className = 'triangle-indicator';
+    function getHeadingDegrees(value) {
+        const parts = (value || '').trim().split('_');
+        if (parts.length < 3) return null;
 
-        const inputEl = marker.querySelector('input[type=text]');
-        if(inputEl){
-            const updateArrow = () => {
-                const val = inputEl.value.trim();
-                if(!val) return;
+        const quat = parts[2].split(',').map(Number);
+        if (quat.length < 4 || !quat.slice(0, 4).every(Number.isFinite)) return null;
 
-                // 로그 형태: posX,posY,posZ_quatX,quatY,quatZ,quatW_speed
-                const parts = val.split('_');
-                if(parts.length < 3) return;
-                const quat = parts[2].split(',').map(Number);
-                if(quat.length < 4) return;
+        // 쿼터니언 → forward → deg
+        const x = quat[0], y = quat[1], z = quat[2], w = quat[3];
+        const fx = 2 * (x * z + w * y);
+        const fz = 1 - 2 * (x * x + y * y);
+        return Math.atan2(fx, fz) * 180 / Math.PI;
+    }
 
-                // 쿼터니언 → forward → deg
-                const x=quat[0], y=quat[1], z=quat[2], w=quat[3];
-                const fx = 2*(x*z + w*y);
-                const fz = 1 - 2*(x*x + y*y);
-                const deg = Math.atan2(fx, fz) * 180 / Math.PI;
-
-                triangle.style.transform = `translate(-50%, -65%) rotate(${deg}deg)`;
-            };
-
-            inputEl.addEventListener('input', updateArrow);
-            updateArrow(); // 초기값 적용
+    function updateTriangle(marker) {
+        if (marker.dataset?.terminalManaged === 'true') return;
+        let triangle = marker.querySelector('.triangle-indicator');
+        if (!triangle) {
+            triangle = document.createElement('div');
+            triangle.className = 'triangle-indicator';
+            marker.appendChild(triangle);
         }
 
-        marker.appendChild(triangle);
+        // 새 UI에서는 위치 입력창과 마커가 서로 다른 레이어에 있습니다.
+        const inputEl = marker.querySelector('input[type=text]') || getPositionInput();
+        const degrees = inputEl ? getHeadingDegrees(inputEl.value) : null;
+        if (degrees !== null) {
+            const transform = `translate(-50%, -65%) rotate(${degrees}deg)`;
+            if (triangle.style.transform !== transform) triangle.style.setProperty('transform', transform, 'important');
+        }
+    }
+
+    function updateAllMarkers() {
+        document.querySelectorAll('.marker').forEach(updateTriangle);
+    }
+
+    function bindPositionInput() {
+        const inputEl = getPositionInput();
+        if (!inputEl) return;
+
+        if (inputEl.__eftWhereAmIHeadingHandler) {
+            inputEl.removeEventListener('input', inputEl.__eftWhereAmIHeadingHandler);
+            inputEl.removeEventListener('change', inputEl.__eftWhereAmIHeadingHandler);
+        }
+
+        inputEl.__eftWhereAmIHeadingHandler = updateAllMarkers;
+        inputEl.addEventListener('input', updateAllMarkers);
+        inputEl.addEventListener('change', updateAllMarkers);
     }
 
     function initMarkers() {
-        const markers = document.querySelectorAll('.marker');
-        if (markers.length === 0) {
-            // .marker가 없으면 다른 선택자 시도
-            const altMarkers = document.querySelectorAll('#map > div');
-            altMarkers.forEach(addTriangleToMarker);
-        } else {
-            markers.forEach(addTriangleToMarker);
-        }
+        bindPositionInput();
+        updateAllMarkers();
     }
 
     injectStyle();
 
     // SPA (Single Page Application) 라우팅 시 #map 엘리먼트가 아예 지워지고 새로 생성됩니다.
     // 기존처럼 #map에 붙여놓으면 MutationObserver가 같이 죽어버리므로 절대 지워지지 않는 document.body를 감시합니다.
+    if (window.__eftWhereAmIMarkerObserver) {
+        window.__eftWhereAmIMarkerObserver.disconnect();
+    }
+
     const container = document.body;
     const observer = new MutationObserver(mutations => {
         for (const mutation of mutations) {
@@ -133,21 +161,29 @@ namespace eft_where_am_i.Classes
                     if (!(node instanceof HTMLElement)) return;
 
                     if (node.classList && node.classList.contains('marker')) {
-                        addTriangleToMarker(node);
+                        updateTriangle(node);
                     } else {
-                        node.querySelectorAll('.marker, #map > div').forEach(addTriangleToMarker);
+                        node.querySelectorAll('.marker').forEach(updateTriangle);
+                    }
+
+                    if (node.matches('#map-position-file, .position-controls') ||
+                        node.querySelector('#map-position-file, .position-controls')) {
+                        bindPositionInput();
                     }
                 });
             }
         }
     });
 
+    window.__eftWhereAmIMarkerObserver = observer;
+
     observer.observe(container, {
         childList: true,
         subtree: true,
     });
 
-    // 2초 후에 마커 초기화 시도
+    initMarkers();
+    // SPA 렌더링 지연에 대비해 한 번 더 초기화
     setTimeout(initMarkers, 2000);
 })();";
 
@@ -616,9 +652,9 @@ namespace eft_where_am_i.Classes
     var selectors = [
         '.panel_right > div.user-layers-panel',
         '.panel_right > div.squad-panel',
-        '#__nuxt > div > div > div.cookie-consent',
-        '#__nuxt > div > div > div.footer-wrap',
-        '#__nuxt > div > div > header'
+        '.cookie-consent',
+        '.footer-wrap.maps-site-chrome, #__nuxt > div > div > div.footer-wrap',
+        'header.maps-site-chrome, #__nuxt > div > div > header'
     ];
 
     // 1-2. 등록된 selector 요소 제거 + 오버스크롤 차단
@@ -634,16 +670,21 @@ namespace eft_where_am_i.Classes
     }
     removeUnwantedElements();
 
+    // Re-injection happens on navigation and screenshot updates; keep one observer.
+    window.__eftWhereAmIUnwantedObserver?.disconnect();
+    if (window.__eftWhereAmIUnwantedFrame) cancelAnimationFrame(window.__eftWhereAmIUnwantedFrame);
     // 1-3. DOM 변경 감지 시 재실행 (debounced)
     var removeScheduled = false;
     var unwantedObserver = new MutationObserver(function() {
         if (removeScheduled) return;
         removeScheduled = true;
-        requestAnimationFrame(function() {
+        window.__eftWhereAmIUnwantedFrame = requestAnimationFrame(function() {
+            window.__eftWhereAmIUnwantedFrame = null;
             removeScheduled = false;
             removeUnwantedElements();
         });
     });
+    window.__eftWhereAmIUnwantedObserver = unwantedObserver;
     if (document.body) {
         unwantedObserver.observe(document.body, { childList: true, subtree: true });
     }
@@ -671,7 +712,7 @@ namespace eft_where_am_i.Classes
 
         var questPanel = document.querySelector('div.items.scroll');
         if (questPanel) {
-            var panelParent = questPanel.closest('.panel') || questPanel.parentElement;
+            var panelParent = questPanel.closest('.panel_right, .panel_left, .panel') || questPanel.parentElement;
             var panelRect = panelParent ? panelParent.getBoundingClientRect() : questPanel.getBoundingClientRect();
 
             if (panelRect.width > 50 && panelRect.height > 50) {
@@ -768,7 +809,7 @@ namespace eft_where_am_i.Classes
 
         var questPanel = document.querySelector('div.items.scroll');
         if (questPanel) {
-            var panelParent = questPanel.closest('.panel') || questPanel.parentElement;
+            var panelParent = questPanel.closest('.panel_right, .panel_left, .panel') || questPanel.parentElement;
             var panelRect = panelParent ? panelParent.getBoundingClientRect() : questPanel.getBoundingClientRect();
             if (panelRect.width > 50 && panelRect.height > 50) {
                 var panelCenterX = panelRect.left + panelRect.width / 2;
@@ -842,7 +883,7 @@ namespace eft_where_am_i.Classes
 
         var questPanel = document.querySelector('div.items.scroll');
         if (questPanel) {
-            var panelParent = questPanel.closest('.panel') || questPanel.parentElement;
+            var panelParent = questPanel.closest('.panel_right, .panel_left, .panel') || questPanel.parentElement;
             var panelRect = panelParent ? panelParent.getBoundingClientRect() : questPanel.getBoundingClientRect();
             if (panelRect.width > 50 && panelRect.height > 50) {
                 var panelCenterX = panelRect.left + panelRect.width / 2;

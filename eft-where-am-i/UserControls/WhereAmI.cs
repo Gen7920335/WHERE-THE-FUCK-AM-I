@@ -1172,7 +1172,10 @@ namespace eft_where_am_i
             {
                 if (isHidden)
                 {
-                    await jsExecutor.ClickButtonAsync(Constants.HIDE_SHOW_PANNE_BUTTON_SELECTOR);
+                    if (!await jsExecutor.IsPanelHiddenAsync())
+                    {
+                        await jsExecutor.ClickButtonAsync(Constants.HIDE_SHOW_PANEL_BUTTON_SELECTOR);
+                    }
                 }
                 else
                 {
@@ -1400,7 +1403,7 @@ namespace eft_where_am_i
 
         private async void btnHideShowPannel_Click(object sender, EventArgs e)
         {
-            await jsExecutor.ClickButtonAsync(Constants.HIDE_SHOW_PANNE_BUTTON_SELECTOR);
+            await jsExecutor.ClickButtonAsync(Constants.HIDE_SHOW_PANEL_BUTTON_SELECTOR);
         }
 
         private async Task SavePanelStateAsync()

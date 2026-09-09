@@ -2,6 +2,18 @@
   if (window.__wtfEnhancementsInstalled) return;
   window.__wtfEnhancementsInstalled = true;
 
+  // Native Pro actions can be divs/SVGs and teleported popup controls, not
+  // just panel buttons. Match exact class tokens, never "progress"/"profile".
+  const paidUiSelector = [
+    '.panel_top .pro', '.panel_left .pro', '.panel_right .pro',
+    '.map-popup .pro', '.popup .pro',
+    '.panel_right .guide-row',
+    '.panel_right .user-layers-panel', '.panel_right .squad-panel',
+    '.hint-root:has(> .pro)',
+    '[class~="paywall"]', '[class~="pro-only"]',
+    '[data-premium="true"]', '[data-pro-only="true"]'
+  ].join(',');
+
   const state = {
     language: 'en',
     uiScale: 1,
@@ -150,6 +162,28 @@
           flex: 0 0 auto !important;
           min-width: max-content;
         }
+        .panel_top .toolbar-context,
+        .panel_top .position-controls {
+          display: flex;
+          flex-wrap: wrap;
+          max-width: 100%;
+          min-width: 0;
+        }
+        .panel_top .position-controls input {
+          min-width: 0;
+          max-width: 100%;
+        }
+        #wtf-clear-pings-button,
+        #wtf-clear-route-button {
+          pointer-events: auto;
+          width: auto;
+          min-width: max-content;
+        }
+        html[data-wtf-layout="landscape"] .panel_left,
+        html[data-wtf-layout="landscape"] .panel_right {
+          top: var(--wtf-landscape-panel-top, 160px) !important;
+          max-height: var(--wtf-landscape-panel-height, calc(100% - 170px)) !important;
+        }
         .panel_top button,
         .panel_top input,
         .panel_top label {
@@ -258,6 +292,7 @@
           scale: var(--wtf-icon-scale);
           transform-origin: center;
         }
+        ${paidUiSelector},
         [data-wtf-commercial-hidden="true"] {
           display: none !important;
           pointer-events: none !important;
@@ -321,6 +356,7 @@
     portraitPanelShell: null,
     routeLayer: null,
     mapWrap: null,
+    mapScene: null,
     domObserver: null,
     mapObserver: null,
     resizeObserver: null,
@@ -510,6 +546,11 @@
           const maximumSideScale = (mapWidth - minimumMapWidth - panelMarginsAndGap) / basePanelWidth;
           sideScale = Math.min(sideScale, Math.max(0.65, maximumSideScale));
         }
+        // The new map toolbar no longer reserves vertical space for the panels.
+        const toolbarBottom = topPanel?.getBoundingClientRect().bottom || mapRect.top;
+        const panelTop = Math.max(10, toolbarBottom - mapRect.top + 8);
+        root.style.setProperty('--wtf-landscape-panel-top', `${panelTop / sideScale}px`);
+        root.style.setProperty('--wtf-landscape-panel-height', `${Math.max(80, mapRect.height - panelTop - 12) / sideScale}px`);
       }
     }
 
@@ -637,6 +678,13 @@
 
   const questDetailUiKo = new Map(Object.entries({
     Requirements: '선행 조건',
+    Require: '필요 조건',
+    'Quest related items': '퀘스트 관련 아이템',
+    Items: '아이템',
+    Prev: '이전 퀘스트',
+    Next: '다음 퀘스트',
+    Details: '상세',
+    'Close ✘': '닫기 ✘',
     Prerequisites: '선행 조건',
     Objectives: '목표',
     'Current objectives': '현재 목표',
@@ -659,6 +707,9 @@
     Wiki: '위키',
     'Wrong spot? Suggest a move': '위치가 잘못됐나요? 이동 제안',
     "Something's off? Suggest a fix": '내용이 이상한가요? 수정 제안',
+    'Bunker at the northern path to the mountain.': '산으로 가는 북쪽 길의 벙커',
+    'The note lies at the marked circle in the dilapidated village in the north of Woods, next to the burning candles.':
+      '삼림 북쪽 폐허 마을의 마크 서클에서 켜진 촛불 옆에 쪽지 있음',
     'The OLI manifest is on the cube-shaped information desk in the back of the OLI store.':
       'OLI 화물 목록은 OLI 매장 안쪽의 정육면체 모양 안내 데스크 위에 있음',
     'Top of the escalator after the main entrance to the OLI store':
@@ -758,6 +809,7 @@
     let match;
 
     if (section === 'requirements') {
+      if ((match = text.match(/^Requires quest:\s*(.+)$/i))) return `선행 퀘스트: ${formatQuestName(match[1])}`;
       if ((match = text.match(/^After (?:taking|accepting):?\s*(.+)$/i))) return `${match[1]} 수락 후`;
       if ((match = text.match(/^After completing:?\s*(.+)$/i))) return `${match[1]} 완료 후`;
       if ((match = text.match(/^If failed:?\s*(.+)$/i))) return `${match[1]} 실패 시`;
@@ -1033,6 +1085,14 @@
       .map-popup {
         opacity: var(--wtf-popup-opacity, 1) !important;
       }
+      .map-popup:not(.wtf-quest-popup):not(.mobile) {
+        box-sizing: border-box;
+        max-width: var(--wtf-popup-max-width, calc(100vw - 16px)) !important;
+        max-height: var(--wtf-popup-max-height, calc(100vh - 16px)) !important;
+        overflow: auto;
+        overscroll-behavior: contain;
+        translate: var(--wtf-popup-shift-x, 0px) var(--wtf-popup-shift-y, 0px);
+      }
       .wtf-popup-close {
         align-items: center;
         background: transparent !important;
@@ -1054,6 +1114,9 @@
       .wtf-popup-close:hover,
       .wtf-popup-close:focus-visible {
         color: #e5b35c !important;
+      }
+      .map-popup.mobile .wtf-native-popup-close {
+        display: none !important;
       }
       .map-popup:not(.wtf-quest-popup) .large.pointer.text-right {
         display: none !important;
@@ -1780,6 +1843,18 @@
         translated = wtfOverlayState.locationTranslations.get(source) || '';
       } else if (questDetailUiKo.has(source)) {
         translated = questDetailUiKo.get(source) || '';
+      } else if (parent.closest('.quests-details-col, .map-popup, .quest')) {
+        // Native detail text uses its own DOM path, separate from pinned
+        // requirement cards. Keep names and numeric unlock delays intact.
+        let match;
+        if (/^Requires quest:\s*\S/i.test(source)) {
+          translated = fallbackQuestStepKo(source, 'requirements');
+        } else if ((match = source.match(/^(⏱\s*)?Available\s+(\d+(?:\.\d+)?)\s*(h|hours?|m|minutes?|d|days?)\s+after unlock[.]?$/i))) {
+          const unit = /^h/i.test(match[3]) ? '시간' : /^m/i.test(match[3]) ? '분' : '일';
+          translated = `${match[1] || ''}해금 후 ${match[2]}${unit} 뒤 수락 가능`;
+        } else if ((match = source.match(/^([+-]?\d+(?:\.\d+)?)\s+Rep$/i))) {
+          translated = `${match[1]} 우호도`;
+        }
       }
       if (!translated) continue;
 
@@ -2306,15 +2381,17 @@
   const ensureClearPingsButton = () => {
     const topPanel = document.querySelector('.panel_top');
     if (!topPanel) return;
+    const buttonHost = topPanel.querySelector('.map-toolbar') || topPanel;
     let button = document.getElementById('wtf-clear-pings-button');
-    if (!button || button.parentElement !== topPanel) {
+    if (!button || button.parentElement !== buttonHost) {
       button?.remove();
       button = document.createElement('button');
       button.id = 'wtf-clear-pings-button';
       button.type = 'button';
-      const nativeButton = topPanel.querySelector('button');
+      const nativeButton = topPanel.querySelector('.primary-tools > button:not(.pro)') || topPanel.querySelector('button');
       if (nativeButton) {
         button.className = nativeButton.className;
+        button.classList.remove('active', 'toolbar-icon');
         for (const attribute of nativeButton.attributes) {
           if (attribute.name.startsWith('data-v-')) button.setAttribute(attribute.name, '');
         }
@@ -2331,7 +2408,7 @@
       });
       const status = topPanel.querySelector('.terminal-status');
       if (status) status.before(button);
-      else topPanel.appendChild(button);
+      else buttonHost.appendChild(button);
     }
     const buttonText = pingCopy('Delete all pings', '핑 전부 삭제');
     if (button.textContent !== buttonText) button.textContent = buttonText;
@@ -2341,15 +2418,17 @@
   const ensureClearRouteButton = () => {
     const topPanel = document.querySelector('.panel_top');
     if (!topPanel) return;
+    const buttonHost = topPanel.querySelector('.map-toolbar') || topPanel;
     let button = document.getElementById('wtf-clear-route-button');
-    if (!button || button.parentElement !== topPanel) {
+    if (!button || button.parentElement !== buttonHost) {
       button?.remove();
       button = document.createElement('button');
       button.id = 'wtf-clear-route-button';
       button.type = 'button';
-      const nativeButton = topPanel.querySelector('button');
+      const nativeButton = topPanel.querySelector('.primary-tools > button:not(.pro)') || topPanel.querySelector('button');
       if (nativeButton) {
         button.className = nativeButton.className;
+        button.classList.remove('active', 'toolbar-icon');
         for (const attribute of nativeButton.attributes) {
           if (attribute.name.startsWith('data-v-')) button.setAttribute(attribute.name, '');
         }
@@ -2368,9 +2447,9 @@
       });
       const pingButton = document.getElementById('wtf-clear-pings-button');
       const status = topPanel.querySelector('.terminal-status');
-      if (pingButton?.parentElement === topPanel) pingButton.after(button);
+      if (pingButton?.parentElement === buttonHost) pingButton.after(button);
       else if (status) status.before(button);
-      else topPanel.appendChild(button);
+      else buttonHost.appendChild(button);
     }
     const buttonText = pingCopy('Delete all route nodes', '경로 전부 삭제');
     if (button.textContent !== buttonText) button.textContent = buttonText;
@@ -2410,6 +2489,47 @@
       }
     }
     return { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
+  };
+
+  const mapSceneTransformInfo = (mapWrap) => {
+    const scene = mapWrap?.querySelector('.map-scene');
+    if (!scene) return null;
+    const computed = getComputedStyle(scene);
+    const originParts = computed.transformOrigin.split(/\s+/);
+    return {
+      element: scene,
+      matrix: parseMapTransform(computed.transform),
+      originX: Number.parseFloat(originParts[0]) || 0,
+      originY: Number.parseFloat(originParts[1]) || 0,
+      layout: getLayoutOffset(scene, mapWrap),
+      width: scene.offsetWidth || Number.parseFloat(computed.width) || 0,
+      height: scene.offsetHeight || Number.parseFloat(computed.height) || 0
+    };
+  };
+
+  const transformPoint = (x, y, transform) => {
+    const relativeX = x - transform.originX;
+    const relativeY = y - transform.originY;
+    return {
+      x: transform.layout.left + transform.originX
+        + (transform.matrix.a * relativeX) + (transform.matrix.c * relativeY) + transform.matrix.e,
+      y: transform.layout.top + transform.originY
+        + (transform.matrix.b * relativeX) + (transform.matrix.d * relativeY) + transform.matrix.f
+    };
+  };
+
+  const inverseTransformPoint = (x, y, transform) => {
+    const determinant = (transform.matrix.a * transform.matrix.d)
+      - (transform.matrix.b * transform.matrix.c);
+    if (!Number.isFinite(determinant) || Math.abs(determinant) < 1e-8) return null;
+    const mappedX = x - transform.layout.left - transform.originX - transform.matrix.e;
+    const mappedY = y - transform.layout.top - transform.originY - transform.matrix.f;
+    return {
+      x: ((transform.matrix.d * mappedX) - (transform.matrix.c * mappedY)) / determinant
+        + transform.originX,
+      y: ((-transform.matrix.b * mappedX) + (transform.matrix.a * mappedY)) / determinant
+        + transform.originY
+    };
   };
 
   const applyNativePopupScope = (element) => {
@@ -2501,8 +2621,70 @@
     renderQuestPopup(markerData);
   };
 
+  const nativePopupLayouts = new Map();
+  let nativePopupLayoutFrame = 0;
+  const fitNativeQuestPopups = () => {
+    nativePopupLayoutFrame = 0;
+    const margin = 8;
+    const toolbar = document.querySelector('.panel_top')?.getBoundingClientRect();
+    const top = Math.min(Math.max(margin, (toolbar?.bottom || 0) + margin), Math.max(margin, window.innerHeight - 80));
+    for (const [popup, entry] of nativePopupLayouts) {
+      if (!popup.isConnected || popup.classList.contains('mobile')) {
+        entry.resize?.disconnect();
+        entry.mutation.disconnect();
+        nativePopupLayouts.delete(popup);
+        for (const suffix of ['max-width', 'max-height', 'shift-x', 'shift-y']) popup.style.removeProperty(`--wtf-popup-${suffix}`);
+        continue;
+      }
+      if (!popup.getClientRects().length) continue;
+      const rect = popup.getBoundingClientRect();
+      // Popup layer is outside the rotating/scaling map scene. Account for
+      // CSS zoom, without touching the native marker anchor or transform.
+      const sx = popup.offsetWidth ? rect.width / popup.offsetWidth : 1;
+      const sy = popup.offsetHeight ? rect.height / popup.offsetHeight : 1;
+      const set = (key, value) => {
+        const text = `${Math.round(value * 100) / 100}px`;
+        if (popup.style.getPropertyValue(key) !== text) popup.style.setProperty(key, text);
+      };
+      set('--wtf-popup-max-width', Math.max(1, window.innerWidth - margin * 2) / sx);
+      set('--wtf-popup-max-height', Math.max(1, window.innerHeight - top - margin) / sy);
+      const sized = popup.getBoundingClientRect();
+      const baseX = sized.left - entry.x * sx;
+      const baseY = sized.top - entry.y * sy;
+      const x = Math.min(Math.max(baseX, margin), Math.max(margin, window.innerWidth - margin - sized.width));
+      const y = Math.min(Math.max(baseY, top), Math.max(top, window.innerHeight - margin - sized.height));
+      entry.x = Math.round((x - baseX) / sx * 100) / 100;
+      entry.y = Math.round((y - baseY) / sy * 100) / 100;
+      set('--wtf-popup-shift-x', entry.x);
+      set('--wtf-popup-shift-y', entry.y);
+      // Ignore our own style mutations, otherwise this becomes an idle loop.
+      entry.style = popup.getAttribute('style');
+    }
+  };
+  const scheduleNativeQuestPopupLayout = () => {
+    if (!nativePopupLayoutFrame && nativePopupLayouts.size) nativePopupLayoutFrame = requestAnimationFrame(fitNativeQuestPopups);
+  };
+
   const ensureNativeQuestPopupCloseButton = () => {
-    for (const popup of document.querySelectorAll('.map-popup:not(.wtf-quest-popup)')) {
+    for (const [popup, entry] of nativePopupLayouts) {
+      if (!popup.isConnected || popup.classList.contains('mobile')) {
+        entry.resize?.disconnect();
+        entry.mutation.disconnect();
+        nativePopupLayouts.delete(popup);
+        for (const suffix of ['max-width', 'max-height', 'shift-x', 'shift-y']) popup.style.removeProperty(`--wtf-popup-${suffix}`);
+      }
+    }
+    for (const popup of document.querySelectorAll('.map-popup:not(.wtf-quest-popup):not(.mobile)')) {
+      if (!nativePopupLayouts.has(popup)) {
+        const entry = { x: 0, y: 0, style: popup.getAttribute('style') };
+        entry.resize = window.ResizeObserver ? new ResizeObserver(scheduleNativeQuestPopupLayout) : null;
+        entry.resize?.observe(popup);
+        entry.mutation = new MutationObserver(() => {
+          if (entry.style !== popup.getAttribute('style')) scheduleNativeQuestPopupLayout();
+        });
+        entry.mutation.observe(popup, { attributes: true, attributeFilter: ['style'] });
+        nativePopupLayouts.set(popup, entry);
+      }
       const nativeSizeToggle = popup.querySelector('.large.pointer.text-right');
       nativeSizeToggle?.setAttribute('aria-hidden', 'true');
       const controls = nativeSizeToggle?.parentElement || popup.querySelector('.ml-15.self-start');
@@ -2520,6 +2702,7 @@
       });
       controls.appendChild(close);
     }
+    scheduleNativeQuestPopupLayout();
   };
 
   const findNativeQuestVisibilityRow = () => {
@@ -2754,8 +2937,11 @@
     const originX = Number.parseFloat(originParts[0]) || 0;
     const originY = Number.parseFloat(originParts[1]) || 0;
     const layout = getLayoutOffset(mapWrap, mapContainer);
-    const width = mapWrap.offsetWidth || Number.parseFloat(computed.width) || 0;
-    const height = mapWrap.offsetHeight || Number.parseFloat(computed.height) || 0;
+    const sceneTransform = mapSceneTransformInfo(mapWrap);
+    const width = sceneTransform?.width
+      || mapWrap.offsetWidth || Number.parseFloat(computed.width) || 0;
+    const height = sceneTransform?.height
+      || mapWrap.offsetHeight || Number.parseFloat(computed.height) || 0;
     const currentZoom = Math.hypot(matrix.a, matrix.b);
     const mapSlug = String(wtfOverlayState.quest.map || '').toLowerCase();
     const baseZoom = tarkovMarketMapDefinitions[mapSlug]?.zoom || 1;
@@ -2763,14 +2949,17 @@
       ? 1
       : Math.max(0.5, Math.sqrt(currentZoom / baseZoom));
     const screenPoint = (left, top) => {
-      const localX = (Number(left) / 100) * width;
-      const localY = (Number(top) / 100) * height;
-      const relativeX = localX - originX;
-      const relativeY = localY - originY;
-      return {
-        x: layout.left + originX + (matrix.a * relativeX) + (matrix.c * relativeY) + matrix.e,
-        y: layout.top + originY + (matrix.b * relativeX) + (matrix.d * relativeY) + matrix.f
+      let point = {
+        x: (Number(left) / 100) * width,
+        y: (Number(top) / 100) * height
       };
+      if (sceneTransform) point = transformPoint(point.x, point.y, sceneTransform);
+      return transformPoint(point.x, point.y, {
+        matrix,
+        originX,
+        originY,
+        layout
+      });
     };
 
     const zoneCanvas = wtfOverlayState.questLayer?.querySelector('.wtf-quest-zone-canvas');
@@ -2816,22 +3005,27 @@
   const mapPercentFromClientPoint = (mapContainer, mapWrap, clientX, clientY) => {
     const computed = getComputedStyle(mapWrap);
     const matrix = parseMapTransform(computed.transform);
-    const determinant = (matrix.a * matrix.d) - (matrix.b * matrix.c);
-    if (!Number.isFinite(determinant) || Math.abs(determinant) < 1e-8) return null;
     const originParts = computed.transformOrigin.split(/\s+/);
     const originX = Number.parseFloat(originParts[0]) || 0;
     const originY = Number.parseFloat(originParts[1]) || 0;
     const layout = getLayoutOffset(mapWrap, mapContainer);
     const containerRect = mapContainer.getBoundingClientRect();
-    const mappedX = (clientX - containerRect.left) - layout.left - originX - matrix.e;
-    const mappedY = (clientY - containerRect.top) - layout.top - originY - matrix.f;
-    const relativeX = ((matrix.d * mappedX) - (matrix.c * mappedY)) / determinant;
-    const relativeY = ((-matrix.b * mappedX) + (matrix.a * mappedY)) / determinant;
-    const width = mapWrap.offsetWidth || Number.parseFloat(computed.width) || 0;
-    const height = mapWrap.offsetHeight || Number.parseFloat(computed.height) || 0;
+    let point = inverseTransformPoint(
+      clientX - containerRect.left,
+      clientY - containerRect.top,
+      { matrix, originX, originY, layout }
+    );
+    if (!point) return null;
+    const sceneTransform = mapSceneTransformInfo(mapWrap);
+    if (sceneTransform) point = inverseTransformPoint(point.x, point.y, sceneTransform);
+    if (!point) return null;
+    const width = sceneTransform?.width
+      || mapWrap.offsetWidth || Number.parseFloat(computed.width) || 0;
+    const height = sceneTransform?.height
+      || mapWrap.offsetHeight || Number.parseFloat(computed.height) || 0;
     if (!(width > 0) || !(height > 0)) return null;
-    const left = ((relativeX + originX) / width) * 100;
-    const top = ((relativeY + originY) / height) * 100;
+    const left = (point.x / width) * 100;
+    const top = (point.y / height) * 100;
     if (!Number.isFinite(left) || !Number.isFinite(top) || left < 0 || left > 100 || top < 0 || top > 100) return null;
     return { left, top };
   };
@@ -3144,19 +3338,30 @@
   };
 
   const observeMapTransform = (mapContainer, mapWrap) => {
-    if (wtfOverlayState.mapWrap === mapWrap && wtfOverlayState.mapObserver) return;
+    const mapScene = mapWrap.querySelector('.map-scene');
+    if (wtfOverlayState.mapWrap === mapWrap
+        && wtfOverlayState.mapScene === mapScene
+        && wtfOverlayState.mapObserver) return;
     wtfOverlayState.mapObserver?.disconnect();
     wtfOverlayState.resizeObserver?.disconnect();
     wtfOverlayState.mapWrap = mapWrap;
+    wtfOverlayState.mapScene = mapScene;
     wtfOverlayState.mapObserver = new MutationObserver(scheduleOverlayPositionUpdate);
     wtfOverlayState.mapObserver.observe(mapWrap, {
       attributes: true,
       attributeFilter: ['style', 'class']
     });
+    if (mapScene) {
+      wtfOverlayState.mapObserver.observe(mapScene, {
+        attributes: true,
+        attributeFilter: ['style', 'class']
+      });
+    }
     if (window.ResizeObserver) {
       wtfOverlayState.resizeObserver = new ResizeObserver(scheduleOverlayPositionUpdate);
       wtfOverlayState.resizeObserver.observe(mapContainer);
       wtfOverlayState.resizeObserver.observe(mapWrap);
+      if (mapScene) wtfOverlayState.resizeObserver.observe(mapScene);
     }
     scheduleOverlayPositionUpdate();
   };
@@ -3213,6 +3418,7 @@
   const hideCommercialAndPaidUi = () => {
     const hide = (element) => {
       if (!(element instanceof Element)) return;
+      if (element.getAttribute('data-wtf-commercial-hidden') === 'true') return;
       element.setAttribute('data-wtf-commercial-hidden', 'true');
       element.setAttribute('aria-hidden', 'true');
       if ('inert' in element) element.inert = true;
@@ -3221,12 +3427,7 @@
     document.querySelectorAll([
       '.content.maps .head-pilot',
       '.content.maps .alert-box',
-      '.panel_right > .user-layers-panel',
-      '.panel_right > .squad-panel',
-      '[class*="paywall" i]',
-      '[class*="pro-only" i]',
-      '[data-premium="true"]',
-      '[data-pro-only="true"]'
+      paidUiSelector
     ].join(',')).forEach(hide);
 
     document.querySelectorAll('a[href]').forEach((link) => {
@@ -3246,9 +3447,10 @@
         return;
       }
 
-      if (/^use your progress\s*[✘✕×x]?$/i.test(text)) {
+      if (/^(?:use your progress|내 진행도 사용|Исп\. ваш прогресс)\s*[✔✘✕×x]?$/i.test(text)) {
         hide(element);
-        hide(element.nextElementSibling);
+        // The next row is now the FREE Story/Kappa/All filter, not a Pro
+        // progress control. Never hide arbitrary siblings across UI updates.
         return;
       }
 
@@ -3302,6 +3504,7 @@
     window.addEventListener('resize', scheduleOverlayPositionUpdate, { passive: true });
     window.addEventListener('resize', applyQuestRequirementsPanelLayout, { passive: true });
     window.addEventListener('resize', scheduleResponsivePanelLayout, { passive: true });
+    window.addEventListener('resize', scheduleNativeQuestPopupLayout, { passive: true });
     window.addEventListener('keydown', (event) => {
       if (event.key === 'Escape' && wtfOverlayState.questPopup && !wtfOverlayState.questPopup.hidden) {
         closeQuestPopup();
