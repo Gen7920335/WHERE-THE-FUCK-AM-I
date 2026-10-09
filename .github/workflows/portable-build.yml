@@ -1,0 +1,76 @@
+name: Portable Build
+
+# Builds the same portable ZIP as release.yml without publishing a release,
+# so pull requests can be checked and downloaded before tagging.
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build_portable:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install frontend dependencies
+        working-directory: eft-where-am-i
+        run: npm ci
+
+      - name: Build frontend assets
+        working-directory: eft-where-am-i
+        run: npm run build:css
+
+      - name: Publish self-contained portable app
+        shell: pwsh
+        run: |
+          [xml]$project = Get-Content eft-where-am-i/eft-where-am-i.csproj
+          # Keep the csproj version so the in-app updater still compares correctly.
+          $version = ($project.Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1).Trim()
+          "PORTABLE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          dotnet publish eft-where-am-i/eft-where-am-i.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:EnableCompressionInSingleFile=true `
+            -p:DebugType=None `
+            -p:DebugSymbols=false `
+            -o ./publish_output
+
+      - name: Remove runtime files from output
+        shell: pwsh
+        run: |
+          @(
+            './publish_output/Microsoft.Web.WebView2.Core.xml',
+            './publish_output/Microsoft.Web.WebView2.WinForms.xml',
+            './publish_output/Microsoft.Web.WebView2.Wpf.xml',
+            './publish_output/WHERE THE FUCK AM I.dll.config',
+            './publish_output/app.log',
+            './publish_output/quest_saves.db'
+          ) | ForEach-Object {
+            if (Test-Path -LiteralPath $_) {
+              Remove-Item -LiteralPath $_ -Force
+            }
+          }
+
+      - name: Upload portable build
+        uses: actions/upload-artifact@v4
+        with:
+          name: WHERE-THE-FUCK-AM-I-v${{ env.PORTABLE_VERSION }}-build${{ github.run_number }}-win-x64-portable
+          path: publish_output/
+          retention-days: 14
