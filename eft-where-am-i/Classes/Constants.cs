@@ -146,6 +146,16 @@ namespace eft_where_am_i.Classes
             forward = transformVector(node, forward);
             if (!forward) return null;
         }
+        if (!scene) {
+            // No transformed scene element: fall back to the toolbar's view rotation.
+            const rotationButton = document.querySelector('.panel_top .toolbar-rotation');
+            const rotationText = rotationButton?.getAttribute('aria-label') || rotationButton?.textContent || '';
+            const view = Number(rotationText.match(/(-?\d+(?:\.\d+)?)\s*°/)?.[1] || 0) * Math.PI / 180;
+            forward = {
+                x: forward.x * Math.cos(view) - forward.y * Math.sin(view),
+                y: forward.x * Math.sin(view) + forward.y * Math.cos(view)
+            };
+        }
         const chain = [];
         for (let node = marker; node && node !== container; node = node.parentElement) chain.push(node);
         for (const node of chain.reverse()) {
@@ -176,7 +186,128 @@ namespace eft_where_am_i.Classes
 
     function updateAllMarkers() {
         document.querySelectorAll('.marker').forEach(updateTriangle);
+        document.querySelectorAll('canvas.players-canvas').forEach(canvas => {
+            canvas.__eftWhereAmIHeading?.render();
+        });
     }
+
+    // 2026-10 UI: the player dot is drawn on canvas.players-canvas instead of a
+    // .marker element. Record where the site draws the first full circle (the
+    // local player; teammates follow) and draw the arrow on a sibling canvas.
+    function bindPlayerCanvas(canvas) {
+        if (canvas.__eftWhereAmIHeading) {
+            canvas.__eftWhereAmIHeading.render();
+            return;
+        }
+
+        const context = canvas.getContext('2d');
+        if (!context) return;
+
+        const overlay = document.createElement('canvas');
+        overlay.className = 'eft-heading-canvas';
+        overlay.setAttribute('aria-hidden', 'true');
+        overlay.style.cssText = 'position:absolute;pointer-events:none;';
+        canvas.insertAdjacentElement('afterend', overlay);
+        const overlayContext = overlay.getContext('2d');
+        if (!overlayContext) {
+            overlay.remove();
+            return;
+        }
+
+        const state = {
+            point: null,
+            circle: false,
+            handled: false,
+            // Player centre in viewport (client) pixels, or null when not drawn.
+            clientPoint: () => {
+                if (!state.point || !canvas.width || !canvas.height) return null;
+                const rect = canvas.getBoundingClientRect();
+                return {
+                    x: rect.left + state.point.e * rect.width / canvas.width,
+                    y: rect.top + state.point.f * rect.height / canvas.height
+                };
+            },
+            render: () => {
+                if (overlay.width !== canvas.width) overlay.width = canvas.width;
+                if (overlay.height !== canvas.height) overlay.height = canvas.height;
+                overlay.style.left = `${canvas.offsetLeft}px`;
+                overlay.style.top = `${canvas.offsetTop}px`;
+                overlay.style.width = `${canvas.clientWidth}px`;
+                overlay.style.height = `${canvas.clientHeight}px`;
+                overlay.style.transform = canvas.style.transform || '';
+                overlay.style.zIndex = getComputedStyle(canvas).zIndex;
+
+                overlayContext.setTransform(1, 0, 0, 1, 0, 0);
+                overlayContext.clearRect(0, 0, overlay.width, overlay.height);
+                const input = getPositionInput();
+                const degrees = state.point && input ? getHeadingDegrees(input.value, canvas) : null;
+                if (degrees === null) return;
+
+                // Screen-sized arrow: keep only the point's translation and the
+                // canvas's device-pixel ratio, never the site's own rotation/zoom.
+                const ratio = canvas.clientWidth ? canvas.width / canvas.clientWidth : 1;
+                overlayContext.setTransform(ratio * iconScale(), 0, 0, ratio * iconScale(), state.point.e, state.point.f);
+                overlayContext.rotate(degrees * Math.PI / 180);
+                overlayContext.beginPath();
+                overlayContext.moveTo(0, -34);
+                overlayContext.lineTo(8, -16);
+                overlayContext.lineTo(-8, -16);
+                overlayContext.closePath();
+                overlayContext.fillStyle = '#8a2be2';
+                overlayContext.strokeStyle = '#70a800';
+                overlayContext.lineWidth = 2;
+                overlayContext.fill();
+                overlayContext.stroke();
+            }
+        };
+        canvas.__eftWhereAmIHeading = state;
+
+        const originalClearRect = context.clearRect;
+        const originalBeginPath = context.beginPath;
+        const originalArc = context.arc;
+        const originalStroke = context.stroke;
+        context.clearRect = function (...args) {
+            const result = originalClearRect.apply(this, args);
+            state.point = null;
+            state.circle = false;
+            state.handled = false;
+            state.render();
+            return result;
+        };
+        context.beginPath = function (...args) {
+            state.circle = false;
+            return originalBeginPath.apply(this, args);
+        };
+        context.arc = function (x, y, radius, start, end, ...args) {
+            state.circle = x === 0 && y === 0 && radius > 0 && Math.abs(end - start) >= Math.PI * 2;
+            return originalArc.call(this, x, y, radius, start, end, ...args);
+        };
+        context.stroke = function (...args) {
+            const result = originalStroke.apply(this, args);
+            if (!state.handled) {
+                state.handled = true;
+                if (state.circle) {
+                    state.point = this.getTransform();
+                    state.render();
+                }
+            }
+            return result;
+        };
+    }
+
+    function iconScale() {
+        const value = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--wtf-icon-scale'));
+        return Number.isFinite(value) && value > 0 ? value : 1;
+    }
+
+    // Shared with auto-pan and floor calibration, which used to read .marker.
+    window.__wtfPlayerCanvasPoint = function () {
+        for (const canvas of document.querySelectorAll('canvas.players-canvas')) {
+            const point = canvas.__eftWhereAmIHeading?.clientPoint();
+            if (point) return point;
+        }
+        return null;
+    };
 
     function bindPositionInput() {
         const inputEl = getPositionInput();
@@ -194,6 +325,7 @@ namespace eft_where_am_i.Classes
 
     function initMarkers() {
         bindPositionInput();
+        document.querySelectorAll('canvas.players-canvas').forEach(bindPlayerCanvas);
         updateAllMarkers();
     }
 
@@ -220,6 +352,12 @@ namespace eft_where_am_i.Classes
                         updateTriangle(node);
                     } else {
                         node.querySelectorAll('.marker').forEach(updateTriangle);
+                    }
+
+                    if (node.matches('canvas.players-canvas')) {
+                        bindPlayerCanvas(node);
+                    } else {
+                        node.querySelectorAll('canvas.players-canvas').forEach(bindPlayerCanvas);
                     }
 
                     if (node.matches('#map-position-file, .position-controls') ||
@@ -256,14 +394,20 @@ namespace eft_where_am_i.Classes
             @"
 (function() {
     var markers = document.querySelectorAll('.marker');
-    if (markers.length === 0) return JSON.stringify({ found: false });
-    var marker = markers[markers.length - 1];
     var mapContainer = document.querySelector('#map');
     if (!mapContainer) return JSON.stringify({ found: false });
+    var mapRect = mapContainer.getBoundingClientRect();
+
+    // 2026-10 UI draws the player on a canvas; use the point the heading script recorded.
+    if (markers.length === 0) {
+        var point = window.__wtfPlayerCanvasPoint ? window.__wtfPlayerCanvasPoint() : null;
+        if (!point) return JSON.stringify({ found: false });
+        return JSON.stringify({ found: true, left: point.x - mapRect.left, top: point.y - mapRect.top, count: 1 });
+    }
+    var marker = markers[markers.length - 1];
 
     // Use getBoundingClientRect for accurate position (includes all transforms)
     var markerRect = marker.getBoundingClientRect();
-    var mapRect = mapContainer.getBoundingClientRect();
 
     // Calculate marker center position relative to map container
     var left = (markerRect.left + markerRect.width / 2) - mapRect.left;
@@ -751,11 +895,18 @@ namespace eft_where_am_i.Classes
     window.__deadZoneAutoPan = function(deadZonePercent) {
         // 2. 마커 찾기
         var markers = document.querySelectorAll('.marker');
-        if (markers.length === 0) return JSON.stringify({ panned: false, reason: 'no-marker' });
-        var marker = markers[markers.length - 1];
-        var markerRect = marker.getBoundingClientRect();
-        var markerCX = markerRect.left + markerRect.width / 2;
-        var markerCY = markerRect.top + markerRect.height / 2;
+        var markerCX, markerCY;
+        if (markers.length > 0) {
+            var markerRect = markers[markers.length - 1].getBoundingClientRect();
+            markerCX = markerRect.left + markerRect.width / 2;
+            markerCY = markerRect.top + markerRect.height / 2;
+        } else {
+            // 2026-10 UI draws the player on a canvas; use the point the heading script recorded.
+            var point = window.__wtfPlayerCanvasPoint ? window.__wtfPlayerCanvasPoint() : null;
+            if (!point) return JSON.stringify({ panned: false, reason: 'no-marker' });
+            markerCX = point.x;
+            markerCY = point.y;
+        }
 
         // 3. 뷰포트 계산 (#map의 부모 또는 #map 자체)
         var mapEl = document.querySelector('#map');
@@ -850,11 +1001,18 @@ namespace eft_where_am_i.Classes
     window.__deadZoneAutoPanCSS = function(deadZonePercent, animate) {
         // CSS transform 직접 수정 폴백 (animate: true면 애니메이션 적용)
         var markers = document.querySelectorAll('.marker');
-        if (markers.length === 0) return JSON.stringify({ panned: false, reason: 'no-marker' });
-        var marker = markers[markers.length - 1];
-        var markerRect = marker.getBoundingClientRect();
-        var markerCX = markerRect.left + markerRect.width / 2;
-        var markerCY = markerRect.top + markerRect.height / 2;
+        var markerCX, markerCY;
+        if (markers.length > 0) {
+            var markerRect = markers[markers.length - 1].getBoundingClientRect();
+            markerCX = markerRect.left + markerRect.width / 2;
+            markerCY = markerRect.top + markerRect.height / 2;
+        } else {
+            // 2026-10 UI draws the player on a canvas; use the point the heading script recorded.
+            var point = window.__wtfPlayerCanvasPoint ? window.__wtfPlayerCanvasPoint() : null;
+            if (!point) return JSON.stringify({ panned: false, reason: 'no-marker' });
+            markerCX = point.x;
+            markerCY = point.y;
+        }
 
         var mapEl = document.querySelector('#map');
         if (!mapEl) return JSON.stringify({ panned: false, reason: 'no-map' });
@@ -924,11 +1082,18 @@ namespace eft_where_am_i.Classes
     window.__deadZoneCalc = function(deadZonePercent) {
         // Pure calculation: returns pan coordinates without executing any events
         var markers = document.querySelectorAll('.marker');
-        if (markers.length === 0) return JSON.stringify({ needsPan: false, reason: 'no-marker' });
-        var marker = markers[markers.length - 1];
-        var markerRect = marker.getBoundingClientRect();
-        var markerCX = markerRect.left + markerRect.width / 2;
-        var markerCY = markerRect.top + markerRect.height / 2;
+        var markerCX, markerCY;
+        if (markers.length > 0) {
+            var markerRect = markers[markers.length - 1].getBoundingClientRect();
+            markerCX = markerRect.left + markerRect.width / 2;
+            markerCY = markerRect.top + markerRect.height / 2;
+        } else {
+            // 2026-10 UI draws the player on a canvas; use the point the heading script recorded.
+            var point = window.__wtfPlayerCanvasPoint ? window.__wtfPlayerCanvasPoint() : null;
+            if (!point) return JSON.stringify({ needsPan: false, reason: 'no-marker' });
+            markerCX = point.x;
+            markerCY = point.y;
+        }
 
         var mapEl = document.querySelector('#map');
         if (!mapEl) return JSON.stringify({ needsPan: false, reason: 'no-map' });

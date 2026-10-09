@@ -12,10 +12,11 @@ const panelScript = executor.slice(executor.indexOf('public async Task<bool> IsP
   .match(/string script = \$@"([\s\S]*?)";/)[1]
   .replace('{JsLiteral(Constants.HIDE_SHOW_PANEL_BUTTON_SELECTOR)}', JSON.stringify(selector('HIDE_SHOW_PANEL_BUTTON_SELECTOR')))
   .replace(/\{\{/g, '{').replace(/\}\}/g, '}').replace(/""/g, '"');
-const inputScript = executor.slice(executor.indexOf('public async Task<bool> EnsureWhereAmIInputAsync('))
-  .match(/string script = \$@"([\s\S]*?)";/)[1]
+const inputTemplate = executor.slice(executor.indexOf('public async Task<bool> EnsureWhereAmIInputAsync('))
+  .match(/string scriptTemplate = \$@"([\s\S]*?)";/)[1]
   .replace('{inputSelector}', JSON.stringify(selector('WHERE_AM_I_INPUT_SELECTOR')))
   .replace(/\{\{/g, '{').replace(/\}\}/g, '}').replace(/""/g, '"');
+const inputScript = inputTemplate.replace('__MENU_OPENED__', 'false');
 
 (async () => {
   const dom = new JSDOM(`<body><header class="maps-site-chrome"></header>

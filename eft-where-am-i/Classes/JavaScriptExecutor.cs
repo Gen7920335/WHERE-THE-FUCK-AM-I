@@ -112,7 +112,7 @@ namespace eft_where_am_i.Classes
         public async Task<bool> EnsureWhereAmIInputAsync(int attempts = 10, int delayMs = 100)
         {
             string inputSelector = JsLiteral(Constants.WHERE_AM_I_INPUT_SELECTOR);
-            string script = $@"
+            string scriptTemplate = $@"
                 (function() {{
                     var input = document.querySelector({inputSelector});
                     if (input && input.offsetParent !== null && !input.disabled && !input.readOnly) {{
@@ -128,11 +128,35 @@ namespace eft_where_am_i.Classes
                     var panel = document.querySelector('.panel_top');
                     if (!panel) return 'panel-not-found';
 
-                    var buttons = Array.from(panel.querySelectorAll('button'));
+                    var isVisible = function(element) {{
+                        return !!element && element.offsetParent !== null && !element.disabled;
+                    }};
                     var normalizedLabels = ['where am i?', '내 위치는?'];
-                    var button = buttons.find(function(candidate) {{
+                    var hasWhereAmILabel = function(candidate) {{
                         return normalizedLabels.includes((candidate.textContent || '').trim().toLowerCase());
+                    }};
+                    var buttons = Array.from(panel.querySelectorAll('button'));
+                    var button = buttons.find(function(candidate) {{
+                        return hasWhereAmILabel(candidate) && isVisible(candidate);
                     }});
+
+                    // 2026-10 UI: the location button lives in the toolbar's More (⋯) dropdown.
+                    var more = panel.querySelector('.dropdown.toolbar-more');
+                    if (!button && more) {{
+                        var menuButtons = Array.from(more.querySelectorAll('.dd-content button'));
+                        var coordinateButton = menuButtons.find(hasWhereAmILabel) ||
+                            more.querySelector('.dd-content > div > button:nth-child(2)');
+                        if (isVisible(coordinateButton)) {{
+                            coordinateButton.click();
+                            return 'clicked';
+                        }}
+                        if (__MENU_OPENED__) return 'waiting-for-menu';
+
+                        var menuButton = more.querySelector(':scope > div > button, :scope > button');
+                        if (!menuButton) return 'menu-button-not-found';
+                        menuButton.click();
+                        return 'menu-opened';
+                    }}
 
                     if (!button) {{
                         button = panel.querySelector(
@@ -167,6 +191,7 @@ namespace eft_where_am_i.Classes
                 await EnsureWebViewInitializedAsync();
                 if (webView.CoreWebView2 == null) return false;
 
+                bool menuOpened = false;
                 bool clickIssued = false;
                 for (int attempt = 0; attempt < attempts; attempt++)
                 {
@@ -174,9 +199,11 @@ namespace eft_where_am_i.Classes
 
                     if (!clickIssued)
                     {
+                        string script = scriptTemplate.Replace("__MENU_OPENED__", menuOpened ? "true" : "false");
                         string result = await webView.CoreWebView2.ExecuteScriptAsync(script);
                         string status = JsonConvert.DeserializeObject<string>(result) ?? string.Empty;
                         if (status == "ready") return true;
+                        if (status == "menu-opened") menuOpened = true;
                         clickIssued = status == "clicked";
                     }
 
