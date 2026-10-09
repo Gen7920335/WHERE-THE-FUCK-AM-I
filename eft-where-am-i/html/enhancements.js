@@ -355,8 +355,10 @@
     panelLayoutFrame: 0,
     portraitPanelShell: null,
     routeLayer: null,
+    mapContainer: null,
     mapWrap: null,
     mapScene: null,
+    mapCanvas: null,
     domObserver: null,
     mapObserver: null,
     resizeObserver: null,
@@ -2907,10 +2909,159 @@
     scheduleOverlayPositionUpdate();
   };
 
-  const ensureQuestLayer = () => {
+  // 2026-10 UI: the map is drawn on canvases. .map-wrap/.map-scene only exist
+  // in the site's builder mode (and in our local Terminal page), so normal maps
+  // expose the view only through the matrix the site passes to setTransform on
+  // the doc canvas before every redraw (map pixels -> canvas pixels).
+  const nativeDocMapCanvas = (mapContainer) => [...mapContainer.querySelectorAll('canvas.doc-map-canvas')]
+    .find((canvas) => canvas.style.display !== 'none') || null;
+
+  const sameMatrix = (left, right) => Boolean(left && right)
+    && left.a === right.a && left.b === right.b && left.c === right.c
+    && left.d === right.d && left.e === right.e && left.f === right.f;
+
+  const bindNativeViewCanvas = (canvas) => {
+    if (canvas.__wtfNativeView) return canvas.__wtfNativeView;
+    const context = canvas.getContext?.('2d');
+    if (!context) return null;
+    const view = { matrix: null };
+    const record = (matrix) => {
+      if (!matrix) return;
+      const next = { a: matrix.a, b: matrix.b, c: matrix.c, d: matrix.d, e: matrix.e, f: matrix.f };
+      if (![next.a, next.b, next.c, next.d, next.e, next.f].every(Number.isFinite)) return;
+      if (sameMatrix(next, { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 })) return;
+      if (Math.abs((next.a * next.d) - (next.b * next.c)) < 1e-12) return;
+      if (sameMatrix(next, view.matrix)) return;
+      view.matrix = next;
+      scheduleOverlayPositionUpdate();
+    };
+    // The site leaves its view transform on the context after drawing.
+    if (typeof context.getTransform === 'function') record(context.getTransform());
+    const originalSetTransform = context.setTransform;
+    context.setTransform = function (...args) {
+      const result = originalSetTransform.apply(this, args);
+      record(args.length >= 6
+        ? { a: args[0], b: args[1], c: args[2], d: args[3], e: args[4], f: args[5] }
+        : args[0]);
+      return result;
+    };
+    canvas.__wtfNativeView = view;
+    return view;
+  };
+
+  const currentOverlayMapSlug = () => {
+    const routeMatch = String(location.pathname || '').match(/\/maps\/([^/?#]+)/i);
+    const fromRoute = routeMatch ? decodeURIComponent(routeMatch[1]).toLowerCase() : '';
+    if (tarkovMarketMapDefinitions[fromRoute]) return fromRoute;
+    return [wtfOverlayState.quest.map, wtfOverlayState.pings.map, wtfOverlayState.route.map, wtfOverlayState.squad.map]
+      .map((slug) => String(slug || '').toLowerCase())
+      .find((slug) => tarkovMarketMapDefinitions[slug]) || '';
+  };
+
+  const resolveOverlayHost = () => {
     const mapContainer = document.querySelector('.map-cont');
-    const mapWrap = mapContainer?.querySelector('.map-wrap');
-    if (!mapContainer || !mapWrap) return false;
+    if (!mapContainer) return null;
+    const mapWrap = mapContainer.querySelector('.map-wrap');
+    if (mapWrap) return { mapContainer, mapWrap, canvas: null };
+    const canvas = nativeDocMapCanvas(mapContainer);
+    return canvas ? { mapContainer, mapWrap: null, canvas } : null;
+  };
+
+  const legacyOverlayGeometry = (mapContainer, mapWrap) => {
+    const computed = getComputedStyle(mapWrap);
+    const matrix = parseMapTransform(computed.transform);
+    const originParts = computed.transformOrigin.split(/\s+/);
+    const wrapTransform = {
+      matrix,
+      originX: Number.parseFloat(originParts[0]) || 0,
+      originY: Number.parseFloat(originParts[1]) || 0,
+      layout: getLayoutOffset(mapWrap, mapContainer)
+    };
+    const sceneTransform = mapSceneTransformInfo(mapWrap);
+    const width = sceneTransform?.width
+      || mapWrap.offsetWidth || Number.parseFloat(computed.width) || 0;
+    const height = sceneTransform?.height
+      || mapWrap.offsetHeight || Number.parseFloat(computed.height) || 0;
+    return {
+      zoom: Math.hypot(matrix.a, matrix.b),
+      rotation: 0,
+      toContainer: (left, top) => {
+        let point = {
+          x: (Number(left) / 100) * width,
+          y: (Number(top) / 100) * height
+        };
+        if (sceneTransform) point = transformPoint(point.x, point.y, sceneTransform);
+        return transformPoint(point.x, point.y, wrapTransform);
+      },
+      fromClient: (clientX, clientY) => {
+        const containerRect = mapContainer.getBoundingClientRect();
+        let point = inverseTransformPoint(
+          clientX - containerRect.left,
+          clientY - containerRect.top,
+          wrapTransform
+        );
+        if (!point) return null;
+        if (sceneTransform) point = inverseTransformPoint(point.x, point.y, sceneTransform);
+        if (!point || !(width > 0) || !(height > 0)) return null;
+        return { left: (point.x / width) * 100, top: (point.y / height) * 100 };
+      }
+    };
+  };
+
+  const nativeOverlayGeometry = (mapContainer, canvas) => {
+    const matrix = bindNativeViewCanvas(canvas)?.matrix;
+    const definition = tarkovMarketMapDefinitions[currentOverlayMapSlug()];
+    if (!matrix || !definition) return null;
+    const ratio = canvas.clientWidth > 0 ? canvas.width / canvas.clientWidth : 1;
+    const a = matrix.a / ratio;
+    const b = matrix.b / ratio;
+    const c = matrix.c / ratio;
+    const d = matrix.d / ratio;
+    const determinant = (a * d) - (b * c);
+    if (!Number.isFinite(determinant) || Math.abs(determinant) < 1e-12) return null;
+    const containerRect = mapContainer.getBoundingClientRect();
+    const canvasRect = canvas.getBoundingClientRect();
+    const offsetX = canvasRect.left - containerRect.left;
+    const offsetY = canvasRect.top - containerRect.top;
+    const e = matrix.e / ratio;
+    const f = matrix.f / ratio;
+    return {
+      zoom: Math.hypot(a, b),
+      rotation: Math.atan2(b, a) * 180 / Math.PI,
+      toContainer: (left, top) => {
+        const mapX = (Number(left) / 100) * definition.width;
+        const mapY = (Number(top) / 100) * definition.height;
+        return {
+          x: offsetX + (a * mapX) + (c * mapY) + e,
+          y: offsetY + (b * mapX) + (d * mapY) + f
+        };
+      },
+      fromClient: (clientX, clientY) => {
+        const x = clientX - canvasRect.left - e;
+        const y = clientY - canvasRect.top - f;
+        const mapX = ((d * x) - (c * y)) / determinant;
+        const mapY = ((-b * x) + (a * y)) / determinant;
+        return {
+          left: (mapX / definition.width) * 100,
+          top: (mapY / definition.height) * 100
+        };
+      }
+    };
+  };
+
+  const resolveOverlayGeometry = (host = wtfOverlayState) => {
+    const mapContainer = host?.mapContainer;
+    if (!mapContainer?.isConnected) return null;
+    if (host.mapWrap?.isConnected) return legacyOverlayGeometry(mapContainer, host.mapWrap);
+    if (host.mapCanvas?.isConnected) return nativeOverlayGeometry(mapContainer, host.mapCanvas);
+    if (host.canvas?.isConnected) return nativeOverlayGeometry(mapContainer, host.canvas);
+    return null;
+  };
+
+  const ensureQuestLayer = () => {
+    const host = resolveOverlayHost();
+    if (!host) return false;
+    const { mapContainer } = host;
     if (!wtfOverlayState.questLayer?.isConnected || wtfOverlayState.questLayer.parentElement !== mapContainer) {
       wtfOverlayState.questLayer?.remove();
       const overlay = document.createElement('div');
@@ -2920,47 +3071,23 @@
       wtfOverlayState.questLayer = overlay;
       renderQuestMarkers();
     }
-    observeMapTransform(mapContainer, mapWrap);
+    observeMapTransform(host);
     return true;
   };
 
   const updateOverlayPositions = () => {
     wtfOverlayState.updateFrame = 0;
-    const mapWrap = wtfOverlayState.mapWrap;
-    const mapContainer = mapWrap?.closest('.map-cont');
-    if (!mapWrap?.isConnected || !mapContainer) return;
+    const mapContainer = wtfOverlayState.mapContainer;
+    const geometry = resolveOverlayGeometry();
+    if (!geometry) return;
 
-    const computed = getComputedStyle(mapWrap);
-    const matrix = parseMapTransform(computed.transform);
-
-    const originParts = computed.transformOrigin.split(/\s+/);
-    const originX = Number.parseFloat(originParts[0]) || 0;
-    const originY = Number.parseFloat(originParts[1]) || 0;
-    const layout = getLayoutOffset(mapWrap, mapContainer);
-    const sceneTransform = mapSceneTransformInfo(mapWrap);
-    const width = sceneTransform?.width
-      || mapWrap.offsetWidth || Number.parseFloat(computed.width) || 0;
-    const height = sceneTransform?.height
-      || mapWrap.offsetHeight || Number.parseFloat(computed.height) || 0;
-    const currentZoom = Math.hypot(matrix.a, matrix.b);
+    const currentZoom = geometry.zoom;
     const mapSlug = String(wtfOverlayState.quest.map || '').toLowerCase();
     const baseZoom = tarkovMarketMapDefinitions[mapSlug]?.zoom || 1;
     const nativeQuestMarkerScale = currentZoom >= baseZoom
       ? 1
       : Math.max(0.5, Math.sqrt(currentZoom / baseZoom));
-    const screenPoint = (left, top) => {
-      let point = {
-        x: (Number(left) / 100) * width,
-        y: (Number(top) / 100) * height
-      };
-      if (sceneTransform) point = transformPoint(point.x, point.y, sceneTransform);
-      return transformPoint(point.x, point.y, {
-        matrix,
-        originX,
-        originY,
-        layout
-      });
-    };
+    const screenPoint = geometry.toContainer;
 
     const zoneCanvas = wtfOverlayState.questLayer?.querySelector('.wtf-quest-zone-canvas');
     if (zoneCanvas) {
@@ -2991,6 +3118,12 @@
           '--wtf-quest-marker-scale',
           String(state.iconScale * nativeQuestMarkerScale)
         );
+      } else if (marker.classList.contains('wtf-squad-marker')) {
+        // Headings are map-space angles; follow the native view rotation.
+        const direction = `${(Number(marker.dataset.direction) || 0) + geometry.rotation}deg`;
+        if (marker.style.getPropertyValue('--wtf-squad-direction') !== direction) {
+          marker.style.setProperty('--wtf-squad-direction', direction);
+        }
       }
     }
     updateRouteLines();
@@ -3002,30 +3135,10 @@
     wtfOverlayState.updateFrame = requestAnimationFrame(updateOverlayPositions);
   };
 
-  const mapPercentFromClientPoint = (mapContainer, mapWrap, clientX, clientY) => {
-    const computed = getComputedStyle(mapWrap);
-    const matrix = parseMapTransform(computed.transform);
-    const originParts = computed.transformOrigin.split(/\s+/);
-    const originX = Number.parseFloat(originParts[0]) || 0;
-    const originY = Number.parseFloat(originParts[1]) || 0;
-    const layout = getLayoutOffset(mapWrap, mapContainer);
-    const containerRect = mapContainer.getBoundingClientRect();
-    let point = inverseTransformPoint(
-      clientX - containerRect.left,
-      clientY - containerRect.top,
-      { matrix, originX, originY, layout }
-    );
+  const mapPercentFromClientPoint = (host, clientX, clientY) => {
+    const point = resolveOverlayGeometry(host)?.fromClient(clientX, clientY);
     if (!point) return null;
-    const sceneTransform = mapSceneTransformInfo(mapWrap);
-    if (sceneTransform) point = inverseTransformPoint(point.x, point.y, sceneTransform);
-    if (!point) return null;
-    const width = sceneTransform?.width
-      || mapWrap.offsetWidth || Number.parseFloat(computed.width) || 0;
-    const height = sceneTransform?.height
-      || mapWrap.offsetHeight || Number.parseFloat(computed.height) || 0;
-    if (!(width > 0) || !(height > 0)) return null;
-    const left = (point.x / width) * 100;
-    const top = (point.y / height) * 100;
+    const { left, top } = point;
     if (!Number.isFinite(left) || !Number.isFinite(top) || left < 0 || left > 100 || top < 0 || top > 100) return null;
     return { left, top };
   };
@@ -3094,27 +3207,50 @@
     scheduleOverlayPositionUpdate();
   };
 
-  const installPingPlacement = (mapContainer, mapWrap) => {
-    if (mapContainer.__wtfPingMapWrap === mapWrap) return;
+  // Panels, popups and our own floating panels never receive pings or nodes.
+  const overlayPlacementBlockedSelector = '.panel_top, .panel_left, .panel_right, button, input, label, a, '
+    + '.map-popup, .popup-layer > *, .map-guide, .map-credits, .mobile-map-ui > *, '
+    + '#wtf-quest-requirements-panel, #wtf-portrait-panel-shell > *';
+
+  // The canvas UI also reacts to the click that follows a handled pointerdown
+  // (marker popups, Alt level switching), so swallow that one click.
+  const swallowFollowingClick = (mapContainer) => {
+    mapContainer.__wtfSwallowClickUntil = performance.now() + 600;
+    if (mapContainer.__wtfSwallowClickHandler) return;
+    mapContainer.__wtfSwallowClickHandler = (event) => {
+      if (performance.now() > (mapContainer.__wtfSwallowClickUntil || 0)) return;
+      mapContainer.__wtfSwallowClickUntil = 0;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    };
+    mapContainer.addEventListener('click', mapContainer.__wtfSwallowClickHandler, true);
+  };
+
+  const installPingPlacement = (host) => {
+    const { mapContainer } = host;
+    const viewKey = host.mapWrap || host.canvas;
+    if (mapContainer.__wtfPingMapWrap === viewKey) return;
     if (mapContainer.__wtfPingPointerHandler) {
       mapContainer.removeEventListener('pointerdown', mapContainer.__wtfPingPointerHandler, true);
     }
     const handler = (event) => {
       if (!event.altKey || event.button !== 0
-          || event.target.closest('.panel_top, .panel_left, .panel_right, button, input, label, a, .map-popup, .wtf-quest-marker')) return;
+          || event.target.closest(`${overlayPlacementBlockedSelector}, .wtf-quest-marker`)) return;
       const nearbyPing = nearestOverlayMarker('.wtf-ping-marker[data-owned="true"]', event.clientX, event.clientY);
       if (nearbyPing?.dataset.id) {
         event.preventDefault();
         event.stopImmediatePropagation();
+        swallowFollowingClick(mapContainer);
         window.chrome?.webview?.postMessage(JSON.stringify({
           action: 'map-ping-delete', id: nearbyPing.dataset.id
         }));
         return;
       }
-      const point = mapPercentFromClientPoint(mapContainer, mapWrap, event.clientX, event.clientY);
+      const point = mapPercentFromClientPoint(wtfOverlayState, event.clientX, event.clientY);
       if (!point) return;
       event.preventDefault();
       event.stopImmediatePropagation();
+      swallowFollowingClick(mapContainer);
       window.chrome?.webview?.postMessage(JSON.stringify({
         action: 'map-ping-add',
         left: point.left,
@@ -3122,15 +3258,15 @@
         floor: selectedPingFloor()
       }));
     };
-    mapContainer.__wtfPingMapWrap = mapWrap;
+    mapContainer.__wtfPingMapWrap = viewKey;
     mapContainer.__wtfPingPointerHandler = handler;
     mapContainer.addEventListener('pointerdown', handler, true);
   };
 
   const ensurePingLayer = () => {
-    const mapContainer = document.querySelector('.map-cont');
-    const mapWrap = mapContainer?.querySelector('.map-wrap');
-    if (!mapContainer || !mapWrap) return false;
+    const host = resolveOverlayHost();
+    if (!host) return false;
+    const { mapContainer } = host;
     if (!wtfOverlayState.pingLayer?.isConnected || wtfOverlayState.pingLayer.parentElement !== mapContainer) {
       wtfOverlayState.pingLayer?.remove();
       const overlay = document.createElement('div');
@@ -3140,8 +3276,8 @@
       wtfOverlayState.pingLayer = overlay;
       renderPingMarkers();
     }
-    installPingPlacement(mapContainer, mapWrap);
-    observeMapTransform(mapContainer, mapWrap);
+    observeMapTransform(host);
+    installPingPlacement(host);
     return true;
   };
 
@@ -3234,16 +3370,15 @@
     scheduleOverlayPositionUpdate();
   };
 
-  const installRoutePlacement = (mapContainer, mapWrap) => {
-    if (mapContainer.__wtfRouteMapWrap === mapWrap) return;
+  const installRoutePlacement = (host) => {
+    const { mapContainer } = host;
+    const viewKey = host.mapWrap || host.canvas;
+    if (mapContainer.__wtfRouteMapWrap === viewKey) return;
     if (mapContainer.__wtfRoutePointerHandler) {
       mapContainer.removeEventListener('pointerdown', mapContainer.__wtfRoutePointerHandler, true);
       mapContainer.removeEventListener('auxclick', mapContainer.__wtfRouteAuxHandler, true);
     }
-    const isInteractiveUi = target => target.closest(
-      '.panel_top, .panel_left, .panel_right, button, input, label, a, .map-popup, '
-      + '.wtf-ping-marker'
-    );
+    const isInteractiveUi = target => target.closest(`${overlayPlacementBlockedSelector}, .wtf-ping-marker`);
     const handler = event => {
       if (event.button !== 1 || isInteractiveUi(event.target)) return;
       event.preventDefault();
@@ -3263,7 +3398,7 @@
         ));
         return;
       }
-      const point = mapPercentFromClientPoint(mapContainer, mapWrap, event.clientX, event.clientY);
+      const point = mapPercentFromClientPoint(wtfOverlayState, event.clientX, event.clientY);
       if (!point) return;
       window.chrome?.webview?.postMessage(JSON.stringify({
         action: 'map-route-node-add',
@@ -3275,7 +3410,7 @@
     const auxHandler = event => {
       if (event.button === 1 && !isInteractiveUi(event.target)) event.preventDefault();
     };
-    mapContainer.__wtfRouteMapWrap = mapWrap;
+    mapContainer.__wtfRouteMapWrap = viewKey;
     mapContainer.__wtfRoutePointerHandler = handler;
     mapContainer.__wtfRouteAuxHandler = auxHandler;
     mapContainer.addEventListener('pointerdown', handler, true);
@@ -3283,9 +3418,9 @@
   };
 
   const ensureRouteLayer = () => {
-    const mapContainer = document.querySelector('.map-cont');
-    const mapWrap = mapContainer?.querySelector('.map-wrap');
-    if (!mapContainer || !mapWrap) return false;
+    const host = resolveOverlayHost();
+    if (!host) return false;
+    const { mapContainer } = host;
     if (!wtfOverlayState.routeLayer?.isConnected || wtfOverlayState.routeLayer.parentElement !== mapContainer) {
       wtfOverlayState.routeLayer?.remove();
       const overlay = document.createElement('div');
@@ -3295,8 +3430,8 @@
       wtfOverlayState.routeLayer = overlay;
       renderRouteNodes();
     }
-    installRoutePlacement(mapContainer, mapWrap);
-    observeMapTransform(mapContainer, mapWrap);
+    observeMapTransform(host);
+    installRoutePlacement(host);
     return true;
   };
 
@@ -3337,31 +3472,51 @@
     });
   };
 
-  const observeMapTransform = (mapContainer, mapWrap) => {
-    const mapScene = mapWrap.querySelector('.map-scene');
-    if (wtfOverlayState.mapWrap === mapWrap
+  const observeMapTransform = ({ mapContainer, mapWrap, canvas }) => {
+    const mapScene = mapWrap?.querySelector('.map-scene') || null;
+    if (wtfOverlayState.mapContainer === mapContainer
+        && wtfOverlayState.mapWrap === mapWrap
         && wtfOverlayState.mapScene === mapScene
-        && wtfOverlayState.mapObserver) return;
+        && wtfOverlayState.mapCanvas === canvas
+        && wtfOverlayState.resizeObserver !== null) return;
     wtfOverlayState.mapObserver?.disconnect();
     wtfOverlayState.resizeObserver?.disconnect();
+    wtfOverlayState.mapObserver = null;
+    wtfOverlayState.resizeObserver = null;
+    wtfOverlayState.mapContainer = mapContainer;
     wtfOverlayState.mapWrap = mapWrap;
     wtfOverlayState.mapScene = mapScene;
-    wtfOverlayState.mapObserver = new MutationObserver(scheduleOverlayPositionUpdate);
-    wtfOverlayState.mapObserver.observe(mapWrap, {
-      attributes: true,
-      attributeFilter: ['style', 'class']
-    });
-    if (mapScene) {
-      wtfOverlayState.mapObserver.observe(mapScene, {
-        attributes: true,
-        attributeFilter: ['style', 'class']
-      });
+    wtfOverlayState.mapCanvas = canvas;
+    const observedTransforms = [];
+    if (mapWrap) {
+      // Our Terminal page pans a stage wrapper (left/top) around the map wrap.
+      for (let element = mapWrap; element && element !== mapContainer; element = element.parentElement) {
+        observedTransforms.push(element);
+      }
+      wtfOverlayState.mapObserver = new MutationObserver(scheduleOverlayPositionUpdate);
+      for (const element of observedTransforms) {
+        wtfOverlayState.mapObserver.observe(element, {
+          attributes: true,
+          attributeFilter: ['style', 'class']
+        });
+      }
+      if (mapScene) {
+        wtfOverlayState.mapObserver.observe(mapScene, {
+          attributes: true,
+          attributeFilter: ['style', 'class']
+        });
+        observedTransforms.push(mapScene);
+      }
+    } else if (canvas) {
+      bindNativeViewCanvas(canvas);
     }
     if (window.ResizeObserver) {
       wtfOverlayState.resizeObserver = new ResizeObserver(scheduleOverlayPositionUpdate);
       wtfOverlayState.resizeObserver.observe(mapContainer);
-      wtfOverlayState.resizeObserver.observe(mapWrap);
-      if (mapScene) wtfOverlayState.resizeObserver.observe(mapScene);
+      for (const element of observedTransforms) wtfOverlayState.resizeObserver.observe(element);
+      if (canvas) wtfOverlayState.resizeObserver.observe(canvas);
+    } else {
+      wtfOverlayState.resizeObserver = false;
     }
     scheduleOverlayPositionUpdate();
   };
@@ -3377,6 +3532,7 @@
       marker.dataset.left = String(member.left);
       marker.dataset.top = String(member.top);
       marker.dataset.elevation = String(member.elevation ?? '');
+      marker.dataset.direction = String(Number(member.direction) || 0);
       marker.title = member.name || 'Squad member';
       marker.setAttribute('aria-hidden', 'true');
       marker.style.setProperty('--wtf-squad-direction', `${Number(member.direction) || 0}deg`);
@@ -3399,9 +3555,9 @@
   };
 
   const ensureSquadLayer = () => {
-    const mapContainer = document.querySelector('.map-cont');
-    const mapWrap = mapContainer?.querySelector('.map-wrap');
-    if (!mapContainer || !mapWrap) return false;
+    const host = resolveOverlayHost();
+    if (!host) return false;
+    const { mapContainer } = host;
     if (!wtfOverlayState.squadLayer?.isConnected || wtfOverlayState.squadLayer.parentElement !== mapContainer) {
       wtfOverlayState.squadLayer?.remove();
       const overlay = document.createElement('div');
@@ -3411,7 +3567,7 @@
       wtfOverlayState.squadLayer = overlay;
       renderSquadMarkers();
     }
-    observeMapTransform(mapContainer, mapWrap);
+    observeMapTransform(host);
     return true;
   };
 

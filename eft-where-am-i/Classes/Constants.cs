@@ -892,26 +892,42 @@ namespace eft_where_am_i.Classes
         unwantedObserver.observe(document.body, { childList: true, subtree: true });
     }
 
-    window.__deadZoneAutoPan = function(deadZonePercent) {
-        // 2. 마커 찾기
-        var markers = document.querySelectorAll('.marker');
-        var markerCX, markerCY;
+    // 플레이어 화면 좌표: 보이는 .marker(구 UI, Terminal) 또는 2026-10 UI의 canvas 점.
+    // 숨겨진 마커(크기 0)는 (0,0)으로 계산되어 지도를 엉뚱하게 끌기 때문에 제외합니다.
+    window.__wtfPlayerScreenPoint = function() {
+        var markers = Array.prototype.filter.call(document.querySelectorAll('.marker'), function(marker) {
+            var rect = marker.getBoundingClientRect();
+            return !marker.hidden && rect.width > 0 && rect.height > 0;
+        });
         if (markers.length > 0) {
             var markerRect = markers[markers.length - 1].getBoundingClientRect();
-            markerCX = markerRect.left + markerRect.width / 2;
-            markerCY = markerRect.top + markerRect.height / 2;
-        } else {
-            // 2026-10 UI draws the player on a canvas; use the point the heading script recorded.
-            var point = window.__wtfPlayerCanvasPoint ? window.__wtfPlayerCanvasPoint() : null;
-            if (!point) return JSON.stringify({ panned: false, reason: 'no-marker' });
-            markerCX = point.x;
-            markerCY = point.y;
+            return { x: markerRect.left + markerRect.width / 2, y: markerRect.top + markerRect.height / 2 };
         }
+        return window.__wtfPlayerCanvasPoint ? window.__wtfPlayerCanvasPoint() : null;
+    };
 
-        // 3. 뷰포트 계산 (#map의 부모 또는 #map 자체)
-        var mapEl = document.querySelector('#map');
-        if (!mapEl) return JSON.stringify({ panned: false, reason: 'no-map' });
-        var viewportEl = mapEl.parentElement || mapEl;
+    // 지도 뷰포트: 구 UI는 #map(.map-wrap)의 .map-cont, 2026-10 UI는 .map-cont 자체입니다.
+    window.__wtfMapViewport = function() {
+        var mapEl = document.querySelector('#map') || document.querySelector('.map-cont');
+        if (!mapEl) return null;
+        return {
+            mapEl: mapEl,
+            viewportEl: mapEl.closest('.map-cont') || mapEl.parentElement || mapEl
+        };
+    };
+
+    window.__deadZoneAutoPan = function(deadZonePercent) {
+        // 2. 마커 찾기
+        var point = window.__wtfPlayerScreenPoint();
+        if (!point) return JSON.stringify({ panned: false, reason: 'no-marker' });
+        var markerCX = point.x;
+        var markerCY = point.y;
+
+        // 3. 뷰포트 계산
+        var mapView = window.__wtfMapViewport();
+        if (!mapView) return JSON.stringify({ panned: false, reason: 'no-map' });
+        var mapEl = mapView.mapEl;
+        var viewportEl = mapView.viewportEl;
         var viewportRect = viewportEl.getBoundingClientRect();
 
         // 4. 패널 감지 (tarkov-market 사이드 패널)
@@ -1000,23 +1016,17 @@ namespace eft_where_am_i.Classes
 
     window.__deadZoneAutoPanCSS = function(deadZonePercent, animate) {
         // CSS transform 직접 수정 폴백 (animate: true면 애니메이션 적용)
-        var markers = document.querySelectorAll('.marker');
-        var markerCX, markerCY;
-        if (markers.length > 0) {
-            var markerRect = markers[markers.length - 1].getBoundingClientRect();
-            markerCX = markerRect.left + markerRect.width / 2;
-            markerCY = markerRect.top + markerRect.height / 2;
-        } else {
-            // 2026-10 UI draws the player on a canvas; use the point the heading script recorded.
-            var point = window.__wtfPlayerCanvasPoint ? window.__wtfPlayerCanvasPoint() : null;
-            if (!point) return JSON.stringify({ panned: false, reason: 'no-marker' });
-            markerCX = point.x;
-            markerCY = point.y;
-        }
+        var point = window.__wtfPlayerScreenPoint();
+        if (!point) return JSON.stringify({ panned: false, reason: 'no-marker' });
+        var markerCX = point.x;
+        var markerCY = point.y;
 
-        var mapEl = document.querySelector('#map');
-        if (!mapEl) return JSON.stringify({ panned: false, reason: 'no-map' });
-        var viewportEl = mapEl.parentElement || mapEl;
+        var mapView = window.__wtfMapViewport();
+        if (!mapView) return JSON.stringify({ panned: false, reason: 'no-map' });
+        // 2026-10 UI는 canvas에 직접 그리므로 CSS transform으로 옮길 대상이 없습니다.
+        if (mapView.mapEl.id !== 'map') return JSON.stringify({ panned: false, reason: 'no-css-transform' });
+        var mapEl = mapView.mapEl;
+        var viewportEl = mapView.viewportEl;
         var viewportRect = viewportEl.getBoundingClientRect();
 
         var effectiveLeft = viewportRect.left;
@@ -1081,23 +1091,14 @@ namespace eft_where_am_i.Classes
 
     window.__deadZoneCalc = function(deadZonePercent) {
         // Pure calculation: returns pan coordinates without executing any events
-        var markers = document.querySelectorAll('.marker');
-        var markerCX, markerCY;
-        if (markers.length > 0) {
-            var markerRect = markers[markers.length - 1].getBoundingClientRect();
-            markerCX = markerRect.left + markerRect.width / 2;
-            markerCY = markerRect.top + markerRect.height / 2;
-        } else {
-            // 2026-10 UI draws the player on a canvas; use the point the heading script recorded.
-            var point = window.__wtfPlayerCanvasPoint ? window.__wtfPlayerCanvasPoint() : null;
-            if (!point) return JSON.stringify({ needsPan: false, reason: 'no-marker' });
-            markerCX = point.x;
-            markerCY = point.y;
-        }
+        var point = window.__wtfPlayerScreenPoint();
+        if (!point) return JSON.stringify({ needsPan: false, reason: 'no-marker' });
+        var markerCX = point.x;
+        var markerCY = point.y;
 
-        var mapEl = document.querySelector('#map');
-        if (!mapEl) return JSON.stringify({ needsPan: false, reason: 'no-map' });
-        var viewportEl = mapEl.parentElement || mapEl;
+        var mapView = window.__wtfMapViewport();
+        if (!mapView) return JSON.stringify({ needsPan: false, reason: 'no-map' });
+        var viewportEl = mapView.viewportEl;
         var viewportRect = viewportEl.getBoundingClientRect();
 
         var effectiveLeft = viewportRect.left;

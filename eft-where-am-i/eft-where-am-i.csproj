@@ -17,11 +17,23 @@
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <SupportedOSPlatformVersion>7.0</SupportedOSPlatformVersion>
     <ApplicationIcon>eft-where-am-i.ico</ApplicationIcon>
-    
+    <!-- 패키지 API 문서(WebView2 *.xml)는 포터블 배포물에 넣지 않는다 -->
+    <CopyDocumentationFilesFromPackages>false</CopyDocumentationFilesFromPackages>
+    <PublishReferencesDocumentationFiles>false</PublishReferencesDocumentationFiles>
+
   </PropertyGroup>
 
   <ItemGroup>
     <Content Include="eft-where-am-i.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- MIT 고지: 포터블 루트에 LICENSE를 함께 배포한다 -->
+    <None Include="..\LICENSE" Link="LICENSE">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </None>
   </ItemGroup>
 
   <ItemGroup>
