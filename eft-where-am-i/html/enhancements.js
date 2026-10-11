@@ -359,6 +359,8 @@
     mapWrap: null,
     mapScene: null,
     mapCanvas: null,
+    layerNumbersKey: '',
+    layerNumbers: null,
     domObserver: null,
     mapObserver: null,
     resizeObserver: null,
@@ -432,6 +434,33 @@
     );
   };
 
+  // Unscaled single-row width of the toolbar. The panel itself is a block that
+  // fills its max-width, so its own width would feed the previous scale back in
+  // and the toolbar could never grow again after the UI size was lowered.
+  const naturalTopPanelWidth = (topPanel, currentScale) => {
+    const fallback = topPanel.getBoundingClientRect().width / currentScale;
+    const row = topPanel.querySelector(':scope > .map-toolbar')
+      || (getComputedStyle(topPanel).display.includes('flex') ? topPanel : topPanel.firstElementChild);
+    if (!row) return fallback;
+    const items = [...row.children].filter((item) => item.getBoundingClientRect().width > 0);
+    if (!items.length) return fallback;
+    const rowStyle = getComputedStyle(row);
+    const panelStyle = getComputedStyle(topPanel);
+    const px = (value) => Number.parseFloat(value) || 0;
+    let width = (px(rowStyle.columnGap) * (items.length - 1))
+      + px(rowStyle.paddingLeft) + px(rowStyle.paddingRight);
+    if (row !== topPanel) {
+      width += px(panelStyle.paddingLeft) + px(panelStyle.paddingRight)
+        + px(panelStyle.borderLeftWidth) + px(panelStyle.borderRightWidth);
+    }
+    for (const item of items) {
+      const itemStyle = getComputedStyle(item);
+      width += (item.getBoundingClientRect().width / currentScale)
+        + px(itemStyle.marginLeft) + px(itemStyle.marginRight);
+    }
+    return width > 0 ? width : fallback;
+  };
+
   const applyResponsivePanelLayout = () => {
     wtfOverlayState.panelLayoutFrame = 0;
     const root = document.documentElement;
@@ -453,18 +482,22 @@
     root.dataset.wtfLayout = portrait ? 'portrait' : 'landscape';
 
     if (topPanel && viewportWidth > 0) {
-      const topWidth = topPanel.getBoundingClientRect().width / currentTopScale;
+      const topWidth = naturalTopPanelWidth(topPanel, currentTopScale);
       if (topWidth > 0) {
         const maximumTopScale = portrait ? 1.15 : state.uiScale;
         const minimumTopScale = portrait ? 0.5 : 0.65;
+        // 2% headroom so sub-pixel rounding never pushes the last item to a second row.
         const fittedTopScale = Math.min(
           topScale,
           maximumTopScale,
-          Math.max(minimumTopScale, (viewportWidth - 30) / topWidth)
+          Math.max(minimumTopScale, (viewportWidth - 30) / (topWidth * 1.02))
         );
         topScale = portrait
           ? clamp(fittedTopScale * 0.5, 0.35, 0.65, 0.5)
           : fittedTopScale;
+        // Flexible items (the search box) change width with the scale; ignore
+        // sub-1.5% re-fits so the toolbar does not jitter on every DOM update.
+        if (Math.abs(topScale - currentTopScale) < 0.015) topScale = currentTopScale;
       }
       topPanel.style.maxWidth = `${Math.max(1, (viewportWidth - 30) / topScale)}px`;
     }
@@ -3161,10 +3194,49 @@
     return nearest;
   };
 
+  // The canvas UI numbers floors itself (Lab: Level 2 = 2, Main = 1, Basement = -1)
+  // and passes that list, in radio order, to its popup layer as layersAsNums.
+  const nativeLayerNumbers = () => {
+    const key = location.pathname;
+    if (wtfOverlayState.layerNumbersKey === key) return wtfOverlayState.layerNumbers;
+    let found = null;
+    const root = document.querySelector('#__nuxt')?.__vue_app__?._container?._vnode;
+    const visit = (vnode, depth) => {
+      if (found || !vnode || depth > 400) return;
+      const component = vnode.component;
+      if (component) {
+        const numbers = component.props?.layersAsNums;
+        if (Array.isArray(numbers) && numbers.length && numbers.every(Number.isFinite)) {
+          found = [...numbers];
+          return;
+        }
+        visit(component.subTree, depth + 1);
+        return;
+      }
+      if (Array.isArray(vnode.children)) {
+        for (const child of vnode.children) if (child && typeof child === 'object') visit(child, depth + 1);
+      }
+      if (vnode.suspense) visit(vnode.suspense.activeBranch, depth + 1);
+    };
+    try {
+      visit(root, 0);
+    } catch {
+      found = null;
+    }
+    if (found) {
+      wtfOverlayState.layerNumbersKey = key;
+      wtfOverlayState.layerNumbers = found;
+    }
+    return found;
+  };
+
   const selectedPingFloor = () => {
     const inputs = [...document.querySelectorAll('input[name="layers"]')];
     const selected = inputs.find(input => input.checked || input.getAttribute('aria-checked') === 'true');
     if (!selected || inputs.length < 2) return null;
+    const numbers = nativeLayerNumbers();
+    const index = inputs.indexOf(selected);
+    if (numbers && numbers.length === inputs.length && Number.isFinite(numbers[index])) return numbers[index];
     if (selected.value === 'Level 2') return 2;
     if (selected.value === 'Ground') return 1;
     return readFloorLevel(selected);
