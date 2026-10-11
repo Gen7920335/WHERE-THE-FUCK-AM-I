@@ -492,8 +492,12 @@
           maximumTopScale,
           Math.max(minimumTopScale, (viewportWidth - 30) / (topWidth * 1.02))
         );
+        // The host shrinks the whole page (WebView2 zoom down to 0.5) to keep
+        // the desktop layout. Portrait halves the toolbar on top of that, so
+        // keep it at least half of its 100% size on screen.
+        const hostZoom = clamp(window.__wtfHostZoom, 0.25, 1, 1);
         topScale = portrait
-          ? clamp(fittedTopScale * 0.5, 0.35, 0.65, 0.5)
+          ? clamp(Math.max(fittedTopScale * 0.5, 0.5 / hostZoom), 0.35, 1.15, 0.5)
           : fittedTopScale;
         // Flexible items (the search box) change width with the scale; ignore
         // sub-1.5% re-fits so the toolbar does not jitter on every DOM update.
@@ -2795,7 +2799,9 @@
     let observer = null;
     const stop = () => observer?.disconnect();
     const enforce = () => {
-      if (guardId !== wtfOverlayState.nativeQuestFilterGuardId) {
+      // Pinned quests take priority over the site's own quest layer, so keep
+      // the native filter off for as long as any pin exists.
+      if (guardId !== wtfOverlayState.nativeQuestFilterGuardId || !wtfOverlayState.questPins.size) {
         stop();
         return;
       }
@@ -2822,7 +2828,6 @@
       enforce();
       frameCount += 1;
       if (frameCount <= 90) requestAnimationFrame(poll);
-      else stop();
     };
     if (leftPanel) {
       observer = new MutationObserver(() => enforce());

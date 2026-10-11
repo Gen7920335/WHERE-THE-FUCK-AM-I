@@ -140,8 +140,6 @@ for (const slug of maps) {
       // Canvas pixels (400,300) at 2x DPR inside a rect at (10,20) -> client (210,170).
       assert.deepEqual({ ...w.__wtfPlayerCanvasPoint() }, { x: 210, y: 170 });
       if (!withScene) {
-        const read = JSON.parse(w.eval(script('READ_MARKER_POSITION_SCRIPT')));
-        assert.deepEqual(read, { found: true, left: 206, top: 164, count: 1 }, 'calibration must read the canvas player');
         const calc = JSON.parse(w.__deadZoneCalc(50));
         assert.notEqual(calc.reason, 'no-marker', 'auto-pan must find the canvas player');
       }

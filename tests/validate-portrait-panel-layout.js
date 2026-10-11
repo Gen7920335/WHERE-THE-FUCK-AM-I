@@ -97,6 +97,22 @@ const nextFrame = () => new Promise((resolve) => window.requestAnimationFrame(re
     'portrait unified panel must remain docked 12px above the map bottom'
   );
   assert.equal(value('--wtf-top-ui-scale'), 0.5, 'portrait map toolbar must be half size');
+
+  // The host zooms the whole page out (down to 0.5) to keep the desktop panels.
+  // The halved toolbar must not shrink again on top of that.
+  for (const hostZoom of [0.5, 0.79]) {
+    window.__wtfHostZoom = hostZoom;
+    window.dispatchEvent(new window.Event('resize'));
+    await nextFrame();
+    assert.ok(
+      Math.abs(value('--wtf-top-ui-scale') * hostZoom - 0.5) < 1e-9,
+      `portrait toolbar must stay half size on screen at host zoom ${hostZoom}`
+    );
+  }
+  delete window.__wtfHostZoom;
+  window.dispatchEvent(new window.Event('resize'));
+  await nextFrame();
+  assert.equal(value('--wtf-top-ui-scale'), 0.5, 'without host zoom the toolbar returns to half size');
   assert.equal(
     value('--wtf-portrait-right-width') / value('--wtf-portrait-left-width'),
     3,

@@ -70,6 +70,25 @@ const enhancementsSource = fs.readFileSync(enhancementsPath, 'utf8');
 if (/script\[type=["']module["']\]\[src\]/.test(enhancementsSource)) {
   throw new Error('Quest source discovery still depends on Cloudflare restoring type="module" first.');
 }
+// Track observers and frames so teardown can stop them before closing jsdom.
+const observers = [];
+const NativeMutationObserver = window.MutationObserver;
+window.MutationObserver = class extends NativeMutationObserver {
+  constructor(callback) {
+    super(callback);
+    observers.push(this);
+  }
+};
+const frames = new Set();
+const nativeRequestAnimationFrame = window.requestAnimationFrame.bind(window);
+window.requestAnimationFrame = (callback) => {
+  const id = nativeRequestAnimationFrame((time) => {
+    frames.delete(id);
+    callback(time);
+  });
+  frames.add(id);
+  return id;
+};
 window.eval(enhancementsSource);
 window.__wtfQuestLiveSource = async () => ({
   allMarkers: [
@@ -130,6 +149,28 @@ setTimeout(async () => {
     throw new Error('Opening quest details re-enabled the native all-quest layer.');
   }
 
+  // Pinned quests take priority: the user turning the site's quest layer back
+  // on later (well after the first 90 frames) must not draw both marker sets.
+  for (let frame = 0; frame < 120; frame += 1) await nextFrame();
+  nativeQuestFilterState.Quests_Quest = true;
+  nativeQuestVisibility.classList.remove('inactive');
+  await nextFrame();
+  if (!nativeQuestVisibility.classList.contains('inactive') || nativeQuestFilterState.Quests_Quest) {
+    throw new Error('The native quest layer came back on top of pinned quests.');
+  }
+
+  // With no pins left, the site's own quest layer belongs to the user again.
+  window.__wtfQuestOverlay.setPinnedQuests([]);
+  nativeQuestFilterState.Quests_Quest = true;
+  nativeQuestVisibility.classList.remove('inactive');
+  await nextFrame();
+  await nextFrame();
+  if (nativeQuestVisibility.classList.contains('inactive') || !nativeQuestFilterState.Quests_Quest) {
+    throw new Error('The native quest layer was forced off without any pinned quest.');
+  }
+
   console.log(`PASS: live quest area hydrated before click; markers=${markersAfterClick}, nativeToggles=${nativeQuestFilterToggleCount}`);
+  observers.forEach((observer) => observer.disconnect());
+  frames.forEach((id) => window.cancelAnimationFrame(id));
   dom.window.close();
 }, 100);

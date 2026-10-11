@@ -1749,15 +1749,19 @@ namespace eft_where_am_i
 
                 double currentZoom = webView2.ZoomFactor;
                 double targetZoom = ResponsiveMapZoom.Calculate(cssWidth, currentZoom);
-                if (Math.Abs(currentZoom - targetZoom) < 0.005)
+                if (Math.Abs(currentZoom - targetZoom) >= 0.005)
                 {
-                    return;
+                    webView2.ZoomFactor = targetZoom;
+                    AppLogger.Info(
+                        "ResponsiveLayout",
+                        $"Map viewport {cssWidth:F0}px at zoom {currentZoom:F3}; applied {targetZoom:F3} to preserve desktop panels.");
+                    currentZoom = targetZoom;
                 }
 
-                webView2.ZoomFactor = targetZoom;
-                AppLogger.Info(
-                    "ResponsiveLayout",
-                    $"Map viewport {cssWidth:F0}px at zoom {currentZoom:F3}; applied {targetZoom:F3} to preserve desktop panels.");
+                // enhancements.js keeps the portrait toolbar readable under this zoom.
+                string zoomLiteral = currentZoom.ToString("0.###", CultureInfo.InvariantCulture);
+                await webView2.ExecuteScriptAsync(
+                    $"window.__wtfHostZoom = {zoomLiteral}; window.dispatchEvent(new Event('resize'));");
             }
             catch (Exception ex)
             {
