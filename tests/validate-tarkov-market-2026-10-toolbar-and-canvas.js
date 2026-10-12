@@ -37,14 +37,23 @@ for (const label of ['Where am I?', '']) {
   }
   const clicks = [];
   for (const button of d.querySelectorAll('button')) button.addEventListener('click', () => clicks.push(button.id));
-  d.querySelector('#more').addEventListener('click', () => { visible.add('ruler'); visible.add('where'); });
+  // The More menu is hidden in WTFMI; a rendered location toggle is clicked
+  // directly, without opening the menu.
+  assert.equal(w.eval(inputScript(false)), 'clicked', `label "${label}" must resolve the location button`);
+  assert.deepEqual(clicks, ['where'], 'only the location button may be clicked');
 
+  // When the menu renders its items lazily, open it once and wait.
+  const content = d.querySelector('.dd-content');
+  content.remove();
+  d.querySelector('#more').addEventListener('click', () => d.querySelector('.toolbar-more').appendChild(content));
+  clicks.length = 0;
+  const detached = content.querySelector('#where');
+  detached.replaceWith(detached.cloneNode(true));
+  content.querySelector('#where').addEventListener('click', () => clicks.push('where'));
   assert.equal(w.eval(inputScript(false)), 'menu-opened');
-  assert.deepEqual(clicks, ['more']);
-  assert.equal(w.eval(inputScript(true)), 'clicked', `label "${label}" must resolve the location button`);
+  assert.equal(w.eval(inputScript(true)), 'clicked');
   assert.deepEqual(clicks, ['more', 'where'], 'only the More toggle and the location button may be clicked');
-
-  visible.delete('ruler'); visible.delete('where');
+  content.remove();
   assert.equal(w.eval(inputScript(true)), 'waiting-for-menu', 'an opened menu must not be toggled closed again');
   assert.deepEqual(clicks, ['more', 'where']);
   w.close();

@@ -14,10 +14,17 @@
     '[data-premium="true"]', '[data-pro-only="true"]'
   ].join(',');
 
-  // Toolbar items the app does not use: quest/key search and phone sign-in.
-  // Screenshot OCR is matched by its label in hideCommercialAndPaidUi.
-  const removedToolbarSelector = [
-    '.map-toolbar > .quest-search', '.map-toolbar > .phone-tools'
+  // Toolbar items the app does not use: phone sign-in (Screenshot OCR is
+  // matched by its label in hideCommercialAndPaidUi).
+  const removedToolbarSelector = '.map-toolbar > .phone-tools';
+
+  // Hidden from view but still clicked by the host: full screen (entered on
+  // load), the More menu and its "Where am i?" toggle (location is always on),
+  // and the location row the host types screenshot names into.
+  const scriptOnlyToolbarSelector = [
+    '.map-toolbar > .toolbar-more',
+    '.map-toolbar .view-tools > .hint-root:nth-child(2)',
+    '.panel_top > .toolbar-context'
   ].join(',');
 
   const state = {
@@ -145,10 +152,25 @@
           max-width: calc(100vw - 30px);
           zoom: var(--wtf-top-ui-scale, var(--wtf-ui-scale));
         }
-        /* With search removed the More menu opens over the side panels and the
-           pinned-quest panel; lift the toolbar only while a menu is open. */
-        .panel_top:has(.dd-link [aria-expanded="true"]) {
-          z-index: 40 !important;
+        ${scriptOnlyToolbarSelector} {
+          display: none !important;
+        }
+        /* Ruler stays a direct button; the site would fold it into More. */
+        .map-toolbar > .primary-tools {
+          display: flex !important;
+        }
+        .wtf-toolbar-break {
+          display: none;
+        }
+        /* Portrait: only the ping/route clear buttons drop to a second row. */
+        html[data-wtf-layout="portrait"] .map-toolbar {
+          flex-wrap: wrap !important;
+        }
+        html[data-wtf-layout="portrait"] .map-toolbar > .wtf-toolbar-break {
+          display: block;
+          flex: 0 0 100% !important;
+          height: 0;
+          min-width: 0;
         }
         .panel_top.desktop-panel {
           display: block !important;
@@ -173,7 +195,6 @@
           flex: 0 0 auto !important;
           min-width: max-content;
         }
-        .panel_top .toolbar-context,
         .panel_top .position-controls {
           display: flex;
           flex-wrap: wrap;
@@ -450,7 +471,8 @@
     const row = topPanel.querySelector(':scope > .map-toolbar')
       || (getComputedStyle(topPanel).display.includes('flex') ? topPanel : topPanel.firstElementChild);
     if (!row) return fallback;
-    const items = [...row.children].filter((item) => item.getBoundingClientRect().width > 0);
+    const items = [...row.children].filter((item) => !item.matches('.wtf-toolbar-break')
+      && item.getBoundingClientRect().width > 0);
     if (!items.length) return fallback;
     const rowStyle = getComputedStyle(row);
     const panelStyle = getComputedStyle(topPanel);
@@ -2125,6 +2147,12 @@
       const status = topPanel.querySelector('.terminal-status');
       if (status) status.before(button);
       else buttonHost.appendChild(button);
+    }
+    if (buttonHost.matches('.map-toolbar') && !button.previousElementSibling?.matches('.wtf-toolbar-break')) {
+      const lineBreak = buttonHost.querySelector(':scope > .wtf-toolbar-break') || document.createElement('span');
+      lineBreak.className = 'wtf-toolbar-break';
+      lineBreak.setAttribute('aria-hidden', 'true');
+      button.before(lineBreak);
     }
     const buttonText = pingCopy('Delete all pings', '핑 전부 삭제');
     if (button.textContent !== buttonText) button.textContent = buttonText;

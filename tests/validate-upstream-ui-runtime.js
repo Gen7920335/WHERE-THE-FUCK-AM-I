@@ -23,7 +23,7 @@ const inputScript = inputTemplate.replace('__MENU_OPENED__', 'false');
     <div class="panel_top desktop-panel"><div class="toolbar-group primary-tools"><button id="where"></button></div>
     <div class="toolbar-group view-tools"><div class="hint-root"><button id="panels" aria-label="Show panels"></button></div>
     <div class="hint-root"><button id="fullscreen" aria-label="Full screen"></button></div></div>
-    <div class="position-controls"><input id="map-position-file"></div></div>
+    <div class="position-controls"></div></div>
     <div class="panel_left"></div><div class="panel_right"><div class="wtf-squad-panel">WTFMI squad</div></div>
     <div id="map"><div class="map-scene"><div class="marker" id="player"></div></div>
     <div class="marker" data-terminal-managed="true" id="terminal"></div></div>
@@ -32,7 +32,6 @@ const inputScript = inputTemplate.replace('__MENU_OPENED__', 'false');
   const tick = () => new Promise(resolve => setTimeout(resolve, 25));
   assert.equal(d.querySelector(selector('HIDE_SHOW_PANEL_BUTTON_SELECTOR')).id, 'panels');
   assert.equal(d.querySelector(selector('FULL_SCREEN_BUTTON_SELECTOR')).id, 'fullscreen');
-  assert.equal(d.querySelector(selector('WHERE_AM_I_INPUT_SELECTOR')).id, 'map-position-file');
   assert.equal(w.eval(panelScript), 'true', 'icon-only Show panels must beat stale panel classes');
   d.querySelector('#panels').setAttribute('aria-label','Hide panels');
   d.querySelector('.panel_left').classList.add('collapsed');
@@ -46,9 +45,12 @@ const inputScript = inputTemplate.replace('__MENU_OPENED__', 'false');
   d.querySelector('#where').onclick = () => locationClicks++;
   assert.equal(w.eval(inputScript), 'clicked');
   assert.equal(locationClicks,1,'new location control must be selected, not the rotation button');
-  Object.defineProperty(d.querySelector('#map-position-file'),'offsetParent',{get:()=>d.body});
+  // WTFMI hides the location row, so an existing input counts as ready even
+  // without layout (offsetParent null) and must not be toggled closed.
+  d.querySelector('.position-controls').innerHTML = '<input id="map-position-file">';
+  assert.equal(d.querySelector(selector('WHERE_AM_I_INPUT_SELECTOR')).id, 'map-position-file');
   assert.equal(w.eval(inputScript), 'ready');
-  assert.equal(locationClicks,1,'visible location input must not be toggled closed');
+  assert.equal(locationClicks,1,'an existing location input must not be toggled closed');
 
   const counts = { active:0, callbacks:0 };
   const NativeObserver = w.MutationObserver;

@@ -88,7 +88,7 @@ namespace eft_where_am_i.Classes
             string script = $@"
                 (function() {{
                     var input = document.querySelector({selector});
-                    return !!input && input.offsetParent !== null && !input.disabled && !input.readOnly;
+                    return !!input && !input.disabled && !input.readOnly;
                 }})()";
             try
             {
@@ -115,7 +115,7 @@ namespace eft_where_am_i.Classes
             string scriptTemplate = $@"
                 (function() {{
                     var input = document.querySelector({inputSelector});
-                    if (input && input.offsetParent !== null && !input.disabled && !input.readOnly) {{
+                    if (input && !input.disabled && !input.readOnly) {{
                         return 'ready';
                     }}
 
@@ -146,7 +146,7 @@ namespace eft_where_am_i.Classes
                         var menuButtons = Array.from(more.querySelectorAll('.dd-content button'));
                         var coordinateButton = menuButtons.find(hasWhereAmILabel) ||
                             more.querySelector('.dd-content > div > button:nth-child(2)');
-                        if (isVisible(coordinateButton)) {{
+                        if (coordinateButton && !coordinateButton.disabled) {{
                             coordinateButton.click();
                             return 'clicked';
                         }}
@@ -237,7 +237,7 @@ namespace eft_where_am_i.Classes
             string script = $@"
                 (function() {{
                     var input = document.querySelector({selector});
-                    if (!input || input.offsetParent === null || input.disabled || input.readOnly) {{
+                    if (!input || input.disabled || input.readOnly) {{
                         return false;
                     }}
 
