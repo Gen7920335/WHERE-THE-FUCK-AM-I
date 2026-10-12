@@ -39,7 +39,6 @@ popup.getBoundingClientRect=()=>{
 };
 w.document.querySelector('.panel_top').getBoundingClientRect=()=>({bottom:110});
 const wait=()=>new Promise(r=>setTimeout(r,80));
-const catalog={questNames:{Snatch:'바꿔치기'},questSteps:{},itemNames:{},locations:{}};
 const checkBounds=()=>{
  const r=popup.getBoundingClientRect();
  assert.ok(r.left>=7.98&&r.top>=117.98,JSON.stringify(r));
@@ -51,7 +50,6 @@ const checkBounds=()=>{
  try {
   w.eval(fs.readFileSync('eft-where-am-i/html/enhancements.js','utf8'));
   w.__wtfSetEnhancementSettings({language:'ko'});
-  w.__wtfSetKoreanLocalization(catalog);
   w.__wtfPingOverlay.configure({map:'woods',pings:[]});
   await wait();
   checkBounds();
@@ -68,25 +66,19 @@ const checkBounds=()=>{
   monitor.observe(popup,{attributes:true});
   await wait(); await wait(); monitor.disconnect();
   assert.equal(mutations,0,'idle layout must not keep writing popup styles');
-  assert.equal(w.document.getElementById('prereq').textContent,'선행 퀘스트: 바꿔치기(Snatch)');
-  assert.equal(w.document.getElementById('delay').textContent,'⏱ 해금 후 10시간 뒤 수락 가능');
-  assert.equal(w.document.getElementById('reward').textContent,'+0.03 우호도');
-  assert.equal(w.document.getElementById('split-reward').textContent,'Lightkeeper+0.03 우호도');
-  for(const [id,text] of [['require','필요 조건'],['items','퀘스트 관련 아이템'],['prev','이전 퀘스트'],['next','다음 퀘스트']]) assert.equal(w.document.getElementById(id).textContent,text);
-  assert.equal(w.document.getElementById('outside').textContent,'Available 10h after unlock');
+  // Native detail text is the site's own (official) localization; we never rewrite it.
+  assert.equal(w.document.getElementById('prereq').textContent,'Requires quest: Snatch');
+  assert.equal(w.document.getElementById('delay').textContent,'⏱ Available 10h after unlock');
   assert.equal(w.document.getElementById('unmatched').textContent,'Unknown original detail');
   assert.equal(w.getComputedStyle(popup.querySelector('.pro')).display,'none');
   let escapes=0;w.addEventListener('keydown',e=>{if(e.key==='Escape')escapes++;});
   popup.querySelector('.wtf-native-popup-close').click();assert.equal(escapes,1);
-  w.__wtfSetEnhancementSettings({language:'en'});w.__wtfSetKoreanLocalization(catalog);
-  assert.equal(w.document.getElementById('prereq').textContent,'Requires quest: Snatch');
-  assert.equal(w.document.getElementById('delay').textContent,'⏱ Available 10h after unlock');
   popup.classList.add('mobile');await wait();
   assert.equal(popup.style.getPropertyValue('--wtf-popup-shift-y'),'','native mobile sheet must keep its own layout');
   assert.equal(w.getComputedStyle(popup.querySelector('.wtf-native-popup-close')).display,'none','mobile sheet owns its close control');
   popup.classList.remove('mobile');await wait();checkBounds();
   popup.remove();await wait();
   assert.ok(resizes.some(r=>r.disconnected),'removed popup observer must disconnect');
-  console.log('PASS: popup bounds/corners/zoom/photo resize, idle stability, cleanup, close, detail translation and English restoration.');
+  console.log('PASS: popup bounds/corners/zoom/photo resize, idle stability, cleanup, close, native detail text left untouched.');
  } finally {observers.forEach(o=>o.disconnect());frames.forEach(id=>w.cancelAnimationFrame(id));w.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

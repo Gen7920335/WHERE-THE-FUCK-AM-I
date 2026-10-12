@@ -116,10 +116,6 @@
     <None Update="translations\ko.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="translations\game-ko.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
-    </None>
   </ItemGroup>
 
     <Target Name="InstallNpmDependencies" BeforeTargets="BuildTailwindCss" Condition="!Exists('$(MSBuildProjectDirectory)\node_modules')">

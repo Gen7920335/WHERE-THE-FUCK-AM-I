@@ -101,7 +101,6 @@ window.__wtfQuestLiveSource = async () => ({
     { uid: 'rect-quest', name: 'Rect Quest', type: 'Elimination', requiredForKappa: false }
   ]
 });
-window.__wtfSetKoreanLocalization({ questNames: { 'Return the Favor': '은혜 갚기', 'Rect Quest': '사각 구역 테스트' } });
 window.__wtfQuestOverlay.configure({ map: 'woods' });
 window.__wtfQuestOverlay.setPinnedQuests(['은혜 갚기 (Return the Favor)', '사각 구역 테스트 (Rect Quest)']);
 

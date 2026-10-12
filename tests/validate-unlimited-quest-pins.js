@@ -78,11 +78,6 @@ window.chrome = { webview: { postMessage: (message) => messages.push(JSON.parse(
 
 const enhancementsPath = path.resolve(__dirname, '..', 'eft-where-am-i', 'html', 'enhancements.js');
 window.eval(fs.readFileSync(enhancementsPath, 'utf8'));
-const questNames = Object.fromEntries(Array.from({ length: questCount }, (_, index) => [
-  `Quest ${index}`,
-  `퀘스트 ${index}`
-]));
-window.__wtfSetKoreanLocalization({ questNames });
 const markers = Array.from({ length: questCount }, (_, index) => ({
   uid: `m${index}`,
   map: 'lab',

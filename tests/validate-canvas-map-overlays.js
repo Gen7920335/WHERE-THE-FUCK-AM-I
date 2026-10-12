@@ -11,7 +11,6 @@ const read = (...parts) => fs.readFileSync(path.join(root, ...parts), 'utf8');
 const enhancements = read('eft-where-am-i', 'html', 'enhancements.js');
 const constants = read('eft-where-am-i', 'Classes', 'Constants.cs');
 const project = read('eft-where-am-i', 'eft-where-am-i.csproj');
-const gameKorean = JSON.parse(read('eft-where-am-i', 'translations', 'game-ko.json'));
 
 // Static checks for the non-JSDOM parts of the 2026-10 fixes.
 assert.match(constants, /window\.__wtfMapViewport = function\(\)/, 'dead-zone pan needs a viewport helper');
@@ -25,9 +24,6 @@ assert.match(project, /<None Include="\.\.\\LICENSE" Link="LICENSE">[\s\S]*?<Cop
   'LICENSE must be published with the portable build');
 assert.match(project, /<PublishReferencesDocumentationFiles>false<\/PublishReferencesDocumentationFiles>/,
   'package XML documentation must stay out of the portable build');
-const emptyParens = Object.values(gameKorean).flatMap((group) => Object.values(group || {}))
-  .filter((value) => typeof value === 'string' && /\(\s*\)/.test(value));
-assert.deepEqual(emptyParens, [], 'Korean names must not contain empty parentheses');
 
 const definition = { width: 4000, height: 3900, rotate: 90, xOffset: 2166, yOffset: 2004, ratio: 2 };
 const projectPercent = (x, y) => {

@@ -341,8 +341,6 @@
     liveQuestSource: 'not-loaded',
     liveQuestError: '',
     questLayer: null,
-    questPopup: null,
-    questPopupMarker: null,
     nativeQuestFilterGuardId: 0,
     floorEventsInstalled: false,
     squad: { map: '', members: [] },
@@ -371,14 +369,12 @@
     questSelectionKey: '',
     questRequirementsSaveTimer: 0,
     questRequirementsResizeObserver: null,
-    questTranslations: new Map(),
-    normalizedQuestTranslations: new Map(),
-    questNameTranslations: new Map(),
-    reverseQuestNameTranslations: new Map(),
     questIdentityCache: new Map(),
-    itemNameTranslations: new Map(),
-    locationTranslations: new Map(),
-    localizedTextOriginals: new WeakMap(),
+    // From the live Tarkov-Market quest store: uid -> English name, and
+    // normalized English/localized name -> English name / localized name.
+    questEnglishNamesByUid: new Map(),
+    questEnglishNamesByAnyName: new Map(),
+    questLocalizedNames: new Map(),
     updateFrame: 0,
     hydrateFrame: 0
   };
@@ -656,115 +652,28 @@
     return slot;
   };
 
-  window.__wtfSetKoreanLocalization = (catalog = {}) => {
-    wtfOverlayState.questTranslations = new Map(Object.entries(catalog.questSteps || {}));
-    wtfOverlayState.normalizedQuestTranslations = buildNormalizedTranslationMap(catalog.questSteps || {});
-    wtfOverlayState.questNameTranslations = new Map(Object.entries(catalog.questNames || {}));
-    wtfOverlayState.reverseQuestNameTranslations = buildReverseQuestNameMap(catalog.questNames || {});
-    wtfOverlayState.itemNameTranslations = new Map(Object.entries(catalog.itemNames || {}));
-    wtfOverlayState.locationTranslations = new Map(Object.entries(catalog.locations || {}));
-    migrateQuestPinsToCanonicalNames();
-    localizeNativeGameNames();
-    addNativeQuestCheckboxes();
-    syncQuestRequirementsPanel();
-    renderQuestRequirementsPanel();
-    renderQuestMarkers();
+  // Game names and quest text come from Tarkov-Market's own localization
+  // (the app opens /kr/ pages in Korean mode); we only read the site locale to
+  // label our own overlays the same way the site does.
+  const siteLocale = () => {
+    const prefix = String(location.pathname || '').match(/^\/([a-z]{2})\/(?:maps|progression)\//i)?.[1];
+    return prefix ? prefix.toLowerCase() : 'en';
   };
 
-  window.__wtfSetQuestTranslations = (translations = {}) => {
-    window.__wtfSetKoreanLocalization({ questSteps: translations });
+  const sitePathPrefix = () => (siteLocale() === 'en' ? '' : `/${siteLocale()}`);
+
+  const localizedLiveText = (english, l10n) => {
+    const locale = siteLocale();
+    const localized = locale === 'en' ? '' : String(l10n?.[locale] || '').replace(/\s+/g, ' ').trim();
+    return localized || String(english || '').replace(/\s+/g, ' ').trim();
   };
 
   const isKoreanQuestMode = () => state.language === 'ko' || state.language.startsWith('ko-');
 
-  const normalizeQuestTranslationKey = (value) => String(value || '')
-    .normalize('NFKC')
-    .replace(/[\u2018\u2019]/g, "'")
-    .replace(/×/g, 'x')
-    .replace(/^\s*(?:[•·▪▫\-–—]|\d+[.)]|\d+\s*\/\s*\d+|\[[ x✓✔]\])\s*/i, '')
-    .replace(/\(\s*x\s*(\d+)\s*\)/gi, '(x$1)')
-    .replace(/\s+/g, ' ')
-    .replace(/[.;]+$/, '')
-    .trim()
-    .toLowerCase();
-
-  function buildNormalizedTranslationMap(translations) {
-    const result = new Map();
-    const collisions = new Set();
-    for (const [english, korean] of Object.entries(translations || {})) {
-      const key = normalizeQuestTranslationKey(english);
-      if (!key || collisions.has(key)) continue;
-      if (result.has(key) && result.get(key) !== korean) {
-        result.delete(key);
-        collisions.add(key);
-      } else {
-        result.set(key, korean);
-      }
-    }
-    return result;
-  }
-
-  const bilingualGameName = (english, translations) => {
-    const source = String(english || '').replace(/\s+/g, ' ').trim();
-    if (!isKoreanQuestMode() || !source) return source;
-    const korean = String(translations.get(source) || '').replace(/\s+/g, ' ').trim();
-    if (!korean || korean.localeCompare(source, undefined, { sensitivity: 'accent' }) === 0) return source;
-    return `${korean}(${source})`;
-  };
-
-  const formatQuestName = (english) => bilingualGameName(english, wtfOverlayState.questNameTranslations);
-  const formatItemName = (english) => bilingualGameName(english, wtfOverlayState.itemNameTranslations);
-
-  const questDetailUiKo = new Map(Object.entries({
-    Requirements: '선행 조건',
-    Require: '필요 조건',
-    'Quest related items': '퀘스트 관련 아이템',
-    Items: '아이템',
-    Prev: '이전 퀘스트',
-    Next: '다음 퀘스트',
-    Details: '상세',
-    'Close ✘': '닫기 ✘',
-    Prerequisites: '선행 조건',
-    Objectives: '목표',
-    'Current objectives': '현재 목표',
-    Rewards: '보상',
-    Experience: '경험치',
-    Reputation: '우호도',
-    Unlocks: '해금',
-    'Previous quest': '이전 퀘스트',
-    'Next quest': '다음 퀘스트',
-    Trader: '상인',
-    Map: '지도',
-    Status: '상태',
-    Level: '레벨',
-    Optional: '선택',
-    Completed: '완료',
-    Failed: '실패',
-    'Required for Kappa': 'Kappa 필수',
-    Hide: '숨기기',
-    Complete: '완료 처리',
-    Wiki: '위키',
-    'Wrong spot? Suggest a move': '위치가 잘못됐나요? 이동 제안',
-    "Something's off? Suggest a fix": '내용이 이상한가요? 수정 제안',
-    'Bunker at the northern path to the mountain.': '산으로 가는 북쪽 길의 벙커',
-    'The note lies at the marked circle in the dilapidated village in the north of Woods, next to the burning candles.':
-      '삼림 북쪽 폐허 마을의 마크 서클에서 켜진 촛불 옆에 쪽지 있음',
-    'The OLI manifest is on the cube-shaped information desk in the back of the OLI store.':
-      'OLI 화물 목록은 OLI 매장 안쪽의 정육면체 모양 안내 데스크 위에 있음',
-    'Top of the escalator after the main entrance to the OLI store':
-      'OLI 매장 정문으로 들어가 에스컬레이터를 올라간 지점'
-  }));
-
-  const translateLocationNames = (value) => {
-    let output = String(value || '');
-    if (!isKoreanQuestMode()) return output;
-    const pairs = [...wtfOverlayState.locationTranslations.entries()]
-      .sort((left, right) => right[0].length - left[0].length);
-    for (const [english, korean] of pairs) {
-      if (output.trim() === english) return korean;
-      output = output.replace(new RegExp(`\\b${english.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi'), korean);
-    }
-    return output;
+  // Quest identity stays the English name/UID; display uses the site locale.
+  const formatQuestName = (english) => {
+    const key = normalizeQuestName(english);
+    return wtfOverlayState.questLocalizedNames.get(key) || String(english || '').replace(/\s+/g, ' ').trim();
   };
 
   const questPanelCopy = (key, count = 0) => {
@@ -798,104 +707,6 @@
       collapse: '접기'
     };
     return korean[key] || english[key] || key;
-  };
-
-  const translateEliminationTargetKo = (value) => {
-    let target = String(value || '').trim();
-    const locationMatch = target.match(/^(.+?)\s+(?:on|in)\s+(.+?)(?=\s+while\s+|$)/i);
-    if (locationMatch) {
-      const remainder = target.slice(locationMatch[0].length).trim();
-      target = `${locationMatch[2]}에서 ${locationMatch[1]}${remainder ? ` ${remainder}` : ''}`;
-    }
-    target = target
-      .replace(/\s+while using\s+(.+)$/i, ' — $1 사용 중')
-      .replace(/\s+while wearing\s+(.+)$/i, ' — $1 착용 중')
-      .replace(/\s+without wearing\s+(.+)$/i, ' — $1 미착용')
-      .replace(/\s+with (?:a )?headshots?$/i, ' — 헤드샷으로')
-      .replace(/\s+from (?:a )?distance of (?:more than|over)\s+(.+)$/i, ' — $1 초과 거리에서')
-      .replace(/\s+during (?:the )?night(?:time)?$/i, ' — 야간에');
-    return target;
-  };
-
-  const fallbackQuestStepKo = (source, section) => {
-    let text = String(source || '').replace(/\s+/g, ' ').trim().replace(/[.;]$/, '');
-    if (!text) return text;
-
-    const optional = /^\[?optional\]?[:\s-]*/i.test(text);
-    text = text.replace(/^\[?optional\]?[:\s-]*/i, '');
-    const shorten = (value) => String(value || '')
-      .replace(/살아서 탈출하기$/g, '생존 후 탈출')
-      .replace(/생존하여 탈출하기$/g, '생존 후 탈출')
-      .replace(/건네주기$/g, '전달')
-      .replace(/전달하기$/g, '전달')
-      .replace(/획득하기$/g, '획득')
-      .replace(/찾아 건네주기$/g, '획득 후 전달')
-      .replace(/찾기$/g, '획득')
-      .replace(/처치하기$/g, '처치')
-      .replace(/방문하기$/g, '이동')
-      .replace(/위치 확인하기$/g, '이동')
-      .replace(/설치하기$/g, '설치')
-      .replace(/표식하기$/g, '표시')
-      .replace(/숨겨두기$/g, '은닉')
-      .replace(/놓기$/g, '배치')
-      .replace(/회수하기$/g, '회수')
-      .replace(/달성하기$/g, '달성')
-      .replace(/완료하기$/g, '완료')
-      .replace(/작동시키기$/g, '작동')
-      .replace(/잠금 해제하기$/g, '잠금 해제')
-      .replace(/사용하기$/g, '사용');
-    const finish = (value) => optional ? `${shorten(value)} (선택)` : shorten(value);
-    let match;
-
-    if (section === 'requirements') {
-      if ((match = text.match(/^Requires quest:\s*(.+)$/i))) return `선행 퀘스트: ${formatQuestName(match[1])}`;
-      if ((match = text.match(/^After (?:taking|accepting):?\s*(.+)$/i))) return `${match[1]} 수락 후`;
-      if ((match = text.match(/^After completing:?\s*(.+)$/i))) return `${match[1]} 완료 후`;
-      if ((match = text.match(/^If failed:?\s*(.+)$/i))) return `${match[1]} 실패 시`;
-      if ((match = text.match(/^(?:Completed|Complete):?\s*(.+)$/i))) return `${match[1]} 완료 필요`;
-      if ((match = text.match(/^One of:?\s*(.+)$/i))) return `다음 중 하나 필요: ${match[1]}`;
-      if ((match = text.match(/^Player level\s+(.+)$/i))) return `플레이어 레벨 ${match[1]} 필요`;
-      if ((match = text.match(/^Loyalty level\s+(.+)\s+with\s+(.+)$/i))) return `${match[2]} 우호도 레벨 ${match[1]} 필요`;
-    }
-
-    if ((match = text.match(/^Find and hand over\s+(.+?)\s+in raid$/i))) return finish(`레이드에서 ${match[1]} 찾아 건네주기`);
-    if ((match = text.match(/^Find and hand over\s+(.+)$/i))) return finish(`${match[1]} 찾아 건네주기`);
-    if ((match = text.match(/^Hand over the found in raid item:?\s*(.+)$/i))) return finish(`레이드에서 발견한 ${match[1]} 건네주기`);
-    if ((match = text.match(/^Hand over\s+(.+)$/i))) return finish(`${match[1]} 건네주기`);
-    if ((match = text.match(/^Find\s+(.+?)\s+in raid$/i))) return finish(`레이드에서 ${match[1]} 찾기`);
-    if ((match = text.match(/^Find\s+(.+)$/i))) return finish(`${match[1]} 찾기`);
-    if ((match = text.match(/^(?:Obtain|Acquire|Get)\s+(.+)$/i))) return finish(`${match[1]} 획득하기`);
-    if ((match = text.match(/^Survive and extract from\s+(.+)$/i))) return finish(`${match[1]}에서 생존하여 탈출하기`);
-    if ((match = text.match(/^(?:Extract|Evacuate) from\s+(.+)$/i))) return finish(`${match[1]}에서 탈출하기`);
-    if ((match = text.match(/^Use the transit from\s+(.+?)\s+to\s+(.+)$/i))) return finish(`${match[1]}에서 ${match[2]}로 가는 환승 이용하기`);
-    if ((match = text.match(/^Locate and mark\s+(.+?)\s+with\s+(.+?)(?:\s+(?:on|in)\s+(.+))?$/i))) {
-      return finish(`${match[3] ? `${match[3]}에서 ` : ''}${match[1]} 찾아 ${match[2]}로 표식하기`);
-    }
-    if ((match = text.match(/^Mark\s+(.+?)\s+with\s+(.+)$/i))) return finish(`${match[1]}에 ${match[2]}로 표식하기`);
-    if ((match = text.match(/^Locate\s+(.+?)\s+(?:on|in)\s+(.+)$/i))) return finish(`${match[2]}에서 ${match[1]} 위치 확인하기`);
-    if ((match = text.match(/^(?:Locate|Discover)\s+(.+)$/i))) return finish(`${match[1]} 위치 확인하기`);
-    if ((match = text.match(/^Visit\s+(.+)$/i))) return finish(`${match[1]} 방문하기`);
-    if ((match = text.match(/^(?:Eliminate|Kill)\s+(.+)$/i))) return finish(`${translateEliminationTargetKo(match[1])} 처치하기`);
-    if ((match = text.match(/^Plant\s+(.+?)\s+(?:at|in|on)\s+(.+)$/i))) return finish(`${match[2]}에 ${match[1]} 설치하기`);
-    if ((match = text.match(/^Stash\s+(.+?)\s+(?:at|in|on)\s+(.+)$/i))) return finish(`${match[2]}에 ${match[1]} 숨겨두기`);
-    if ((match = text.match(/^Place\s+(.+?)\s+(?:at|in|on)\s+(.+)$/i))) return finish(`${match[2]}에 ${match[1]} 놓기`);
-    if ((match = text.match(/^(?:Retrieve|Recover)\s+(.+)$/i))) return finish(`${match[1]} 회수하기`);
-    if ((match = text.match(/^(?:Deliver|Turn in)\s+(.+)$/i))) return finish(`${match[1]} 전달하기`);
-    if ((match = text.match(/^Reach\s+(.+)$/i))) return finish(`${match[1]} 달성하기`);
-    if ((match = text.match(/^Complete\s+(.+)$/i))) return finish(`${match[1]} 완료하기`);
-    if ((match = text.match(/^Talk to\s+(.+)$/i))) return finish(`${match[1]}에게 말 걸기`);
-    if ((match = text.match(/^Activate\s+(.+)$/i))) return finish(`${match[1]} 작동시키기`);
-    if ((match = text.match(/^Unlock\s+(.+)$/i))) return finish(`${match[1]} 잠금 해제하기`);
-    if ((match = text.match(/^Use\s+(.+)$/i))) return finish(`${match[1]} 사용하기`);
-    return finish(text);
-  };
-
-  const translateQuestStep = (text, section) => {
-    const source = String(text || '').replace(/\s+/g, ' ').trim();
-    if (!isKoreanQuestMode() || !source) return source;
-    const official = wtfOverlayState.questTranslations.get(source)
-      || wtfOverlayState.normalizedQuestTranslations.get(normalizeQuestTranslationKey(source));
-    return official || translateLocationNames(fallbackQuestStepKo(source, section));
   };
 
   const installWtfOverlayStyles = () => {
@@ -975,28 +786,6 @@
       .wtf-quest-marker:focus-visible {
         outline: 2px solid #e5b35c;
         outline-offset: 4px;
-      }
-      .wtf-quest-popup.map-popup {
-        box-sizing: border-box;
-        margin: 0;
-        pointer-events: auto;
-        position: absolute;
-        transform: translateX(calc(-50% - 10px)) translateY(calc(-100% - 24px));
-        transform-origin: calc(50% + 10px) calc(100% + 24px);
-        z-index: 31;
-      }
-      .wtf-quest-popup[hidden] {
-        display: none !important;
-      }
-      .wtf-quest-popup-objective {
-        color: #d7d0c4;
-        margin-top: 7px;
-        white-space: normal;
-      }
-      .wtf-quest-popup-meta {
-        color: #a49d90;
-        font-size: 11px;
-        margin-top: 6px;
       }
       #wtf-quest-requirements-panel {
         background: rgba(20, 20, 18, .97);
@@ -1124,7 +913,7 @@
       .map-popup {
         opacity: var(--wtf-popup-opacity, 1) !important;
       }
-      .map-popup:not(.wtf-quest-popup):not(.mobile) {
+      .map-popup:not(.mobile) {
         box-sizing: border-box;
         max-width: var(--wtf-popup-max-width, calc(100vw - 16px)) !important;
         max-height: var(--wtf-popup-max-height, calc(100vh - 16px)) !important;
@@ -1157,7 +946,7 @@
       .map-popup.mobile .wtf-native-popup-close {
         display: none !important;
       }
-      .map-popup:not(.wtf-quest-popup) .large.pointer.text-right {
+      .map-popup .large.pointer.text-right {
         display: none !important;
       }
       #wtf-squad-layer {
@@ -1590,7 +1379,7 @@
         clearTimeout(timeout);
         reject(new Error('Quest detail page failed to load'));
       };
-      iframe.src = `/progression/quests?quest=${encodeURIComponent(quest.id)}`;
+      iframe.src = `${sitePathPrefix()}/progression/quests?quest=${encodeURIComponent(quest.id)}`;
     });
 
     for (let attempt = 0; attempt < 100; attempt += 1) {
@@ -1609,7 +1398,7 @@
             .filter(Boolean);
         };
         return {
-          requirements: getList(['Requirements', 'Prerequisites', '요구 사항', '선행 조건']),
+          requirements: getList(['Requirements', 'Prerequisites', '요구 조건', '요구 사항', '선행 조건']),
           objectives: getList(['Objectives', 'Current objectives', '목표', '현재 목표'])
         };
       }
@@ -1647,7 +1436,7 @@
     return pending;
   };
 
-  const appendQuestRequirementsSection = (card, label, items, emptyText, sectionKind) => {
+  const appendQuestRequirementsSection = (card, label, items, emptyText) => {
     const section = document.createElement('div');
     section.className = 'wtf-quest-requirements-section';
     const heading = document.createElement('div');
@@ -1659,7 +1448,7 @@
       list.className = 'wtf-quest-requirements-list';
       for (const item of items) {
         const row = document.createElement('li');
-        row.textContent = translateQuestStep(item, sectionKind);
+        row.textContent = item;
         list.appendChild(row);
       }
       section.appendChild(list);
@@ -1711,14 +1500,12 @@
           card,
           questPanelCopy('prerequisites'),
           details.requirements || [],
-          questPanelCopy('noPrerequisites'),
-          'requirements');
+          questPanelCopy('noPrerequisites'));
         appendQuestRequirementsSection(
           card,
           questPanelCopy('objectives'),
           details.objectives || [],
-          questPanelCopy('noObjectives'),
-          'objectives');
+          questPanelCopy('noObjectives'));
       }
       body.appendChild(card);
     }
@@ -1774,176 +1561,49 @@
     return row?.querySelector?.('span:not(.alt)') || null;
   };
 
+  // Pin keys stay the English quest name even when the site shows another
+  // language: rows carry data-quest-uid and the live store maps uid -> name.
   const getCanonicalQuestName = (row) => {
+    const uid = String(row?.dataset?.questUid || '');
+    const english = uid ? wtfOverlayState.questEnglishNamesByUid.get(uid) : '';
+    if (english) return english;
     const nameElement = getQuestNameElement(row);
-    if (!nameElement) return '';
-    if (!row.dataset.wtfQuestNameOriginal) {
-      row.dataset.wtfQuestNameOriginal = nameElement.textContent?.replace(/\s+/g, ' ').trim() || '';
-    }
-    const canonical = resolveCanonicalQuestName(row.dataset.wtfQuestNameOriginal);
-    if (canonical && canonical !== row.dataset.wtfQuestNameOriginal) {
-      row.dataset.wtfQuestNameOriginal = canonical;
-    }
-    return canonical;
+    return resolveCanonicalQuestName(nameElement?.textContent || '');
   };
-
-  const localizeNativeQuestNames = () => {
-    for (const row of document.querySelectorAll('div.items.scroll div.no-wrap.d-flex[data-quest-uid]')) {
-      const nameElement = getQuestNameElement(row);
-      if (!nameElement) continue;
-      const original = getCanonicalQuestName(row);
-      const display = formatQuestName(original);
-      if (nameElement.textContent !== display) nameElement.textContent = display;
-    }
-  };
-
-  const localizeNativeItemNames = () => {
-    for (const element of document.querySelectorAll('a[href*="/item/"], [data-item-uid] a, [data-item-id] a')) {
-      if (element.children.length) continue;
-      if (!element.dataset.wtfItemNameOriginal) {
-        element.dataset.wtfItemNameOriginal = element.textContent?.replace(/\s+/g, ' ').trim() || '';
-      }
-      const original = element.dataset.wtfItemNameOriginal;
-      if (!original || !wtfOverlayState.itemNameTranslations.has(original)) continue;
-      const display = formatItemName(original);
-      if (element.textContent !== display) element.textContent = display;
-    }
-  };
-
-  const localizeNativeLocationNames = () => {
-    const selectors = [
-      '.maps-list span',
-      '.map-list span',
-      '[data-map] span',
-      '[data-location] span',
-      'select option',
-      '.locations span',
-      '.location span'
-    ].join(',');
-    for (const element of document.querySelectorAll(selectors)) {
-      if (element.children.length) continue;
-      if (!element.dataset.wtfLocationOriginal) {
-        element.dataset.wtfLocationOriginal = element.textContent?.replace(/\s+/g, ' ').trim() || '';
-      }
-      const original = element.dataset.wtfLocationOriginal;
-      const display = isKoreanQuestMode() ? translateLocationNames(original) : original;
-      if (display && element.textContent !== display) element.textContent = display;
-    }
-  };
-
-  const localizeExactCatalogNames = () => {
-    for (const element of document.querySelectorAll('body *:not(script):not(style):not(svg):not(path)')) {
-      if (!(element instanceof HTMLElement) || element.childElementCount) continue;
-      if (!element.dataset.wtfGameNameOriginal) {
-        const candidate = element.textContent?.replace(/\s+/g, ' ').trim() || '';
-        if (!wtfOverlayState.questNameTranslations.has(candidate)
-          && !wtfOverlayState.itemNameTranslations.has(candidate)) continue;
-        element.dataset.wtfGameNameOriginal = candidate;
-      }
-      const original = element.dataset.wtfGameNameOriginal;
-      const display = wtfOverlayState.questNameTranslations.has(original)
-        ? formatQuestName(original)
-        : formatItemName(original);
-      if (display && element.textContent !== display) element.textContent = display;
-    }
-  };
-
-  const localizeNativeQuestDetailText = () => {
-    if (!document.body) return;
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-    const textNodes = [];
-    while (walker.nextNode()) textNodes.push(walker.currentNode);
-
-    for (const textNode of textNodes) {
-      const parent = textNode.parentElement;
-      if (!parent || parent.closest('script, style, textarea, input, #wtf-quest-requirements-panel, .wtf-quest-popup')) continue;
-
-      const savedOriginal = wtfOverlayState.localizedTextOriginals.get(textNode);
-      if (!isKoreanQuestMode()) {
-        if (savedOriginal !== undefined && textNode.nodeValue !== savedOriginal) textNode.nodeValue = savedOriginal;
-        continue;
-      }
-
-      const raw = savedOriginal ?? String(textNode.nodeValue || '');
-      const normalized = raw.replace(/\s+/g, ' ').trim();
-      if (!normalized) continue;
-      const prefixMatch = normalized.match(/^((?:[•·▪▫\-–—]|\d+[.)]|\d+\s*\/\s*\d+)\s+)/);
-      const prefix = prefixMatch?.[1] || '';
-      const source = prefix ? normalized.slice(prefix.length).trim() : normalized;
-      let translated = '';
-      if (wtfOverlayState.questTranslations.has(source)
-        || wtfOverlayState.normalizedQuestTranslations.has(normalizeQuestTranslationKey(source))) {
-        translated = translateQuestStep(source, 'objectives');
-      } else if (wtfOverlayState.questNameTranslations.has(source)) {
-        translated = formatQuestName(source);
-      } else if (wtfOverlayState.itemNameTranslations.has(source)) {
-        translated = formatItemName(source);
-      } else if (wtfOverlayState.locationTranslations.has(source)) {
-        translated = wtfOverlayState.locationTranslations.get(source) || '';
-      } else if (questDetailUiKo.has(source)) {
-        translated = questDetailUiKo.get(source) || '';
-      } else if (parent.closest('.quests-details-col, .map-popup, .quest')) {
-        // Native detail text uses its own DOM path, separate from pinned
-        // requirement cards. Keep names and numeric unlock delays intact.
-        let match;
-        if (/^Requires quest:\s*\S/i.test(source)) {
-          translated = fallbackQuestStepKo(source, 'requirements');
-        } else if ((match = source.match(/^(⏱\s*)?Available\s+(\d+(?:\.\d+)?)\s*(h|hours?|m|minutes?|d|days?)\s+after unlock[.]?$/i))) {
-          const unit = /^h/i.test(match[3]) ? '시간' : /^m/i.test(match[3]) ? '분' : '일';
-          translated = `${match[1] || ''}해금 후 ${match[2]}${unit} 뒤 수락 가능`;
-        } else if ((match = source.match(/^([+-]?\d+(?:\.\d+)?)\s+Rep$/i))) {
-          translated = `${match[1]} 우호도`;
-        }
-      }
-      if (!translated) continue;
-
-      if (savedOriginal === undefined) wtfOverlayState.localizedTextOriginals.set(textNode, raw);
-      const leading = raw.match(/^\s*/)?.[0] || '';
-      const trailing = raw.match(/\s*$/)?.[0] || '';
-      const display = `${leading}${prefix}${translated}${trailing}`;
-      if (textNode.nodeValue !== display) textNode.nodeValue = display;
-    }
-  };
-
-  function localizeNativeGameNames() {
-    localizeNativeQuestNames();
-    localizeNativeItemNames();
-    localizeNativeLocationNames();
-    localizeExactCatalogNames();
-    localizeNativeQuestDetailText();
-  }
 
   const normalizeQuestName = (value) => String(value || '')
     .normalize('NFKC')
-    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[‘’]/g, "'")
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase();
 
-  const buildReverseQuestNameMap = (translations) => {
-    const reverse = new Map();
-    for (const [english, localized] of Object.entries(translations || {})) {
-      const key = normalizeQuestName(localized);
-      if (!key) continue;
-      const candidates = reverse.get(key) || [];
-      if (!candidates.includes(english)) candidates.push(english);
-      reverse.set(key, candidates);
-    }
-    return reverse;
-  };
-
   const resolveCanonicalQuestName = (value) => {
     const source = String(value || '').replace(/\s+/g, ' ').trim();
     if (!source) return '';
-    if (wtfOverlayState.questNameTranslations.has(source)) return source;
+    const known = wtfOverlayState.questEnglishNamesByAnyName.get(normalizeQuestName(source));
+    if (known) return known;
+    // Pins saved by older builds may carry the "Korean(English)" display form.
+    const englishSuffix = source.match(/\(([^()]*)\)\s*$/)?.[1]?.trim() || '';
+    return wtfOverlayState.questEnglishNamesByAnyName.get(normalizeQuestName(englishSuffix)) || source;
+  };
 
-    const bilingualMatch = source.match(/\(([^()]*)\)\s*$/);
-    const englishSuffix = bilingualMatch?.[1]?.trim() || '';
-    if (englishSuffix && wtfOverlayState.questNameTranslations.has(englishSuffix)) return englishSuffix;
-
-    const candidates = wtfOverlayState.reverseQuestNameTranslations.get(normalizeQuestName(source)) || [];
-    if (candidates.length) return candidates[0];
-    return source;
+  const rememberLiveQuestNames = (quests) => {
+    const byUid = new Map();
+    const byAnyName = new Map();
+    const localizedNames = new Map();
+    for (const quest of quests) {
+      const english = questDisplayNameFromLiveData(quest);
+      if (!english) continue;
+      const localized = localizedLiveText(english, quest?.name_l10n);
+      if (quest?.uid) byUid.set(String(quest.uid), english);
+      byAnyName.set(normalizeQuestName(english), english);
+      if (localized) byAnyName.set(normalizeQuestName(localized), english);
+      localizedNames.set(normalizeQuestName(english), localized);
+    }
+    wtfOverlayState.questEnglishNamesByUid = byUid;
+    wtfOverlayState.questEnglishNamesByAnyName = byAnyName;
+    wtfOverlayState.questLocalizedNames = localizedNames;
   };
 
   const migrateQuestPinsToCanonicalNames = () => {
@@ -2021,7 +1681,9 @@
         markerUid: String(marker.uid || ''),
         questId: String(marker.questUid),
         quest: questName,
-        objective: String(marker.name || marker.desc || ''),
+        objective: marker.name
+          ? localizedLiveText(marker.name, marker.name_l10n)
+          : localizedLiveText(marker.desc, marker.desc_l10n),
         questStepUids: Array.isArray(marker.questStepUids) ? [...marker.questStepUids] : [],
         level: marker.level === null || marker.level === undefined ? null : Number(marker.level),
         storyline: quest?.type === 'Storyline',
@@ -2042,6 +1704,7 @@
       if (!point) continue;
       markers.push({ ...common, kind: 'point', left: point.left, top: point.top });
     }
+    rememberLiveQuestNames(quests);
     return { map: mapSlug, markers, questCount: quests.length };
   };
 
@@ -2130,6 +1793,8 @@
         if (!snapshot.markers.length) throw new Error(`No live quest markers were returned for ${mapSlug}.`);
         wtfOverlayState.quest = snapshot;
         wtfOverlayState.liveQuestError = '';
+        migrateQuestPinsToCanonicalNames();
+        addNativeQuestCheckboxes();
         syncQuestRequirementsPanel();
         renderQuestMarkers();
         reportLiveQuestStatus('ready', { questCount: snapshot.questCount });
@@ -2576,90 +2241,6 @@
     return element;
   };
 
-  const closeQuestPopup = () => {
-    if (wtfOverlayState.questPopup) {
-      wtfOverlayState.questPopup.hidden = true;
-      wtfOverlayState.questPopup.replaceChildren();
-    }
-    wtfOverlayState.questPopupMarker = null;
-  };
-
-  const updateQuestPopupPosition = () => {
-    const popup = wtfOverlayState.questPopup;
-    const marker = wtfOverlayState.questPopupMarker;
-    if (!popup?.isConnected || popup.hidden || !marker?.isConnected) return;
-    popup.style.left = marker.style.left;
-    popup.style.top = marker.style.top;
-  };
-
-  const renderQuestPopup = (markerData) => {
-    const popup = wtfOverlayState.questPopup;
-    if (!popup) return;
-    popup.replaceChildren();
-
-    const inner = applyNativePopupScope(document.createElement('div'));
-    inner.className = 'inner';
-    const header = applyNativePopupScope(document.createElement('div'));
-    header.className = 'd-flex h-space-between v-start';
-    const title = applyNativePopupScope(document.createElement('div'));
-    title.className = 'title w-100';
-    title.textContent = formatQuestName(String(markerData.quest || 'Quest'));
-    const close = applyNativePopupScope(document.createElement('button'));
-    close.type = 'button';
-    close.className = 'wtf-popup-close';
-    close.textContent = '\u00d7';
-    close.title = state.language === 'ko' ? '\uB2EB\uAE30' : 'Close';
-    close.setAttribute('aria-label', close.title);
-    close.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      closeQuestPopup();
-    });
-    header.append(title, close);
-
-    const objective = applyNativePopupScope(document.createElement('div'));
-    objective.className = 'wtf-quest-popup-objective';
-    objective.textContent = translateQuestStep(String(markerData.objective || ''), 'objectives');
-    const meta = applyNativePopupScope(document.createElement('div'));
-    meta.className = 'wtf-quest-popup-meta';
-    const labels = [
-      markerData.category === 'item'
-        ? (state.language === 'ko' ? '\uD018\uC2A4\uD2B8 \uC544\uC774\uD15C \uC704\uCE58' : 'Quest item location')
-        : (state.language === 'ko' ? '\uD018\uC2A4\uD2B8 \uBAA9\uD45C' : 'Quest objective'),
-      markerData.optional ? (state.language === 'ko' ? '\uC120\uD0DD \uBAA9\uD45C' : 'Optional') : ''
-    ].filter(Boolean);
-    meta.textContent = labels.join(' \u00b7 ');
-    inner.append(header, objective, meta);
-    popup.appendChild(inner);
-    popup.hidden = false;
-    updateQuestPopupPosition();
-  };
-
-  const ensureQuestPopup = () => {
-    const mapContainer = document.querySelector('.map-cont');
-    if (!mapContainer) return null;
-    let popup = wtfOverlayState.questPopup;
-    if (!popup?.isConnected || popup.parentElement !== mapContainer) {
-      popup?.remove();
-      popup = applyNativePopupScope(document.createElement('div'));
-      popup.className = 'map-popup wtf-quest-popup';
-      popup.hidden = true;
-      popup.setAttribute('role', 'dialog');
-      popup.addEventListener('pointerdown', (event) => event.stopPropagation());
-      popup.addEventListener('mousedown', (event) => event.stopPropagation());
-      popup.addEventListener('click', (event) => event.stopPropagation());
-      mapContainer.appendChild(popup);
-      wtfOverlayState.questPopup = popup;
-    }
-    return popup;
-  };
-
-  const openQuestPopup = (markerData, marker) => {
-    ensureQuestPopup();
-    wtfOverlayState.questPopupMarker = marker;
-    renderQuestPopup(markerData);
-  };
-
   const nativePopupLayouts = new Map();
   let nativePopupLayoutFrame = 0;
   const fitNativeQuestPopups = () => {
@@ -2713,7 +2294,7 @@
         for (const suffix of ['max-width', 'max-height', 'shift-x', 'shift-y']) popup.style.removeProperty(`--wtf-popup-${suffix}`);
       }
     }
-    for (const popup of document.querySelectorAll('.map-popup:not(.wtf-quest-popup):not(.mobile)')) {
+    for (const popup of document.querySelectorAll('.map-popup:not(.mobile)')) {
       if (!nativePopupLayouts.has(popup)) {
         const entry = { x: 0, y: 0, style: popup.getAttribute('style') };
         entry.resize = window.ResizeObserver ? new ResizeObserver(scheduleNativeQuestPopupLayout) : null;
@@ -2909,7 +2490,7 @@
       marker.dataset.spreadY = '0';
       marker.title = [
         formatQuestName(markerData.quest),
-        translateQuestStep(markerData.objective, 'objectives')
+        markerData.objective
       ].filter(Boolean).join(' \u00b7 ');
       marker.setAttribute('role', 'button');
       marker.setAttribute('aria-label', marker.title);
@@ -3165,7 +2746,6 @@
       }
     }
     updateRouteLines();
-    updateQuestPopupPosition();
   };
 
   const scheduleOverlayPositionUpdate = () => {
@@ -3702,7 +3282,6 @@
     wtfOverlayState.hydrateFrame = 0;
     installWtfOverlayStyles();
     hideCommercialAndPaidUi();
-    localizeNativeGameNames();
     addNativeQuestCheckboxes();
     syncQuestRequirementsPanel();
     ensureQuestLayer();
@@ -3738,11 +3317,6 @@
     window.addEventListener('resize', applyQuestRequirementsPanelLayout, { passive: true });
     window.addEventListener('resize', scheduleResponsivePanelLayout, { passive: true });
     window.addEventListener('resize', scheduleNativeQuestPopupLayout, { passive: true });
-    window.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape' && wtfOverlayState.questPopup && !wtfOverlayState.questPopup.hidden) {
-        closeQuestPopup();
-      }
-    });
     scheduleWtfEnhancementHydration();
   };
 

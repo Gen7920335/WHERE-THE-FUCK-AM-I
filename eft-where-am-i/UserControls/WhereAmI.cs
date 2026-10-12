@@ -19,7 +19,6 @@ namespace eft_where_am_i
         private AppSettings appSettings; // AppSettings 참조
         private JavaScriptExecutor jsExecutor;
         private QuestRepository questRepository;
-        private readonly QuestTranslationService questTranslationService = new();
         private FloorManager floorManager;
         private readonly Dictionary<string, string> mapDisplayNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -79,9 +78,12 @@ namespace eft_where_am_i
         private static bool IsLocalTerminalMap(string? mapName) =>
             string.Equals(mapName, "terminal", StringComparison.OrdinalIgnoreCase);
 
-        private static string GetMapUrl(string? mapName) => IsLocalTerminalMap(mapName)
+        // 한국어 모드는 Tarkov-Market 공식 번역(/kr/) 페이지를 그대로 쓴다.
+        private static string GetMapUrl(string? mapName, string? language) => IsLocalTerminalMap(mapName)
             ? "https://appcontent/terminal-map.html"
-            : $"https://tarkov-market.com/maps/{mapName}";
+            : language?.StartsWith("ko", StringComparison.OrdinalIgnoreCase) == true
+                ? $"https://tarkov-market.com/kr/maps/{mapName}"
+                : $"https://tarkov-market.com/maps/{mapName}";
 
         public WhereAmI()
         {
@@ -102,7 +104,7 @@ namespace eft_where_am_i
             appSettings ??= settingsHandler.GetSettings();
             ApplyTheme();
             ApplyTranslations();
-            siteUrl = GetMapUrl(appSettings.latest_map);
+            siteUrl = GetMapUrl(appSettings.latest_map, appSettings.language);
 
             // Load 이벤트 핸들러 등록
             this.Load += WhereAmI_Load;
@@ -652,7 +654,7 @@ namespace eft_where_am_i
 
                 appSettings.latest_map = selectedMap;
                 SaveSettings();  // 설정 저장
-                siteUrl = GetMapUrl(selectedMap);
+                siteUrl = GetMapUrl(selectedMap, appSettings.language);
                 webView2.Source = new Uri(siteUrl);
                 WmiInitialize();
 
@@ -736,13 +738,6 @@ namespace eft_where_am_i
                 }
             });
             await webView2.ExecuteScriptAsync($"window.__wtfSetEnhancementSettings?.({settingsJson});");
-
-            KoreanGameLocalizationCatalog localization =
-                appSettings.language?.StartsWith("ko", StringComparison.OrdinalIgnoreCase) == true
-                    ? await questTranslationService.GetKoreanCatalogAsync()
-                    : new KoreanGameLocalizationCatalog();
-            string localizationJson = Newtonsoft.Json.JsonConvert.SerializeObject(localization);
-            await webView2.ExecuteScriptAsync($"window.__wtfSetKoreanLocalization?.({localizationJson});");
         }
 
         private async Task InjectQuestOverlayAsync()
