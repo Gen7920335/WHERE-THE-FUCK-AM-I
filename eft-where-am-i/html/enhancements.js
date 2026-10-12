@@ -2116,6 +2116,10 @@
     setRouteVisible(wtfOverlayState.routeVisible, false);
   };
 
+  // "Delete all" removes only what this player placed (no creatorId).
+  const ownPingCount = () => (wtfOverlayState.pings.pings || []).filter((ping) => !ping.creatorId).length;
+  const ownRouteNodeCount = () => (wtfOverlayState.route.nodes || []).filter((node) => !node.creatorId).length;
+
   const ensureClearPingsButton = () => {
     const topPanel = document.querySelector('.panel_top');
     if (!topPanel) return;
@@ -2137,10 +2141,10 @@
       button.addEventListener('click', event => {
         event.preventDefault();
         event.stopPropagation();
-        if (!(wtfOverlayState.pings.pings?.length > 0)) return;
+        if (!ownPingCount()) return;
         const confirmed = window.confirm(pingCopy(
-          'Delete every ping on this map?',
-          '이 지도에 찍힌 핑을 전부 삭제할까요?'
+          'Delete all of your pings on this map?',
+          '이 지도에 내가 찍은 핑을 전부 삭제할까요?'
         ));
         if (confirmed) window.chrome?.webview?.postMessage(JSON.stringify({ action: 'map-pings-clear' }));
       });
@@ -2156,7 +2160,7 @@
     }
     const buttonText = pingCopy('Delete all pings', '핑 전부 삭제');
     if (button.textContent !== buttonText) button.textContent = buttonText;
-    button.disabled = !(wtfOverlayState.pings.pings?.length > 0);
+    button.disabled = !ownPingCount();
   };
 
   const ensureClearRouteButton = () => {
@@ -2180,10 +2184,10 @@
       button.addEventListener('click', event => {
         event.preventDefault();
         event.stopPropagation();
-        if (!(wtfOverlayState.route.nodes?.length > 0)) return;
+        if (!ownRouteNodeCount()) return;
         const confirmed = window.confirm(pingCopy(
-          'Delete every route node on this map?',
-          '이 지도의 경로 노드를 전부 삭제할까요?'
+          'Delete all of your route nodes on this map?',
+          '이 지도에 내가 놓은 경로 노드를 전부 삭제할까요?'
         ));
         if (confirmed) {
           window.chrome?.webview?.postMessage(JSON.stringify({ action: 'map-route-nodes-clear' }));
@@ -2197,7 +2201,7 @@
     }
     const buttonText = pingCopy('Delete all route nodes', '경로 전부 삭제');
     if (button.textContent !== buttonText) button.textContent = buttonText;
-    button.disabled = !(wtfOverlayState.route.nodes?.length > 0);
+    button.disabled = !ownRouteNodeCount();
   };
 
   const getLayoutOffset = (element, ancestor) => {

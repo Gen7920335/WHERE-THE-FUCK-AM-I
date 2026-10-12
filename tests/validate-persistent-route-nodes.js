@@ -18,7 +18,13 @@ assert.match(settings, /double\s+route_line_width\s*\{[^}]*\}\s*=\s*1\.5/, 'rout
 assert.match(host, /currentRouteNodeCount\s*>=\s*20/, 'host must enforce the twenty-node limit');
 assert.match(host, /case\s+"map-route-node-delete"/, 'route node deletion is missing');
 assert.match(host, /case\s+"map-route-nodes-clear"/, 'current-map route clear-all is missing');
-assert.match(host, /RemoveSavedRouteNodes\(appSettings\.latest_map\)/, 'route clear-all must target only the active map');
+assert.match(host, /RemoveOwnSavedRouteNodes\(appSettings\.latest_map\)/, 'route clear-all must target only the active map');
+// Squad: "Delete all" removes only this player's pings and nodes.
+assert.match(host, /RemoveOwnSavedPings\(appSettings\.latest_map\)/, 'ping clear-all must remove only own pings');
+assert.match(host, /&& string\.IsNullOrWhiteSpace\(ping\.creatorId\)/, 'teammate pings (creatorId) must survive clear-all');
+assert.match(host, /&& string\.IsNullOrWhiteSpace\(node\.creatorId\)/, 'teammate nodes (creatorId) must survive clear-all');
+assert.doesNotMatch(host, /squadNetworkService\.ClearPings\(/, 'clear-all must not broadcast a map-wide ping wipe');
+assert.match(overlay, /const ownPingCount = \(\) => \(wtfOverlayState\.pings\.pings \|\| \[\]\)\.filter\(\(ping\) => !ping\.creatorId\)/, 'the ping clear button must count only own pings');
 assert.match(host, /\.Where\(node\s*=>\s*string\.Equals\([\s\S]*?node\.map,[\s\S]*?appSettings\.latest_map/, 'route snapshots must be filtered to the active map');
 assert.match(network, /type\s*=\s*"route-node-upsert"/, 'route nodes must synchronize with the squad');
 assert.match(network, /node\.participantSlot\s*=\s*peer\.ParticipantSlot/, 'host must authenticate route ownership and color');

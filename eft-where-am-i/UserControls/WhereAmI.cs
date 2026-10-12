@@ -998,11 +998,38 @@ namespace eft_where_am_i
                 && string.Equals(node.id, routeNodeId, StringComparison.OrdinalIgnoreCase));
         }
 
-        private void RemoveSavedRouteNodes(string map)
+        // "Delete all" only removes what this player placed; teammates' pings and
+        // nodes carry their creatorId and stay.
+        private List<string> RemoveOwnSavedPings(string map)
+        {
+            appSettings.map_pings ??= new List<MapPing>();
+            List<string> ids = appSettings.map_pings
+                .Where(ping => string.Equals(ping.map, map, StringComparison.OrdinalIgnoreCase)
+                    && string.IsNullOrWhiteSpace(ping.creatorId)
+                    && !string.IsNullOrWhiteSpace(ping.id))
+                .Select(ping => ping.id)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            appSettings.map_pings.RemoveAll(ping =>
+                string.Equals(ping.map, map, StringComparison.OrdinalIgnoreCase)
+                && string.IsNullOrWhiteSpace(ping.creatorId));
+            return ids;
+        }
+
+        private List<string> RemoveOwnSavedRouteNodes(string map)
         {
             appSettings.map_route_nodes ??= new List<MapRouteNode>();
+            List<string> ids = appSettings.map_route_nodes
+                .Where(node => string.Equals(node.map, map, StringComparison.OrdinalIgnoreCase)
+                    && string.IsNullOrWhiteSpace(node.creatorId)
+                    && !string.IsNullOrWhiteSpace(node.id))
+                .Select(node => node.id)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
             appSettings.map_route_nodes.RemoveAll(node =>
-                string.Equals(node.map, map, StringComparison.OrdinalIgnoreCase));
+                string.Equals(node.map, map, StringComparison.OrdinalIgnoreCase)
+                && string.IsNullOrWhiteSpace(node.creatorId));
+            return ids;
         }
 
         private void PublishSavedPingsToSquad()
@@ -1566,9 +1593,12 @@ namespace eft_where_am_i
                         break;
 
                     case "map-pings-clear":
-                        RemoveSavedPings(appSettings.latest_map);
+                        List<string> ownPingIds = RemoveOwnSavedPings(appSettings.latest_map);
                         SaveSettings();
-                        squadNetworkService.ClearPings(appSettings.latest_map);
+                        foreach (string ownPingId in ownPingIds)
+                        {
+                            squadNetworkService.DeletePing(appSettings.latest_map, ownPingId);
+                        }
                         await InjectPingOverlayAsync();
                         break;
 
@@ -1622,21 +1652,11 @@ namespace eft_where_am_i
                         break;
 
                     case "map-route-nodes-clear":
-                        appSettings.map_route_nodes ??= new List<MapRouteNode>();
-                        List<string> currentMapRouteNodeIds = appSettings.map_route_nodes
-                            .Where(node => string.Equals(
-                                node.map,
-                                appSettings.latest_map,
-                                StringComparison.OrdinalIgnoreCase))
-                            .Select(node => node.id)
-                            .Where(id => !string.IsNullOrWhiteSpace(id))
-                            .Distinct(StringComparer.OrdinalIgnoreCase)
-                            .ToList();
-                        RemoveSavedRouteNodes(appSettings.latest_map);
+                        List<string> ownRouteNodeIds = RemoveOwnSavedRouteNodes(appSettings.latest_map);
                         SaveSettings();
-                        foreach (string currentMapRouteNodeId in currentMapRouteNodeIds)
+                        foreach (string ownRouteNodeId in ownRouteNodeIds)
                         {
-                            squadNetworkService.DeleteRouteNode(appSettings.latest_map, currentMapRouteNodeId);
+                            squadNetworkService.DeleteRouteNode(appSettings.latest_map, ownRouteNodeId);
                         }
                         await InjectRouteOverlayAsync();
                         break;
