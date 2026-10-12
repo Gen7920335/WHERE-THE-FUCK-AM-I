@@ -14,6 +14,12 @@
     '[data-premium="true"]', '[data-pro-only="true"]'
   ].join(',');
 
+  // Toolbar items the app does not use: quest/key search and phone sign-in.
+  // Screenshot OCR is matched by its label in hideCommercialAndPaidUi.
+  const removedToolbarSelector = [
+    '.map-toolbar > .quest-search', '.map-toolbar > .phone-tools'
+  ].join(',');
+
   const state = {
     language: 'en',
     uiScale: 1,
@@ -138,6 +144,11 @@
           box-sizing: border-box;
           max-width: calc(100vw - 30px);
           zoom: var(--wtf-top-ui-scale, var(--wtf-ui-scale));
+        }
+        /* With search removed the More menu opens over the side panels and the
+           pinned-quest panel; lift the toolbar only while a menu is open. */
+        .panel_top:has(.dd-link [aria-expanded="true"]) {
+          z-index: 40 !important;
         }
         .panel_top.desktop-panel {
           display: block !important;
@@ -293,6 +304,7 @@
           transform-origin: center;
         }
         ${paidUiSelector},
+        ${removedToolbarSelector},
         [data-wtf-commercial-hidden="true"] {
           display: none !important;
           pointer-events: none !important;
@@ -3240,8 +3252,14 @@
     document.querySelectorAll([
       '.content.maps .head-pilot',
       '.content.maps .alert-box',
-      paidUiSelector
+      paidUiSelector,
+      removedToolbarSelector
     ].join(',')).forEach(hide);
+
+    for (const button of document.querySelectorAll('.panel_top button')) {
+      const label = `${button.getAttribute('aria-label') || ''} ${button.textContent || ''}`;
+      if (/\bOCR\b/i.test(label)) hide(button.closest('.hint-root') || button);
+    }
 
     document.querySelectorAll('a[href]').forEach((link) => {
       const href = String(link.getAttribute('href') || '').toLowerCase();
