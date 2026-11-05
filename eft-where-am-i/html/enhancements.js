@@ -415,6 +415,40 @@
     if (onMap && (event.type === 'mousedown' || event.type === 'pointerdown')) tiltGesture = true;
     if (event.type === 'mouseup' || event.type === 'pointerup') tiltGesture = event.buttons !== 0;
   };
+  // The site's panels stop mouseup, so a map drag released over a panel never
+  // ends: the map keeps following the cursor until the next plain click (pings
+  // and route nodes don't count, the site never sees them). Once a drag that
+  // began on the map reaches a panel, hold the pointer on the map so the release
+  // still lands there. Capture starts only then, so clicks are not retargeted.
+  // Registered before the tilt rewrite, which stops trusted events on Terminal.
+  const mapDragPanelSelector = '.panel_top, .panel_left, .panel_right';
+  let mapDragPointerId = null;
+  const keepMapDragOnMap = (event) => {
+    if (!event.isTrusted) return;
+    const target = event.target instanceof Element ? event.target : null;
+    const container = document.querySelector('.map-cont');
+    if (event.type === 'pointerdown') {
+      mapDragPointerId = event.button === 0 && container && target && container.contains(target)
+        && !target.closest(`${mapDragPanelSelector}, .map-popup, #wtf-quest-requirements-panel`)
+        ? event.pointerId
+        : null;
+      return;
+    }
+    if (event.type !== 'pointermove' || !(event.buttons & 1)) {
+      mapDragPointerId = null;
+      return;
+    }
+    if (event.pointerId !== mapDragPointerId || !container || !target?.closest(mapDragPanelSelector)) return;
+    if (container.hasPointerCapture?.(event.pointerId)) return;
+    try {
+      container.setPointerCapture(event.pointerId);
+    } catch (error) {
+      mapDragPointerId = null;
+    }
+  };
+  for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel']) {
+    window.addEventListener(type, keepMapDragOnMap, { capture: true });
+  }
   for (const type of tiltEventTypes) {
     window.addEventListener(type, rewriteTiltedMapEvent, { capture: true, passive: false });
   }

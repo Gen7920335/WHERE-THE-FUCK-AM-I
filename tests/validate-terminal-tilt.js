@@ -223,4 +223,52 @@ assert.match(constants, /__wtfMapTiltDegrees/, 'heading fallback must add the Te
   window.close();
 }
 
-console.log('PASS: Terminal adds 14.7 deg about the view centre (map, markers, player), icons/labels upright at their anchors, clears untilted, map input turned back (click, wheel), UI and script events untouched, heading adds the tilt; Customs unchanged.');
+// --- A map drag released over a site panel still ends on the map -----------------
+// The panels stop mouseup; once a drag that began on the map reaches a panel the
+// pointer is captured by the map, so the release reaches the site's drag handler.
+for (const url of ['https://tarkov-market.com/maps/customs', 'https://tarkov-market.com/maps/terminal']) {
+  const { window, ctx } = makeDom(url);
+  const container = window.document.querySelector('.map-cont');
+  const captured = [];
+  container.setPointerCapture = (id) => captured.push(id);
+  container.hasPointerCapture = (id) => captured.includes(id);
+  const canvas = ctx('canvas.markers-canvas').canvas;
+  const panel = window.document.querySelector('.panel_top button');
+  const Pointer = window.PointerEvent || window.MouseEvent;
+  const fire = (node, type, init) => {
+    const event = new Pointer(type, { bubbles: true, cancelable: true, pointerId: 7, ...init });
+    if (!('pointerId' in event)) Object.defineProperty(event, 'pointerId', { value: 7 });
+    const impl = implForWrapper(event); impl.isTrusted = true; implForWrapper(node)._dispatch(impl);
+  };
+  const map = url.split('/').pop();
+  // Drag on the map only: no capture.
+  fire(canvas, 'pointerdown', { button: 0, buttons: 1, clientX: 600, clientY: 400 });
+  fire(canvas, 'pointermove', { button: -1, buttons: 1, clientX: 650, clientY: 420 });
+  fire(canvas, 'pointerup', { button: 0, buttons: 0, clientX: 650, clientY: 420 });
+  assert.deepEqual(captured, [], `${map}: a drag that stays on the map is left alone`);
+  // Hovering a panel with no button down after a click: no capture.
+  fire(canvas, 'pointerdown', { button: 0, buttons: 1, clientX: 600, clientY: 400 });
+  fire(canvas, 'pointerup', { button: 0, buttons: 0, clientX: 600, clientY: 400 });
+  fire(panel, 'pointermove', { button: -1, buttons: 0, clientX: 20, clientY: 10 });
+  assert.deepEqual(captured, [], `${map}: hovering a panel after a click is left alone`);
+  // A press that starts on a panel: no capture.
+  fire(panel, 'pointerdown', { button: 0, buttons: 1, clientX: 20, clientY: 10 });
+  fire(panel, 'pointermove', { button: -1, buttons: 1, clientX: 25, clientY: 12 });
+  fire(panel, 'pointerup', { button: 0, buttons: 0, clientX: 25, clientY: 12 });
+  assert.deepEqual(captured, [], `${map}: panel clicks are left alone`);
+  // Middle-button press (route node) dragged over a panel: no capture.
+  fire(canvas, 'pointerdown', { button: 1, buttons: 4, clientX: 600, clientY: 400 });
+  fire(panel, 'pointermove', { button: -1, buttons: 4, clientX: 20, clientY: 10 });
+  fire(panel, 'pointerup', { button: 1, buttons: 0, clientX: 20, clientY: 10 });
+  assert.deepEqual(captured, [], `${map}: middle-button presses are left alone`);
+  // A map drag that reaches a panel: the map captures the pointer once.
+  fire(canvas, 'pointerdown', { button: 0, buttons: 1, clientX: 600, clientY: 400 });
+  fire(canvas, 'pointermove', { button: -1, buttons: 1, clientX: 300, clientY: 200 });
+  assert.deepEqual(captured, [], `${map}: no capture while the drag is still over the map`);
+  fire(panel, 'pointermove', { button: -1, buttons: 1, clientX: 20, clientY: 10 });
+  fire(panel, 'pointermove', { button: -1, buttons: 1, clientX: 22, clientY: 11 });
+  assert.deepEqual(captured, [7], `${map}: a map drag that reaches a panel is held on the map`);
+  window.close();
+}
+
+console.log('PASS: Terminal adds 14.7 deg about the view centre (map, markers, player), icons/labels upright at their anchors, clears untilted, map input turned back (click, wheel), UI and script events untouched, heading adds the tilt; Customs unchanged; a map drag released over a panel still ends on the map.');
