@@ -126,6 +126,11 @@ const click = (window, element) => element.dispatchEvent(new window.MouseEvent('
   await waitFor(() => document.querySelectorAll('.wtf-quest-marker[data-step]').length === 11, '11 rings');
 
   const ring = (step) => document.querySelector(`.wtf-quest-marker[data-step="${step}"]`);
+  // Rings use the green the quest markers show on other maps (ring and number).
+  for (const node of document.querySelectorAll('.wtf-quest-marker[data-step]')) {
+    assert.equal(node.querySelector('path').getAttribute('fill'), '#70a800', `ring ${node.dataset.step} fill`);
+    assert.equal(node.querySelector('text').getAttribute('fill'), '#70a800', `ring ${node.dataset.step} number`);
+  }
   click(window, ring(1));
   const popup = () => document.querySelector('.map-cont > .popup-layer > .map-popup[data-wtf-built-in-step]');
   assert.ok(popup(), 'ring 1 must open a popup inside the site popup layer');

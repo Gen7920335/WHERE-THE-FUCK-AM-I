@@ -160,10 +160,17 @@
   const TERMINAL_EXTRA_TILT_DEG = 14.7;
   const tiltCanvasPattern = /(?:^|\s)(?:doc-map-canvas|markers-canvas|players-canvas|pilot-heatmap-canvas)(?:\s|$)/;
   const glyphCanvasPattern = /(?:^|\s)(?:markers-canvas|players-canvas)(?:\s|$)/;
-  const mapTiltRadians = () => {
-    const slug = String(location.pathname || '').match(/\/maps\/([^/?#]+)/)?.[1]?.toLowerCase();
-    return slug === 'terminal' ? TERMINAL_EXTRA_TILT_DEG * Math.PI / 180 : 0;
+  // The canvas hooks below run on every draw call, so the map slug is parsed
+  // once per path instead of once per call.
+  let pathMapSlugCache = { path: null, slug: '' };
+  const pathMapSlug = () => {
+    const path = String(location.pathname || '');
+    if (pathMapSlugCache.path !== path) {
+      pathMapSlugCache = { path, slug: path.match(/\/maps\/([^/?#]+)/)?.[1]?.toLowerCase() || '' };
+    }
+    return pathMapSlugCache.slug;
   };
+  const mapTiltRadians = () => (pathMapSlug() === 'terminal' ? TERMINAL_EXTRA_TILT_DEG * Math.PI / 180 : 0);
   window.__wtfMapTiltDegrees = () => mapTiltRadians() * 180 / Math.PI;
   const contextTilt = (context) => {
     const canvas = context?.canvas;
@@ -217,8 +224,9 @@
     return nativeSetTransform.call(this, tilted.a, tilted.b, tilted.c, tilted.d, tilted.e, tilted.f);
   };
   // Where the site drew its marker icons in the last frame (container pixels),
-  // so our step rings can stand beside them instead of on top of them.
-  const nativeIconFrame = { icons: [], box: null, onDrawn: null };
+  // so our step rings can stand beside them instead of on top of them. Only maps
+  // with built-in steps need it (wanted is set next to builtInQuestSteps).
+  const nativeIconFrame = { icons: [], box: null, onDrawn: null, wanted: () => false };
   const isMarkersCanvas = (context) => /(?:^|\s)markers-canvas(?:\s|$)/.test(context?.canvas?.className || '');
   const beginNativeIconFrame = (context, width, height) => {
     const canvas = context.canvas;
@@ -242,12 +250,15 @@
     // Icons only: skip tiny dots and whole-layer images.
     if (!(size >= 8 && size <= 64)) return;
     if (nativeIconFrame.icons.length >= 4000) return;
+    // The icon-size setting enlarges the drawn icon around this same centre
+    // (drawImage hook above), so the ring must clear the enlarged icon.
+    const iconScale = state.iconScale > 0 ? state.iconScale : 1;
     nativeIconFrame.icons.push({
       x: box.left + ((m.a * x) + (m.c * y) + m.e) / box.ratio,
       y: box.top + ((m.b * x) + (m.d * y) + m.f) / box.ratio,
       // Some sprites carry transparent padding or a caption; the visible icon
       // itself is at most about 26 px across.
-      r: Math.min(size / 2, 13)
+      r: Math.min(size / 2, 13) * iconScale
     });
     nativeIconFrame.onDrawn?.();
   };
@@ -257,7 +268,9 @@
   // would leave the corners uncleared, so clear in the site's own space.
   const nativeClearRect = contextPrototype.clearRect;
   contextPrototype.clearRect = function (...args) {
-    if (isMarkersCanvas(this)) beginNativeIconFrame(this, args[2], args[3]);
+    // A new frame: the last label box no longer frames anything.
+    this.__wtfLabelBox = null;
+    if (isMarkersCanvas(this) && nativeIconFrame.wanted(pathMapSlug())) beginNativeIconFrame(this, args[2], args[3]);
     const requested = this.__wtfTilted ? this.__wtfRequestedTransform : null;
     if (!requested) return nativeClearRect.apply(this, args);
     this.save();
@@ -268,11 +281,27 @@
       this.restore();
     }
   };
-  const nativeResetTransform = contextPrototype.resetTransform;
-  if (nativeResetTransform) {
-    contextPrototype.resetTransform = function (...args) {
-      this.__wtfTilted = false;
-      return nativeResetTransform.apply(this, args);
+  // save()/restore() bring the transform back, so they bring back what we know
+  // about it too; otherwise a restore() after an untilted identity (a layer copy)
+  // leaves a tilted canvas marked untilted (labels drawn tilted, corners left
+  // uncleared). resetTransform() is identity, which setTransform tilts where the
+  // canvas draws with it.
+  const nativeSave = contextPrototype.save;
+  const nativeRestore = contextPrototype.restore;
+  if (typeof nativeSave === 'function' && typeof nativeRestore === 'function') {
+    contextPrototype.save = function (...args) {
+      (this.__wtfTiltStack ||= []).push([this.__wtfTilted, this.__wtfRequestedTransform]);
+      return nativeSave.apply(this, args);
+    };
+    contextPrototype.restore = function (...args) {
+      const saved = this.__wtfTiltStack?.pop();
+      if (saved) [this.__wtfTilted, this.__wtfRequestedTransform] = saved;
+      return nativeRestore.apply(this, args);
+    };
+  }
+  if (typeof contextPrototype.resetTransform === 'function') {
+    contextPrototype.resetTransform = function () {
+      return this.setTransform(1, 0, 0, 1, 0, 0);
     };
   }
 
@@ -293,7 +322,7 @@
   const isGlyphCanvas = (context) => glyphCanvasPattern.test(context?.canvas?.className || '');
   const tiltedDrawImage = contextPrototype.drawImage;
   contextPrototype.drawImage = function (...args) {
-    const markers = isMarkersCanvas(this);
+    const markers = isMarkersCanvas(this) && nativeIconFrame.wanted(pathMapSlug());
     if (!markers && (!this.__wtfTilted || !isGlyphCanvas(this))) return tiltedDrawImage.apply(this, args);
     let x;
     let y;
@@ -444,6 +473,10 @@
   for (const type of tiltEventTypes) {
     window.addEventListener(type, rewriteTiltedMapEvent, { capture: true, passive: false });
   }
+  // A gesture that ends without a release reaching the page (pointer cancelled,
+  // window lost focus) must not keep rewriting later moves over the panels.
+  window.addEventListener('pointercancel', () => { tiltGesture = false; }, { capture: true });
+  window.addEventListener('blur', () => { tiltGesture = false; });
   const screenPointOf = (event) => event?.__wtfScreenPoint || event;
 
   const applyDomScale = () => {
@@ -1072,6 +1105,8 @@
       ]
     }
   };
+  // Site icon positions are recorded only where step rings may need them.
+  nativeIconFrame.wanted = (slug) => Object.prototype.hasOwnProperty.call(builtInQuestSteps, slug);
 
   const participantPalette = [
     { color: '#ff3b30', glow: 'rgba(255, 59, 48, .9)' },
@@ -2114,6 +2149,8 @@
   ).replace(/\s+/g, ' ').trim();
 
   const liveQuestMarkerColor = (markerData) => {
+    // Built-in walkthrough rings use the green quest markers show on other maps.
+    if (markerData.builtInStep) return '#70a800';
     if (markerData.storyline) return '#8598a6';
     if (markerData.requiredForKappa) return '#70a800';
     return '#a87b00';
@@ -2844,7 +2881,13 @@
       // Fit the popup on screen only while it opens (the site's own open move
       // takes 0.4 s); after that it stays put on its marker and moves with the
       // map instead of chasing the screen edges.
-      entry.openedAt ??= performance.now();
+      // A popup element the site reuses for another marker opens again, so it
+      // gets its own fit instead of keeping the last marker's shift.
+      const opened = [...popup.querySelectorAll('.title')].map((node) => node.textContent).join('\n');
+      if (entry.opened !== opened) {
+        entry.opened = opened;
+        entry.openedAt = performance.now();
+      }
       if (performance.now() - entry.openedAt > nativePopupFitMs) {
         entry.style = popup.getAttribute('style');
         continue;
@@ -3018,7 +3061,7 @@
   // open, so their popup is rebuilt from the site's own MapPopup markup: the same
   // element tree, classes and scoped-style attributes, placed in the site's
   // popup layer. The site's CSS then styles it exactly like a native quest popup.
-  const builtInStepPopupState = { popup: null, marker: null, markerData: null, index: 0, offset: 18 };
+  const builtInStepPopupState = { popup: null, marker: null, markerData: null, index: 0 };
 
   // Vue scoped styles key elements by data-v-<hash>; the hashes change with every
   // site build, so read them from the site's own stylesheet rules.
@@ -3197,7 +3240,6 @@
     if (scope.layer) popup.setAttribute(`data-v-${scope.layer}`, '');
     popup.dataset.wtfBuiltInStep = String(markerData.step);
     const offset = Math.round(marker.getBoundingClientRect().height / 2) + 3;
-    builtInStepPopupState.offset = offset;
     popup.style.transformOrigin = `calc(50% + 10px) calc(100% + ${12 + offset}px)`;
     popup.style.transform = `translateX(calc(-50% - 10px)) translateY(calc(-100% - ${12 + offset}px))`;
     // The site's popup keeps map gestures from reaching the map underneath.
@@ -3214,16 +3256,19 @@
   };
 
   // Closing follows the site's popup: Escape (also sent by the close button),
-  // a click on the map, or another popup opening.
+  // a click on the map, or another popup opening. Capture phase: the popup stops
+  // keydown from bubbling, so Escape pressed inside it would never reach here.
   window.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') closeBuiltInStepPopup();
-  });
+  }, true);
   // Like the site's popup it stays open while the map is dragged or zoomed and
-  // follows its ring; only a click (press and release without moving) closes it.
+  // follows its ring; only a click (press and release without moving) on the map
+  // itself closes it, not one on the panels and toolbar laid over the map.
   let builtInPopupPress = null;
   const isMapClickTarget = (target) => target instanceof Element
     && Boolean(target.closest('.map-cont'))
-    && !target.closest('.map-popup[data-wtf-built-in-step], .wtf-quest-marker');
+    && !target.closest('.map-popup[data-wtf-built-in-step], .wtf-quest-marker, '
+      + '.panel_top, .panel_left, .panel_right, #wtf-quest-requirements-panel');
   document.addEventListener('pointerdown', (event) => {
     builtInPopupPress = builtInStepPopupState.popup && event.button === 0 && isMapClickTarget(event.target)
       ? { x: event.clientX, y: event.clientY, moved: false }
@@ -3349,10 +3394,17 @@
         number.setAttribute('paint-order', 'stroke');
         number.textContent = String(markerData.step);
         svg.appendChild(number);
+        // Pins, live data and identity updates rebuild the layer: an open step
+        // popup moves to the rebuilt ring of its step instead of closing.
+        if (builtInStepPopupState.popup && builtInStepPopupState.markerData?.builtInStep === markerData.builtInStep) {
+          builtInStepPopupState.marker = marker;
+          builtInStepPopupState.markerData = markerData;
+        }
       }
       marker.appendChild(svg);
       overlay.appendChild(marker);
     }
+    wtfOverlayState.builtInRingsShown = Boolean(overlay.querySelector('.wtf-quest-marker[data-step]'));
     updateQuestMarkerFloorOpacity();
     scheduleOverlayPositionUpdate();
   };
@@ -3541,6 +3593,12 @@
     const rings = [...layer.querySelectorAll('.wtf-quest-marker[data-step]')]
       .sort((a, b) => Number(a.dataset.step) - Number(b.dataset.step));
     if (!rings.length) return;
+    // Measure every ring before updateOverlayPositions writes positions: one
+    // layout per frame instead of one forced layout per ring.
+    for (const ring of rings) {
+      const size = Math.round(ring.getBoundingClientRect().width * 100) / 100;
+      if (size > 0 && ring.dataset.ringSize !== String(size)) ring.dataset.ringSize = String(size);
+    }
     const icons = nativeIconFrame.icons;
     const placed = [];
     for (const ring of rings) {
@@ -3629,16 +3687,11 @@
       marker.style.left = (screen.x + spreadX) + 'px';
       marker.style.top = (screen.y + spreadY) + 'px';
       if (marker.classList.contains('wtf-quest-marker')) {
-        marker.style.setProperty(
-          '--wtf-quest-marker-scale',
-          String(state.iconScale * nativeQuestMarkerScale)
-        );
-        if (marker.dataset.step) {
-          const size = Math.round(marker.getBoundingClientRect().width * 100) / 100;
-          if (size > 0 && marker.dataset.ringSize !== String(size)) {
-            marker.dataset.ringSize = String(size);
-            scheduleOverlayPositionUpdate();
-          }
+        const scale = String(state.iconScale * nativeQuestMarkerScale);
+        if (marker.style.getPropertyValue('--wtf-quest-marker-scale') !== scale) {
+          marker.style.setProperty('--wtf-quest-marker-scale', scale);
+          // A step ring changed size: lay the rings out again with the new size.
+          if (marker.dataset.step) scheduleOverlayPositionUpdate();
         }
       } else if (marker.classList.contains('wtf-squad-marker')) {
         // Headings are map-space angles; follow the native view rotation.
@@ -3657,9 +3710,10 @@
     if (wtfOverlayState.updateFrame) return;
     wtfOverlayState.updateFrame = requestAnimationFrame(updateOverlayPositions);
   };
-  // Re-place the step rings after the site redraws its icons.
+  // Re-place the step rings after the site redraws its icons (called for every
+  // icon the site draws, so it only reads a flag kept by renderQuestMarkers).
   nativeIconFrame.onDrawn = () => {
-    if (wtfOverlayState.questLayer?.querySelector('.wtf-quest-marker[data-step]')) scheduleOverlayPositionUpdate();
+    if (wtfOverlayState.builtInRingsShown) scheduleOverlayPositionUpdate();
   };
 
   const mapPercentFromClientPoint = (host, clientX, clientY) => {
