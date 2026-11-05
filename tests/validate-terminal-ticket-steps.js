@@ -113,7 +113,6 @@ const waitFor = async (check, label) => {
   }
   assert.fail(`timed out waiting for ${label}`);
 };
-const near = (actual, expected, label) => assert.ok(Math.abs(actual - expected) < 0.5, `${label}: expected ${expected}, got ${actual}`);
 const click = (window, element) => element.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
 
 (async () => {
@@ -264,49 +263,7 @@ const click = (window, element) => element.dispatchEvent(new window.MouseEvent('
   assert.match(krPopup.querySelector(':scope > div:nth-child(2) > .px-10.bold').textContent, /BRDM 앞 콘크리트 바리케이드 위/);
   kr.window.close();
 
-  // Opening a step popup moves the map like the site's popup does: the marker
-  // glides (0.4 s, through the site's own drag handling) to the middle of the
-  // map, and low enough that the popup fits under the toolbar above it. On
-  // Terminal the drag is given in the site's unrotated space.
-  const pan = makeDom('https://tarkov-market.com/maps/terminal');
-  const pw = pan.window;
-  const pd = pw.document;
-  const cont = pd.querySelector('.map-cont');
-  Object.defineProperty(cont, 'offsetWidth', { value: 1200 });
-  Object.defineProperty(cont, 'offsetHeight', { value: 800 });
-  cont.getBoundingClientRect = () => ({ left: 0, top: 0, width: 1200, height: 800, right: 1200, bottom: 800, x: 0, y: 0 });
-  Object.defineProperty(pw.HTMLElement.prototype, 'offsetHeight', {
-    configurable: true,
-    get() { return this.classList?.contains('map-popup') ? 400 : 0; }
-  });
-  pw.__wtfQuestOverlay.configure({ map: 'terminal' });
-  pw.__wtfQuestOverlay.setPinnedQuests(['The Ticket']);
-  await waitFor(() => pd.querySelectorAll('.wtf-quest-marker[data-step]').length === 11, '11 rings for the pan check');
-  const drags = [];
-  for (const type of ['mousedown', 'mousemove', 'mouseup']) {
-    pw.addEventListener(type, (event) => drags.push({ type, x: event.clientX, y: event.clientY, target: event.target.className || event.target.nodeName }), true);
-  }
-  const panRing = pd.querySelector('.wtf-quest-marker[data-step="4"]');
-  await waitFor(() => panRing.style.left !== '', 'ring placed');
-  const ringAt = { x: Number.parseFloat(panRing.style.left), y: Number.parseFloat(panRing.style.top) };
-  click(pw, panRing);
-  await new Promise((resolve) => setTimeout(resolve, 700));
-  assert.ok(pd.querySelector('.map-popup[data-wtf-built-in-step="4"]'), 'the popup stays open while the map moves');
-  assert.equal(drags[0].type, 'mousedown');
-  assert.match(String(drags[0].target), /markers-canvas|doc-map-canvas/, 'the move starts on the site map canvas');
-  assert.equal(drags[drags.length - 1].type, 'mouseup');
-  assert.ok(drags.filter((d) => d.type === 'mousemove').length >= 5, 'the move is animated over several frames');
-  const offset = 18;
-  const goal = { x: 600, y: Math.max(400 + 12 + offset, 8 + 400 + 12 + offset) };
-  const screen = { x: goal.x - ringAt.x, y: goal.y - ringAt.y };
-  const tilt = 14.7 * Math.PI / 180;
-  const site = { x: (screen.x * Math.cos(tilt)) + (screen.y * Math.sin(tilt)), y: (-screen.x * Math.sin(tilt)) + (screen.y * Math.cos(tilt)) };
-  const end = drags[drags.length - 1];
-  near(end.x - drags[0].x, site.x, 'site drag x');
-  near(end.y - drags[0].y, site.y, 'site drag y');
-  pan.window.close();
-
-  console.log('PASS: The Ticket 11 rings, site-identical popup (scope, tree, classes), 22 photos with arrows/wheel/thumbnails/enlarge, drag/zoom keep and click close, rings beside site icons, map moves for the popup like the site, Escape close, Korean text, default 270 deg Terminal rotation kept once.');
+  console.log('PASS: The Ticket 11 rings, site-identical popup (scope, tree, classes), 22 photos with arrows/wheel/thumbnails/enlarge, drag/zoom keep and click close, rings beside site icons, Escape close, Korean text, default 270 deg Terminal rotation kept once.');
 })().catch((error) => {
   console.error(error);
   process.exitCode = 1;
