@@ -49,10 +49,14 @@ namespace eft_where_am_i.Classes
                 {
                     string json = File.ReadAllText(_filePath);
                     _settings = JsonConvert.DeserializeObject<AppSettings>(json) ?? new AppSettings();
+                    if (RemovePreTarkovMarketTerminalMarks(_settings))
+                    {
+                        Save();
+                    }
                 }
                 else
                 {
-                    _settings = new AppSettings();
+                    _settings = new AppSettings { terminal_marks_tarkov_market_space = true };
                     Save();
                 }
             }
@@ -60,6 +64,28 @@ namespace eft_where_am_i.Classes
             {
                 throw new Exception($"Error loading JSON file: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Up to v1.1.18 Terminal was our own map page, so Terminal pings and route
+        /// nodes were saved in that page's left/top space. Terminal now uses the
+        /// Tarkov-Market map, where those values point elsewhere. On the first run
+        /// after the update, drop the saved Terminal marks once (other maps keep
+        /// theirs: their space did not change) and remember that it was done, so
+        /// marks placed afterwards stay.
+        /// </summary>
+        public static bool RemovePreTarkovMarketTerminalMarks(AppSettings settings)
+        {
+            if (settings == null || settings.terminal_marks_tarkov_market_space)
+            {
+                return false;
+            }
+
+            static bool IsTerminal(string map) => string.Equals(map, "terminal", StringComparison.OrdinalIgnoreCase);
+            settings.map_pings?.RemoveAll(ping => ping != null && IsTerminal(ping.map));
+            settings.map_route_nodes?.RemoveAll(node => node != null && IsTerminal(node.map));
+            settings.terminal_marks_tarkov_market_space = true;
+            return true;
         }
 
         public void Save()
@@ -323,6 +349,8 @@ namespace eft_where_am_i.Classes
         public List<MapPing> map_pings { get; set; } = new List<MapPing>();
         public Dictionary<string, bool> ping_visible_per_map { get; set; } = new Dictionary<string, bool>();
         public List<MapRouteNode> map_route_nodes { get; set; } = new List<MapRouteNode>();
+        // True once Terminal pings and route nodes are in Tarkov-Market map space.
+        public bool terminal_marks_tarkov_market_space { get; set; } = false;
         public Dictionary<string, bool> route_visible_per_map { get; set; } = new Dictionary<string, bool>();
         public string squad_name { get; set; } = string.Empty;
         public string squad_host { get; set; } = "127.0.0.1";
