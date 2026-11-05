@@ -119,12 +119,6 @@ namespace eft_where_am_i.Classes
                         return 'ready';
                     }}
 
-                    var terminalButton = document.querySelector('#terminalWhereButton');
-                    if (terminalButton) {{
-                        terminalButton.click();
-                        return 'clicked';
-                    }}
-
                     var panel = document.querySelector('.panel_top');
                     if (!panel) return 'panel-not-found';
 

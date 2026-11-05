@@ -1,0 +1,45 @@
+The Ticket step photos (Terminal)
+=================================
+
+All 22 images in this folder are in-game screenshots from the
+Escape from Tarkov Wiki (escapefromtarkov.fandom.com), pages
+"The Ticket" and "Terminal". They were scaled to fit 1280x720 and
+saved as WebP; nothing else was changed.
+
+License: Creative Commons Attribution-ShareAlike 3.0 (CC BY-SA 3.0)
+https://creativecommons.org/licenses/by-sa/3.0/
+Source pages:
+  https://escapefromtarkov.fandom.com/wiki/The_Ticket
+  https://escapefromtarkov.fandom.com/wiki/Terminal
+
+File                          Wiki file
+armory-key-1-body-armory.webp Armory_key_Spawn_1.png
+armory-key-2-table.webp       Armory_key_Spawn_2.png
+armory-key-3-body-route.webp  Armory_key_Spawn_3.png
+armory-key-4-body-spawn.webp  Armory_key_Spawn_4.png
+armory-equipment-locker.webp  Armory_Equipment_locker.png
+alpha1-container.webp         Secure_container_Alpha-1_Spawn.png
+black-keycard-spawn.webp      Black_Division_keycard_Spawn.png
+seaport-weapon-box.webp       Seaport_terminal_building_interior.png
+seaport-building.webp         Seaport_terminal_building_outer.png
+admin-keypad-door.webp        Black_Division_keycard_Lock.png
+admin-building.webp           Terminal_administration_building.png
+metal-gate.webp               Terminalexplosivegate.png
+toolset-1.webp                TerminalToolsetSpawn1.png
+toolset-3.webp                TerminalToolsetSpawn3.png
+panel-10.webp                 TerminalPanelNo10.png
+panel-9.webp                  TerminalPanelNo9.png
+pump-drain-button.webp        TerminalIMPumpingStationButton.png
+pump-station.webp             TerminalPumpingStation.png
+pier-key-safe.webp            Pier_door_key_Spawn.png
+pier-key-room.webp            TerminalPierDoorKeyRooom.png
+pier-door.webp                Pier_door_key_door.png
+zubr-boat.webp                Zubr_Boat.png
+
+The Ticket step positions
+-------------------------
+The 11 step positions on Terminal were placed from re3mr's Terminal
+map PSD and the EFT Wiki walkthrough. re3mr's map is licensed under
+Creative Commons Attribution-NonCommercial-ShareAlike 4.0
+(CC BY-NC-SA 4.0): https://creativecommons.org/licenses/by-nc-sa/4.0/
+No part of the map image itself is included.

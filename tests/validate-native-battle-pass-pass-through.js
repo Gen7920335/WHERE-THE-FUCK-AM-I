@@ -21,14 +21,12 @@ const projectFile = read('eft-where-am-i/eft-where-am-i.csproj');
 const hostSource = read('eft-where-am-i/UserControls/WhereAmI.cs');
 const settingsSource = read('eft-where-am-i/Classes/SettingsHandler.cs');
 const enhancementSource = read('eft-where-am-i/html/enhancements.js');
-const terminalSource = read('eft-where-am-i/html/terminal-map.js');
 
 for (const [name, source] of [
   ['project', projectFile],
   ['host', hostSource],
   ['settings', settingsSource],
-  ['enhancements', enhancementSource],
-  ['Terminal', terminalSource]
+  ['enhancements', enhancementSource]
 ]) {
   assert(!/battle.?pass|battlepass|native-battle|wtf-blue-cross/i.test(source),
     `${name} still contains a custom Battle Pass integration trace.`);

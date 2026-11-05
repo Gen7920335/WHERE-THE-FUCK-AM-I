@@ -11,20 +11,20 @@ const settingsPage = read('eft-where-am-i/UserControls/SettingPage.cs');
 
 assert.match(
   constants,
-  /WHERE_AM_I_INPUT_SELECTOR\s*=\s*"#map-position-file, "[\s\S]*?\.position-controls[\s\S]*?#terminalLocationInput"/,
-  'the dedicated Tarkov-Market and Terminal location inputs must be selected directly'
+  /WHERE_AM_I_INPUT_SELECTOR\s*=\s*"#map-position-file, "[\s\S]*?\.position-controls/,
+  'the dedicated Tarkov-Market location input must be selected directly'
 );
 assert.doesNotMatch(constants, /WHERE_AM_I_BUTTON_SELECTOR/, 'the obsolete positional button selector must stay removed');
 assert.match(
   constants,
-  /panel_top\.desktop-panel > div > div:nth-child\(3\) > button, #terminalFullScreen/,
-  'the updated Tarkov-Market fullscreen control and Terminal fallback must both remain wired'
+  /panel_top\.desktop-panel > div > div:nth-child\(3\) > button";/,
+  'the updated Tarkov-Market fullscreen control must remain wired'
 );
 
 assert.match(executor, /SemaphoreSlim whereAmIInputLock/, 'location input opening must be serialized');
 assert.match(executor, /EnsureWhereAmIInputAsync/, 'the location input must be opened through the guarded helper');
 assert.match(executor, /SetWhereAmIInputValueAsync/, 'coordinates must use the dedicated input setter');
-assert.match(executor, /#terminalWhereButton/, 'the local Terminal map must retain its location button');
+assert.doesNotMatch(executor, /#terminalWhereButton/, 'the retired local Terminal page must stay removed');
 assert.match(executor, /\['where am i\?', '내 위치는\?'\]/, 'the live button must be matched by label');
 assert.match(executor, /label\.includes\('rotate'\).*text\.includes\('°'\)/s, 'the structural fallback must identify the rotate control');
 assert.doesNotMatch(

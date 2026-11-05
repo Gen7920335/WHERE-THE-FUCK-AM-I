@@ -15,7 +15,7 @@ assert.match(models, /sealed class MapRouteNode/, 'route node model is missing')
 assert.match(settings, /List<MapRouteNode>\s+map_route_nodes/, 'route nodes must persist in settings');
 assert.match(settings, /route_visible_per_map/, 'route visibility must persist per map');
 assert.match(settings, /double\s+route_line_width\s*\{[^}]*\}\s*=\s*1\.5/, 'route line width must persist in settings');
-assert.match(host, /currentRouteNodeCount\s*>=\s*20/, 'host must enforce the twenty-node limit');
+assert.match(host, /currentRouteNodeCount\s*>=\s*40/, 'host must enforce the forty-node limit');
 assert.match(host, /case\s+"map-route-node-delete"/, 'route node deletion is missing');
 assert.match(host, /case\s+"map-route-nodes-clear"/, 'current-map route clear-all is missing');
 assert.match(host, /RemoveOwnSavedRouteNodes\(appSettings\.latest_map\)/, 'route clear-all must target only the active map');
@@ -52,8 +52,8 @@ assert.ok(
   readPixels('.wtf-route-node', 'width') < readPixels('.wtf-ping-marker', 'width'),
   'route nodes must be smaller than ping markers'
 );
-assert.match(overlay, /slice\(0,\s*100\)/, 'renderer must cap the five twenty-node participant routes');
-assert.match(overlay, /route\.localNodeCount/, 'the twenty-node limit must be per local participant');
+assert.match(overlay, /slice\(0,\s*200\)/, 'renderer must cap the five forty-node participant routes');
+assert.match(overlay, /route\.localNodeCount/, 'the forty-node limit must be per local participant');
 assert.match(overlay, /contextmenu[\s\S]*map-route-node-delete/, 'right-click deletion must suppress the browser menu');
 assert.match(overlay, /wtf-clear-route-button[\s\S]*map-route-nodes-clear/, 'the top panel must expose route clear-all');
 assert.match(host, /case\s+"route-line-width-changed"[\s\S]*?route_line_width\s*=\s*Math\.Clamp\([^;]*0\.5,\s*8\.0\)/, 'host must clamp and save route line width');

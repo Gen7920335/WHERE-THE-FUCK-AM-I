@@ -77,6 +77,15 @@ const checkBounds=()=>{
   assert.equal(popup.style.getPropertyValue('--wtf-popup-shift-y'),'','native mobile sheet must keep its own layout');
   assert.equal(w.getComputedStyle(popup.querySelector('.wtf-native-popup-close')).display,'none','mobile sheet owns its close control');
   popup.classList.remove('mobile');await wait();checkBounds();
+  // Once opened, the popup stays on its marker: map moves carry it along
+  // (even off screen) instead of pushing it back inside the window.
+  await new Promise(r=>setTimeout(r,800));
+  const fixedX=num('--wtf-popup-shift-x'),fixedY=num('--wtf-popup-shift-y');
+  for(const [x,y] of [[-500,-300],[1800,900]]){
+   origin={x,y}; popup.style.top=`${y}px`; await wait();
+   assert.equal(num('--wtf-popup-shift-x'),fixedX,'opened popup is not pushed back inside the window (x)');
+   assert.equal(num('--wtf-popup-shift-y'),fixedY,'opened popup is not pushed back inside the window (y)');
+  }
   popup.remove();await wait();
   assert.ok(resizes.some(r=>r.disconnected),'removed popup observer must disconnect');
   console.log('PASS: popup bounds/corners/zoom/photo resize, idle stability, cleanup, close, native detail text left untouched.');

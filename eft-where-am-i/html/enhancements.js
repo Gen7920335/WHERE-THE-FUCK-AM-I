@@ -2,6 +2,20 @@
   if (window.__wtfEnhancementsInstalled) return;
   window.__wtfEnhancementsInstalled = true;
 
+  // Terminal opens turned like the in-game wall map (-75.3 deg): the first visit sets
+  // the site's own rotation to 270 deg and the Terminal tilt below adds 14.7 deg.
+  // After that the user's own rotation is kept. This runs before the site's scripts,
+  // which read the key when the map loads.
+  try {
+    const mapSlug = String(location.pathname || '').match(/\/maps\/([^/?#]+)/)?.[1];
+    if (mapSlug === 'terminal' && localStorage.getItem('wtf_terminal_default_rotation_v1') !== '1') {
+      if (localStorage.getItem('tm_map_rotation:terminal') === null) {
+        localStorage.setItem('tm_map_rotation:terminal', '270');
+      }
+      localStorage.setItem('wtf_terminal_default_rotation_v1', '1');
+    }
+  } catch {}
+
   // Native Pro actions can be divs/SVGs and teleported popup controls, not
   // just panel buttons. Match exact class tokens, never "progress"/"profile".
   const paidUiSelector = [
@@ -131,6 +145,339 @@
   CanvasRenderingContext2D.prototype.strokeText = function (...args) {
     return scaleCanvasFont(this, () => originalStrokeText.apply(this, args));
   };
+
+  // ---- Terminal at the in-game wall-map angle (-75.3 deg) ------------------
+  // The site rotates its map only in 90-degree steps (0/90/180/270). Terminal
+  // must look like the in-game wall map, which is 14.7 deg clockwise of the
+  // site's 270 deg view, so on Terminal every site rotation gets that extra
+  // 14.7 deg (270 -> -75.3, then the site's own button keeps adding 90).
+  // The extra angle is folded into the view transform of the site's canvases,
+  // so map shapes, markers, the player arrow and our overlays (which read that
+  // transform) all turn together; icons and text are turned back upright around
+  // their own anchor. Mouse events on the map are turned back by the same angle
+  // before the site sees them, so its hit tests, hover, wheel zoom anchor and
+  // drag panning keep working in its own unrotated space.
+  const TERMINAL_EXTRA_TILT_DEG = 14.7;
+  const tiltCanvasPattern = /(?:^|\s)(?:doc-map-canvas|markers-canvas|players-canvas|pilot-heatmap-canvas)(?:\s|$)/;
+  const glyphCanvasPattern = /(?:^|\s)(?:markers-canvas|players-canvas)(?:\s|$)/;
+  // The canvas hooks below run on every draw call, so the map slug is parsed
+  // once per path instead of once per call.
+  let pathMapSlugCache = { path: null, slug: '' };
+  const pathMapSlug = () => {
+    const path = String(location.pathname || '');
+    if (pathMapSlugCache.path !== path) {
+      pathMapSlugCache = { path, slug: path.match(/\/maps\/([^/?#]+)/)?.[1]?.toLowerCase() || '' };
+    }
+    return pathMapSlugCache.slug;
+  };
+  const mapTiltRadians = () => (pathMapSlug() === 'terminal' ? TERMINAL_EXTRA_TILT_DEG * Math.PI / 180 : 0);
+  window.__wtfMapTiltDegrees = () => mapTiltRadians() * 180 / Math.PI;
+  const contextTilt = (context) => {
+    const canvas = context?.canvas;
+    if (!canvas?.classList || !tiltCanvasPattern.test(canvas.className)) return 0;
+    if (canvas.style?.display === 'none') return 0;
+    return mapTiltRadians();
+  };
+  const tiltedMatrix = (context, matrix, radians) => {
+    // Rotation about the canvas centre (the view centre), applied after the site matrix.
+    const cx = context.canvas.width / 2;
+    const cy = context.canvas.height / 2;
+    const cos = Math.cos(radians);
+    const sin = Math.sin(radians);
+    const r = { a: cos, b: sin, c: -sin, d: cos, e: cx - (cos * cx) + (sin * cy), f: cy - (sin * cx) - (cos * cy) };
+    return {
+      a: (r.a * matrix.a) + (r.c * matrix.b),
+      b: (r.b * matrix.a) + (r.d * matrix.b),
+      c: (r.a * matrix.c) + (r.c * matrix.d),
+      d: (r.b * matrix.c) + (r.d * matrix.d),
+      e: (r.a * matrix.e) + (r.c * matrix.f) + r.e,
+      f: (r.b * matrix.e) + (r.d * matrix.f) + r.f
+    };
+  };
+  const contextPrototype = CanvasRenderingContext2D.prototype;
+  const nativeSetTransform = contextPrototype.setTransform;
+  contextPrototype.setTransform = function (...args) {
+    const radians = contextTilt(this);
+    if (!radians) {
+      this.__wtfTilted = false;
+      this.__wtfRequestedTransform = null;
+      return nativeSetTransform.apply(this, args);
+    }
+    const source = args.length >= 6
+      ? { a: args[0], b: args[1], c: args[2], d: args[3], e: args[4], f: args[5] }
+      : (args[0] || { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 });
+    const matrix = {
+      a: source.a ?? source.m11 ?? 1, b: source.b ?? source.m12 ?? 0, c: source.c ?? source.m21 ?? 0,
+      d: source.d ?? source.m22 ?? 1, e: source.e ?? source.m41 ?? 0, f: source.f ?? source.m42 ?? 0
+    };
+    // Remember the site's own matrix: clearing uses it untilted (see clearRect).
+    this.__wtfRequestedTransform = matrix;
+    // The map canvas uses identity only to clear or copy whole layers; the marker
+    // and player canvases draw with it (device scale 1, no padding).
+    const isIdentity = matrix.a === 1 && matrix.b === 0 && matrix.c === 0 && matrix.d === 1 && matrix.e === 0 && matrix.f === 0;
+    if (isIdentity && !glyphCanvasPattern.test(this.canvas.className)) {
+      this.__wtfTilted = false;
+      return nativeSetTransform.call(this, 1, 0, 0, 1, 0, 0);
+    }
+    const tilted = tiltedMatrix(this, matrix, radians);
+    this.__wtfTilted = true;
+    return nativeSetTransform.call(this, tilted.a, tilted.b, tilted.c, tilted.d, tilted.e, tilted.f);
+  };
+  // Where the site drew its marker icons in the last frame (container pixels),
+  // so our step rings can stand beside them instead of on top of them. Only maps
+  // with built-in steps need it (wanted is set next to builtInQuestSteps).
+  const nativeIconFrame = { icons: [], box: null, onDrawn: null, wanted: () => false };
+  const isMarkersCanvas = (context) => /(?:^|\s)markers-canvas(?:\s|$)/.test(context?.canvas?.className || '');
+  const beginNativeIconFrame = (context, width, height) => {
+    const canvas = context.canvas;
+    if (!(width >= canvas.width / 2) || !(height >= canvas.height / 2)) return;
+    nativeIconFrame.icons = [];
+    const container = canvas.closest?.('.map-cont');
+    const canvasRect = canvas.getBoundingClientRect();
+    const containerRect = container ? container.getBoundingClientRect() : { left: 0, top: 0 };
+    nativeIconFrame.box = {
+      left: canvasRect.left - containerRect.left,
+      top: canvasRect.top - containerRect.top,
+      ratio: canvasRect.width > 0 ? canvas.width / canvasRect.width : 1
+    };
+  };
+  const recordNativeIcon = (context, x, y, width, height) => {
+    const box = nativeIconFrame.box;
+    if (!box || !Number.isFinite(x) || !Number.isFinite(y)) return;
+    const m = context.getTransform();
+    const scale = Math.hypot(m.a, m.b) / box.ratio;
+    const size = Math.max(Math.abs(width), Math.abs(height)) * scale;
+    // Icons only: skip tiny dots and whole-layer images.
+    if (!(size >= 8 && size <= 64)) return;
+    if (nativeIconFrame.icons.length >= 4000) return;
+    // The icon-size setting enlarges the drawn icon around this same centre
+    // (drawImage hook above), so the ring must clear the enlarged icon.
+    const iconScale = state.iconScale > 0 ? state.iconScale : 1;
+    nativeIconFrame.icons.push({
+      x: box.left + ((m.a * x) + (m.c * y) + m.e) / box.ratio,
+      y: box.top + ((m.b * x) + (m.d * y) + m.f) / box.ratio,
+      // Some sprites carry transparent padding or a caption; the visible icon
+      // itself is at most about 26 px across.
+      r: Math.min(size / 2, 13) * iconScale
+    });
+    nativeIconFrame.onDrawn?.();
+  };
+  window.__wtfNativeIconFrame = () => nativeIconFrame.icons.map((icon) => ({ ...icon }));
+
+  // The site clears its canvases with the rectangle it asked for; a tilted clear
+  // would leave the corners uncleared, so clear in the site's own space.
+  const nativeClearRect = contextPrototype.clearRect;
+  contextPrototype.clearRect = function (...args) {
+    // A new frame: the last label box no longer frames anything.
+    this.__wtfLabelBox = null;
+    if (isMarkersCanvas(this) && nativeIconFrame.wanted(pathMapSlug())) beginNativeIconFrame(this, args[2], args[3]);
+    const requested = this.__wtfTilted ? this.__wtfRequestedTransform : null;
+    if (!requested) return nativeClearRect.apply(this, args);
+    this.save();
+    nativeSetTransform.call(this, requested.a, requested.b, requested.c, requested.d, requested.e, requested.f);
+    try {
+      return nativeClearRect.apply(this, args);
+    } finally {
+      this.restore();
+    }
+  };
+  // save()/restore() bring the transform back, so they bring back what we know
+  // about it too; otherwise a restore() after an untilted identity (a layer copy)
+  // leaves a tilted canvas marked untilted (labels drawn tilted, corners left
+  // uncleared). resetTransform() is identity, which setTransform tilts where the
+  // canvas draws with it.
+  const nativeSave = contextPrototype.save;
+  const nativeRestore = contextPrototype.restore;
+  if (typeof nativeSave === 'function' && typeof nativeRestore === 'function') {
+    contextPrototype.save = function (...args) {
+      (this.__wtfTiltStack ||= []).push([this.__wtfTilted, this.__wtfRequestedTransform]);
+      return nativeSave.apply(this, args);
+    };
+    contextPrototype.restore = function (...args) {
+      const saved = this.__wtfTiltStack?.pop();
+      if (saved) [this.__wtfTilted, this.__wtfRequestedTransform] = saved;
+      return nativeRestore.apply(this, args);
+    };
+  }
+  if (typeof contextPrototype.resetTransform === 'function') {
+    contextPrototype.resetTransform = function () {
+      return this.setTransform(1, 0, 0, 1, 0, 0);
+    };
+  }
+
+  // Draw a glyph upright around its own anchor while the canvas is tilted.
+  const drawUpright = (context, x, y, draw) => {
+    const radians = context.__wtfTilted ? contextTilt(context) : 0;
+    if (!radians || !Number.isFinite(x) || !Number.isFinite(y)) return draw();
+    context.save();
+    context.translate(x, y);
+    context.rotate(-radians);
+    context.translate(-x, -y);
+    try {
+      return draw();
+    } finally {
+      context.restore();
+    }
+  };
+  const isGlyphCanvas = (context) => glyphCanvasPattern.test(context?.canvas?.className || '');
+  const tiltedDrawImage = contextPrototype.drawImage;
+  contextPrototype.drawImage = function (...args) {
+    const markers = isMarkersCanvas(this) && nativeIconFrame.wanted(pathMapSlug());
+    if (!markers && (!this.__wtfTilted || !isGlyphCanvas(this))) return tiltedDrawImage.apply(this, args);
+    let x;
+    let y;
+    let width;
+    let height;
+    if (args.length >= 9) {
+      [width, height] = [args[7], args[8]];
+      x = args[5] + (width / 2);
+      y = args[6] + (height / 2);
+    } else if (args.length >= 5) {
+      [width, height] = [args[3], args[4]];
+      x = args[1] + (width / 2);
+      y = args[2] + (height / 2);
+    } else {
+      const image = args[0];
+      [width, height] = [Number(image?.width) || 0, Number(image?.height) || 0];
+      x = args[1] + width / 2;
+      y = args[2] + height / 2;
+    }
+    if (markers) recordNativeIcon(this, x, y, width, height);
+    if (!this.__wtfTilted || !isGlyphCanvas(this)) return tiltedDrawImage.apply(this, args);
+    return drawUpright(this, x, y, () => tiltedDrawImage.apply(this, args));
+  };
+  // Label boxes: the site fills a translucent black box, then writes the label
+  // inside it; both turn upright around the box centre so the text stays inside.
+  const isLabelBoxFill = (style) => /^rgba\(0, 0, 0, 0\.(?:5|8)\)$/.test(String(style));
+  const nativeFillRect = contextPrototype.fillRect;
+  contextPrototype.fillRect = function (x, y, width, height) {
+    if (!this.__wtfTilted || !isGlyphCanvas(this) || !isLabelBoxFill(this.fillStyle)) {
+      return nativeFillRect.call(this, x, y, width, height);
+    }
+    const box = { x, y, width, height, cx: x + width / 2, cy: y + height / 2 };
+    this.__wtfLabelBox = box;
+    return drawUpright(this, box.cx, box.cy, () => nativeFillRect.call(this, x, y, width, height));
+  };
+  const textPivot = (context, x, y) => {
+    const box = context.__wtfLabelBox;
+    if (box && x >= box.x && x <= box.x + box.width && y >= box.y && y <= box.y + box.height) return [box.cx, box.cy];
+    return [x, y];
+  };
+  for (const name of ['fillText', 'strokeText']) {
+    const nativeText = contextPrototype[name];
+    contextPrototype[name] = function (text, x, y, ...rest) {
+      if (!this.__wtfTilted) return nativeText.call(this, text, x, y, ...rest);
+      const [px, py] = textPivot(this, x, y);
+      return drawUpright(this, px, py, () => nativeText.call(this, text, x, y, ...rest));
+    };
+  }
+  const nativeStrokeRect = contextPrototype.strokeRect;
+  contextPrototype.strokeRect = function (x, y, width, height) {
+    // The dashed hover/selection box around an icon stays square to the screen.
+    if (!this.__wtfTilted || !isGlyphCanvas(this) || !this.getLineDash?.().length) {
+      return nativeStrokeRect.call(this, x, y, width, height);
+    }
+    return drawUpright(this, x + width / 2, y + height / 2, () => nativeStrokeRect.call(this, x, y, width, height));
+  };
+
+  // Map mouse input: turn the pointer back into the site's unrotated space.
+  const tiltEventTypes = ['pointerdown', 'pointermove', 'pointerup', 'mousedown', 'mousemove', 'mouseup',
+    'click', 'dblclick', 'auxclick', 'contextmenu', 'wheel'];
+  const tiltUiSelector = '.panel_top, .panel_left, .panel_right, .map-popup, .wtf-quest-marker, .wtf-route-node, '
+    + '.wtf-ping-marker, .wtf-squad-marker, button, input, a, label, select, textarea, #wtf-quest-requirements-panel';
+  let tiltGesture = false;
+  const unrotateClientPoint = (container, clientX, clientY, radians) => {
+    const rect = container.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dx = clientX - cx;
+    const dy = clientY - cy;
+    const cos = Math.cos(radians);
+    const sin = Math.sin(radians);
+    return { x: cx + (dx * cos) + (dy * sin), y: cy - (dx * sin) + (dy * cos) };
+  };
+  const rewriteTiltedMapEvent = (event) => {
+    if (!event.isTrusted) return;
+    const radians = mapTiltRadians();
+    if (!radians) {
+      tiltGesture = false;
+      return;
+    }
+    const container = document.querySelector('.map-cont');
+    if (!container) return;
+    const target = event.target instanceof Element ? event.target : null;
+    const onMap = Boolean(target && container.contains(target) && !target.closest(tiltUiSelector));
+    const continuing = tiltGesture && /move|up$/.test(event.type);
+    if (!onMap && !continuing) return;
+    const point = unrotateClientPoint(container, event.clientX, event.clientY, radians);
+    const init = {
+      bubbles: event.bubbles, cancelable: event.cancelable, composed: event.composed, view: event.view,
+      detail: event.detail, screenX: event.screenX + (point.x - event.clientX), screenY: event.screenY + (point.y - event.clientY),
+      clientX: point.x, clientY: point.y, ctrlKey: event.ctrlKey, shiftKey: event.shiftKey, altKey: event.altKey,
+      metaKey: event.metaKey, button: event.button, buttons: event.buttons, relatedTarget: event.relatedTarget,
+      movementX: event.movementX, movementY: event.movementY
+    };
+    if (typeof PointerEvent !== 'undefined' && event instanceof PointerEvent) {
+      Object.assign(init, {
+        pointerId: event.pointerId, width: event.width, height: event.height, pressure: event.pressure,
+        tangentialPressure: event.tangentialPressure, tiltX: event.tiltX, tiltY: event.tiltY, twist: event.twist,
+        pointerType: event.pointerType, isPrimary: event.isPrimary
+      });
+    }
+    if (typeof WheelEvent !== 'undefined' && event instanceof WheelEvent) {
+      Object.assign(init, { deltaX: event.deltaX, deltaY: event.deltaY, deltaZ: event.deltaZ, deltaMode: event.deltaMode });
+    }
+    const clone = new event.constructor(event.type, init);
+    // Our own map handlers read screen positions (their geometry includes the tilt).
+    clone.__wtfScreenPoint = { clientX: event.clientX, clientY: event.clientY };
+    event.stopImmediatePropagation();
+    (target || container).dispatchEvent(clone);
+    if (clone.defaultPrevented) event.preventDefault();
+    if (onMap && (event.type === 'mousedown' || event.type === 'pointerdown')) tiltGesture = true;
+    if (event.type === 'mouseup' || event.type === 'pointerup') tiltGesture = event.buttons !== 0;
+  };
+  // The site's panels stop mouseup, so a map drag released over a panel never
+  // ends: the map keeps following the cursor until the next plain click (pings
+  // and route nodes don't count, the site never sees them). Once a drag that
+  // began on the map reaches a panel, hold the pointer on the map so the release
+  // still lands there. Capture starts only then, so clicks are not retargeted.
+  // Registered before the tilt rewrite, which stops trusted events on Terminal.
+  const mapDragPanelSelector = '.panel_top, .panel_left, .panel_right';
+  let mapDragPointerId = null;
+  const keepMapDragOnMap = (event) => {
+    if (!event.isTrusted) return;
+    const target = event.target instanceof Element ? event.target : null;
+    const container = document.querySelector('.map-cont');
+    if (event.type === 'pointerdown') {
+      mapDragPointerId = event.button === 0 && container && target && container.contains(target)
+        && !target.closest(`${mapDragPanelSelector}, .map-popup, #wtf-quest-requirements-panel`)
+        ? event.pointerId
+        : null;
+      return;
+    }
+    if (event.type !== 'pointermove' || !(event.buttons & 1)) {
+      mapDragPointerId = null;
+      return;
+    }
+    if (event.pointerId !== mapDragPointerId || !container || !target?.closest(mapDragPanelSelector)) return;
+    if (container.hasPointerCapture?.(event.pointerId)) return;
+    try {
+      container.setPointerCapture(event.pointerId);
+    } catch (error) {
+      mapDragPointerId = null;
+    }
+  };
+  for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel']) {
+    window.addEventListener(type, keepMapDragOnMap, { capture: true });
+  }
+  for (const type of tiltEventTypes) {
+    window.addEventListener(type, rewriteTiltedMapEvent, { capture: true, passive: false });
+  }
+  // A gesture that ends without a release reaching the page (pointer cancelled,
+  // window lost focus) must not keep rewriting later moves over the panels.
+  window.addEventListener('pointercancel', () => { tiltGesture = false; }, { capture: true });
+  window.addEventListener('blur', () => { tiltGesture = false; });
+  const screenPointOf = (event) => event?.__wtfScreenPoint || event;
 
   const applyDomScale = () => {
     const root = document.documentElement;
@@ -381,7 +728,7 @@
     pings: { map: '', pings: [] },
     pingsVisible: true,
     pingLayer: null,
-    route: { map: '', nodes: [], maxNodes: 20, localNodeCount: 0 },
+    route: { map: '', nodes: [], maxNodes: 40, localNodeCount: 0 },
     routeVisible: true,
     panelLayoutFrame: 0,
     portraitPanelShell: null,
@@ -634,6 +981,9 @@
   };
 
   const tarkovMarketQuestIconPath = 'm253.943,502.885c-66.495,0-129.01-25.895-176.029-72.913C30.895,382.953,5,320.438,5,253.943S30.895,124.933,77.914,77.914,187.448,5,253.943,5s129.01,25.895,176.029,72.914c47.019,47.019,72.913,109.534,72.913,176.029s-25.895,129.01-72.913,176.029c-47.02,47.019-109.534,72.913-176.029,72.913Zm0-437.885c-104.184,0-188.943,84.759-188.943,188.943s84.759,188.942,188.943,188.942,188.942-84.759,188.942-188.942-84.759-188.943-188.942-188.943Zm40,289.2h-80v70h80v-70Zm0-269.75h-80v250.265h80V84.449Z';
+  // The quest icon's outer ring only (outer r 248.943, hole r 188.943).
+  const tarkovMarketQuestRingPath = 'M253.943 5A248.943 248.943 0 1 1 253.943 502.886A248.943 248.943 0 1 1 253.943 5Z'
+    + 'M253.943 65A188.943 188.943 0 1 0 253.943 442.886A188.943 188.943 0 1 0 253.943 65Z';
 
   // Keep the same projection constants and operation order as Tarkov-Market's
   // canvas renderer. Live marker geometry is projected directly from its store.
@@ -649,8 +999,114 @@
     streets: { width: 3260, height: 3500, zoom: 0.7, rotate: 90, xOffset: 1660, yOffset: 1420, ratio: 2 },
     lab: { width: 5500, height: 4200, zoom: 0.41, rotate: 180, xOffset: 6100, yOffset: 4050, ratio: 10 },
     labyrinth: { width: 3300, height: 3200, zoom: 0.8, rotate: 180, xOffset: 1485, yOffset: 1602, ratio: 10 },
+    terminal: { width: 3850, height: 4150, zoom: 0.52, rotate: 90, xOffset: 1926, yOffset: 2160, ratio: 2 },
     icebreaker: { width: 5000, height: 8400, zoom: 0.24, rotate: 90, xOffset: 2500, yOffset: 4200, ratio: 25 }
   };
+
+  // Tarkov-Market has no Terminal markers for The Ticket (its quest marker sits on
+  // Shoreline), so the Terminal walkthrough steps are ours. Positions are game
+  // coordinates in the site's own marker space (geometry.x / geometry.y), placed
+  // from re3mr's Terminal PSD (CC BY-NC-SA 4.0) and the EFT wiki walkthrough;
+  // step 10 sits on the site's Pier Door unlock icon (measured in the app).
+  // They render as numbered rings and follow the quest pin like site markers.
+  const builtInQuestSteps = {
+    terminal: {
+      quest: 'The Ticket',
+      wiki: 'https://escapefromtarkov.fandom.com/wiki/The_Ticket',
+      steps: [
+        {
+          x: -327.5, y: 176.1, en: 'Find the key for the armory', kr: '무기고 열쇠 찾기',
+          details: { en: 'The Armory key spawns in one of 4 places: three dead RUAF soldiers (outside the spawn building, on the route, outside the armory) or the table inside the armory.', kr: '무기고 열쇠는 4곳 중 1곳에 스폰: RUAF 병사 시체 3구(스폰 건물 앞, 무기고 가는 길, 무기고 앞) 또는 무기고 안 테이블.' },
+          images: [
+            { src: 'maps/terminal-photos/armory-key-1-body-armory.webp', en: 'Inside a dead RUAF soldier outside the armory building.', kr: '무기고 건물 앞 RUAF 병사 시체 안.' },
+            { src: 'maps/terminal-photos/armory-key-2-table.webp', en: 'On a table inside the armory building.', kr: '무기고 건물 안 테이블 위.' },
+            { src: 'maps/terminal-photos/armory-key-3-body-route.webp', en: 'In the left hand of a dead RUAF soldier on the way to the armory.', kr: '무기고 가는 길 RUAF 병사 시체의 왼손.' },
+            { src: 'maps/terminal-photos/armory-key-4-body-spawn.webp', en: 'In the right hand of a dead RUAF soldier right outside the spawn building.', kr: '스폰 건물 바로 앞 RUAF 병사 시체의 오른손.' }
+          ]
+        },
+        {
+          x: -257.4, y: 188.4, en: 'Unlock the armory and recover your equipment', kr: '무기고를 열고 장비 회수',
+          details: { en: 'Open the armory with the Armory key. Your equipment is in a random locker. Savior ending: also take the Alpha-1 container from the desk under the window.', kr: 'Armory key로 무기고 열기. 장비는 무작위 사물함 1곳에 있음. Savior 엔딩: 창문 아래 책상의 Alpha-1 컨테이너도 획득.' },
+          images: [
+            { src: 'maps/terminal-photos/armory-equipment-locker.webp', en: 'The equipment is in a random locker.', kr: '장비는 무작위 사물함에 있음.' },
+            { src: 'maps/terminal-photos/alpha1-container.webp', en: 'Savior ending: Alpha-1 container on the desk under the window.', kr: 'Savior 엔딩: 창문 아래 책상 위 Alpha-1 컨테이너.' }
+          ]
+        },
+        {
+          x: -267.1, y: 264.4, en: 'Obtain the Black Division keycard', kr: '블랙 디비전 키카드 획득',
+          details: { en: 'Seaport Terminal building (MS), west of the armory: weapon box on a tipped-over ATM. A Black Division squad guards the building.', kr: '무기고 서쪽 Seaport Terminal 건물(MS): 넘어진 ATM 위 무기 상자. 건물은 블랙 디비전 분대가 지킴.' },
+          images: [
+            { src: 'maps/terminal-photos/black-keycard-spawn.webp', en: 'Inside the weapon box on an ATM.', kr: 'ATM 위 무기 상자 안.' },
+            { src: 'maps/terminal-photos/seaport-weapon-box.webp', en: 'The weapon box inside the building.', kr: '건물 안 무기 상자.' },
+            { src: 'maps/terminal-photos/seaport-building.webp', en: 'The Seaport Terminal building (MS).', kr: 'Seaport Terminal 건물(MS).' }
+          ]
+        },
+        {
+          x: -153.8, y: 85.3, en: 'Access the Terminal loading zone', kr: '터미널 하역 구역 진입',
+          details: { en: 'Admin building (D3): clear the Black Division team at the entrance, then swipe the keycard at the scanner next to the service-passage door.', kr: 'Admin 건물(D3): 입구의 블랙 디비전 팀 처리 후, 서비스 통로 문 옆 스캐너에 키카드 사용.' },
+          images: [
+            { src: 'maps/terminal-photos/admin-keypad-door.webp', en: 'The door.', kr: '문.' },
+            { src: 'maps/terminal-photos/admin-building.webp', en: 'The administration building.', kr: 'Admin 건물.' }
+          ]
+        },
+        {
+          x: 7.8, y: 122.5, en: 'Open the metal gate to the fuel depot', kr: '연료 저장소 금속 문 열기',
+          details: { en: 'Use an SZ-1 explosive charge (7 spawns nearby), Elite Strength, or push it with another player.', kr: 'SZ-1 폭약(근처 스폰 7곳) 사용, Strength 엘리트, 또는 다른 플레이어와 함께 밀어서 열기.' },
+          images: [
+            { src: 'maps/terminal-photos/metal-gate.webp', en: 'The gate.', kr: '게이트.' }
+          ]
+        },
+        {
+          x: 24.5, y: 128.8, en: '(Optional) Take a Toolset', kr: '(선택) 공구 세트 챙기기',
+          details: { en: 'Three Toolsets spawn every raid just past the metal gate. Not required: panels can be repaired bare-handed, but with a low success chance and arm damage on failure.', kr: 'Metal Gate 바로 지나 Toolset 3개가 매 레이드 스폰. 필수 아님: 맨손 수리도 가능하지만 성공률이 낮고 실패 시 팔 손상.' },
+          images: [
+            { src: 'maps/terminal-photos/toolset-1.webp', en: '1: In front of the BRDM after the gate, on a concrete barricade.', kr: '1: 게이트 지나 BRDM 앞 콘크리트 바리케이드 위.' },
+            { src: 'maps/terminal-photos/toolset-3.webp', en: '3: Next to the fuel pumps left after the gate, on barrels.', kr: '3: 게이트 지나 왼쪽 주유기 옆 드럼통 위.' }
+          ]
+        },
+        {
+          x: 253.1, y: 180.1, en: 'Repair the broken electrical panel', kr: '고장 난 배전반 수리',
+          details: { en: 'Solo: always panel 9 or 10. 2-5 players: 1-5 panels across all 10 locations. Look for the open, sparking panel.', kr: '솔로: 항상 9번 또는 10번 배전반. 2-5명: 10곳 중 1-5개. 열려 있고 스파크가 튀는 배전반 찾기.' },
+          images: [
+            { src: 'maps/terminal-photos/panel-10.webp', en: 'No. 10 - Right outside the pumping station door.', kr: '10번 - 펌핑 스테이션 문 바로 앞.' },
+            { src: 'maps/terminal-photos/panel-9.webp', en: 'No. 9 - Behind the building right after the metal gate.', kr: '9번 - Metal Gate 바로 지나 건물 뒤.' }
+          ]
+        },
+        {
+          x: 260.7, y: 154.8, en: 'Drain the water in the pumping station', kr: '펌핑 스테이션 물 빼기',
+          details: { en: 'Once power is restored, press the drain button inside the pumping station.', kr: '전력 복구 후 펌핑 스테이션 안 배수 버튼 누르기.' },
+          images: [
+            { src: 'maps/terminal-photos/pump-drain-button.webp', en: 'The button that drains the water.', kr: '물을 빼는 버튼.' },
+            { src: 'maps/terminal-photos/pump-station.webp', en: 'The pumping station.', kr: '펌핑 스테이션.' }
+          ]
+        },
+        {
+          x: 266.1, y: 150.3, en: 'Take the Pier door key', kr: '부두 문 열쇠 챙기기',
+          details: { en: 'From the safe inside the pumping station, only after draining the water.', kr: '물을 뺀 뒤에만, 펌핑 스테이션 안 금고에서 획득.' },
+          images: [
+            { src: 'maps/terminal-photos/pier-key-safe.webp', en: 'The safe.', kr: '금고.' },
+            { src: 'maps/terminal-photos/pier-key-room.webp', en: 'The room with the safe.', kr: '금고가 있는 방.' }
+          ]
+        },
+        {
+          x: 338.7, y: -259.6, en: 'Unlock the pier door', kr: '부두 문 열기',
+          details: { en: 'Three routes through the container loading bays (east / centre / west); Black Division squads on every route. Opening the door starts a 3-minute extraction timer for everyone.', kr: '컨테이너 하역장을 지나는 경로 3개(동쪽 / 가운데 / 서쪽), 모든 경로에 블랙 디비전 분대. 문을 열면 모두에게 3분 탈출 타이머 시작.' },
+          images: [
+            { src: 'maps/terminal-photos/pier-door.webp', en: 'The pier door.', kr: '부두 문.' }
+          ]
+        },
+        {
+          x: 74.6, y: -295.2, en: 'Escape from Tarkov', kr: '타르코프 탈출',
+          details: { en: 'Reach the Zubr Boat within 3 minutes of the pier door opening. A final Black Division team guards the pier.', kr: '부두 문이 열린 뒤 3분 안에 Zubr Boat 도착. 부두는 마지막 블랙 디비전 팀이 지킴.' },
+          images: [
+            { src: 'maps/terminal-photos/zubr-boat.webp', en: 'The Zubr Boat extraction.', kr: 'Zubr Boat 탈출구.' }
+          ]
+        }
+      ]
+    }
+  };
+  // Site icon positions are recorded only where step rings may need them.
+  nativeIconFrame.wanted = (slug) => Object.prototype.hasOwnProperty.call(builtInQuestSteps, slug);
 
   const participantPalette = [
     { color: '#ff3b30', glow: 'rgba(255, 59, 48, .9)' },
@@ -817,6 +1273,10 @@
       .wtf-quest-marker.wtf-other-floor {
         opacity: .2;
       }
+      .wtf-quest-step-number {
+        font-family: Arial, Helvetica, sans-serif;
+        font-weight: 700;
+      }
       .wtf-quest-marker:focus-visible {
         outline: 2px solid #e5b35c;
         outline-offset: 4px;
@@ -947,13 +1407,24 @@
       .map-popup {
         opacity: var(--wtf-popup-opacity, 1) !important;
       }
+      /* Terminal tilt: the site's compass turns with the map, letters stay upright. */
+      .map-compass__rose,
+      .map-compass__cardinal-orbit {
+        rotate: var(--wtf-map-tilt, 0deg);
+      }
+      .map-compass__cardinal {
+        rotate: calc(-1 * var(--wtf-map-tilt, 0deg));
+      }
+      .map-compass-anchor {
+        translate: var(--wtf-compass-tilt-x, 0px) var(--wtf-compass-tilt-y, 0px);
+      }
       .map-popup:not(.mobile) {
         box-sizing: border-box;
         max-width: var(--wtf-popup-max-width, calc(100vw - 16px)) !important;
         max-height: var(--wtf-popup-max-height, calc(100vh - 16px)) !important;
         overflow: auto;
         overscroll-behavior: contain;
-        translate: var(--wtf-popup-shift-x, 0px) var(--wtf-popup-shift-y, 0px);
+        translate: calc(var(--wtf-popup-shift-x, 0px) + var(--wtf-popup-tilt-x, 0px)) calc(var(--wtf-popup-shift-y, 0px) + var(--wtf-popup-tilt-y, 0px));
       }
       .wtf-popup-close {
         align-items: center;
@@ -1678,6 +2149,8 @@
   ).replace(/\s+/g, ' ').trim();
 
   const liveQuestMarkerColor = (markerData) => {
+    // Built-in walkthrough rings use the green quest markers show on other maps.
+    if (markerData.builtInStep) return '#70a800';
     if (markerData.storyline) return '#8598a6';
     if (markerData.requiredForKappa) return '#70a800';
     return '#a87b00';
@@ -1737,6 +2210,33 @@
       const point = projectLiveQuestMarker(mapSlug, marker.geometry.x, marker.geometry.y);
       if (!point) continue;
       markers.push({ ...common, kind: 'point', left: point.left, top: point.top });
+    }
+    const builtIn = builtInQuestSteps[mapSlug];
+    if (builtIn) {
+      const builtInKey = normalizeQuestName(builtIn.quest);
+      const quest = quests.find((candidate) => normalizeQuestName(questDisplayNameFromLiveData(candidate)) === builtInKey
+        || normalizeQuestName(candidate?.name_en) === builtInKey);
+      wtfOverlayState.builtInQuestUid = String(quest?.uid || '');
+      builtIn.steps.forEach((step, index) => {
+        const point = projectLiveQuestMarker(mapSlug, step.x, step.y);
+        if (!point) return;
+        markers.push({
+          markerUid: '',
+          questId: String(quest?.uid || ''),
+          quest: quest ? questDisplayNameFromLiveData(quest) : builtIn.quest,
+          objective: localizedLiveText(step.en, { kr: step.kr, ko: step.kr }),
+          questStepUids: [],
+          level: null,
+          storyline: quest ? quest.type === 'Storyline' : true,
+          requiredForKappa: Boolean(quest?.requiredForKappa),
+          kind: 'point',
+          step: index + 1,
+          builtInStep: step,
+          wiki: builtIn.wiki,
+          left: point.left,
+          top: point.top
+        });
+      });
     }
     rememberLiveQuestNames(quests);
     return { map: mapSlug, markers, questCount: quests.length };
@@ -1879,7 +2379,42 @@
     }));
   };
 
+  // The site lists no Terminal quest for our built-in steps (The Ticket), so the
+  // quest list gets one row of its own, shaped like the site's rows, to pin it.
+  const ensureBuiltInQuestRow = () => {
+    const builtIn = builtInQuestSteps[String(wtfOverlayState.quest.map || '').toLowerCase()];
+    const existing = document.querySelector('[data-wtf-built-in-quest]');
+    const nativeRow = document.querySelector('div.items.scroll div.no-wrap.d-flex[data-quest-uid]:not([data-wtf-built-in-quest])');
+    // An empty list (the default Story filter on Terminal) has no site row to
+    // find it by, so fall back to the quest tool's own list.
+    if (nativeRow) wtfOverlayState.questListContainer = nativeRow.parentElement;
+    else if (!wtfOverlayState.questListContainer?.isConnected) {
+      wtfOverlayState.questListContainer = document.querySelector('.panel_right .tools_quests div.items.scroll') || null;
+    }
+    const container = wtfOverlayState.questListContainer?.isConnected ? wtfOverlayState.questListContainer : null;
+    if (!builtIn || !container) {
+      if (existing && !builtIn) existing.remove();
+      return;
+    }
+    const uid = String(wtfOverlayState.builtInQuestUid || '');
+    let row = existing;
+    if (!row || row.parentElement !== container || row.dataset.questUid !== uid) {
+      row?.remove();
+      row = document.createElement('div');
+      row.className = nativeRow?.className || 'no-wrap d-flex';
+      row.dataset.wtfBuiltInQuest = builtIn.quest;
+      row.dataset.questUid = uid;
+      const name = document.createElement('span');
+      row.appendChild(name);
+      container.prepend(row);
+    }
+    const name = getQuestNameElement(row);
+    const label = formatQuestName(builtIn.quest);
+    if (name && name.textContent !== label) name.textContent = label;
+  };
+
   const addNativeQuestCheckboxes = () => {
+    ensureBuiltInQuestRow();
     const rows = document.querySelectorAll('div.items.scroll div.no-wrap.d-flex[data-quest-uid]');
     for (const row of rows) {
       const nameElement = getQuestNameElement(row);
@@ -1952,54 +2487,30 @@
     let items = null;
     let scopeSource = null;
 
-    if (leftPanel.classList.contains('terminal-side-panel')) {
-      let group = leftPanel.querySelector('.wtf-ping-filter-group');
+    const columns = leftPanel.querySelector('.two-columns');
+    if (!columns) return;
+    const titles = [...columns.querySelectorAll(':scope > .mb-5 > div:first-child > .bold')];
+    const title = titles.find(element => /^(?:visibility|가시성)$/i.test(element.textContent.trim()));
+    items = title?.parentElement?.nextElementSibling || null;
+    scopeSource = items?.firstElementChild || title;
+    if (!items?.classList.contains('items')) {
+      let group = columns.querySelector(':scope > .wtf-ping-filter-group');
       if (!group) {
-        group = document.createElement('section');
-        group.className = 'mb-5 terminal-filter-section wtf-ping-filter-group';
-        group.dataset.section = 'visibility';
-        const heading = document.createElement('button');
-        heading.type = 'button';
-        heading.className = 'terminal-section-heading';
-        heading.setAttribute('aria-expanded', 'true');
-        heading.innerHTML = `<span class="bold">${pingCopy('Visibility', '가시성')}</span><span aria-hidden="true">-/+</span>`;
+        group = document.createElement('div');
+        group.className = 'mb-5 wtf-ping-filter-group';
+        const headingRow = document.createElement('div');
+        const heading = document.createElement('span');
+        heading.className = 'bold';
+        heading.textContent = pingCopy('Visibility', '가시성');
+        headingRow.appendChild(heading);
         items = document.createElement('div');
-        items.className = 'items scroll terminal-filter-items';
-        heading.addEventListener('click', () => {
-          const collapsed = group.classList.toggle('collapsed');
-          heading.setAttribute('aria-expanded', String(!collapsed));
-        });
-        group.append(heading, items);
-        leftPanel.querySelector('.terminal-layer-list')?.appendChild(group);
+        items.className = 'items';
+        group.append(headingRow, items);
+        columns.appendChild(group);
       } else {
-        items = group.querySelector('.terminal-filter-items');
+        items = group.querySelector('.items');
       }
-    } else {
-      const columns = leftPanel.querySelector('.two-columns');
-      if (!columns) return;
-      const titles = [...columns.querySelectorAll(':scope > .mb-5 > div:first-child > .bold')];
-      const title = titles.find(element => /^(?:visibility|가시성)$/i.test(element.textContent.trim()));
-      items = title?.parentElement?.nextElementSibling || null;
-      scopeSource = items?.firstElementChild || title;
-      if (!items?.classList.contains('items')) {
-        let group = columns.querySelector(':scope > .wtf-ping-filter-group');
-        if (!group) {
-          group = document.createElement('div');
-          group.className = 'mb-5 wtf-ping-filter-group';
-          const headingRow = document.createElement('div');
-          const heading = document.createElement('span');
-          heading.className = 'bold';
-          heading.textContent = pingCopy('Visibility', '가시성');
-          headingRow.appendChild(heading);
-          items = document.createElement('div');
-          items.className = 'items';
-          group.append(headingRow, items);
-          columns.appendChild(group);
-        } else {
-          items = group.querySelector('.items');
-        }
-        scopeSource = titles[0] || columns.firstElementChild;
-      }
+      scopeSource = titles[0] || columns.firstElementChild;
     }
     if (!items) return;
 
@@ -2015,9 +2526,7 @@
       control?.remove();
       control = applyScope(document.createElement('div'));
       control.id = 'wtf-ping-control';
-      control.className = leftPanel.classList.contains('terminal-side-panel')
-        ? 'terminal-filter-row no-wrap d-flex inactive'
-        : 'd-flex h-space-between mb-5 no-wrap inactive';
+      control.className = 'd-flex h-space-between mb-5 no-wrap inactive';
       control.tabIndex = 0;
       control.setAttribute('role', 'checkbox');
       control.title = pingCopy(
@@ -2111,7 +2620,7 @@
       pingControl.after(control);
     }
     const count = control.querySelector('[data-wtf-route-count]');
-    const countText = `${wtfOverlayState.route.localNodeCount || 0}/${wtfOverlayState.route.maxNodes || 20}`;
+    const countText = `${wtfOverlayState.route.localNodeCount || 0}/${wtfOverlayState.route.maxNodes || 40}`;
     if (count && count.textContent !== countText) count.textContent = countText;
     setRouteVisible(wtfOverlayState.routeVisible, false);
   };
@@ -2148,9 +2657,7 @@
         ));
         if (confirmed) window.chrome?.webview?.postMessage(JSON.stringify({ action: 'map-pings-clear' }));
       });
-      const status = topPanel.querySelector('.terminal-status');
-      if (status) status.before(button);
-      else buttonHost.appendChild(button);
+      buttonHost.appendChild(button);
     }
     if (buttonHost.matches('.map-toolbar') && !button.previousElementSibling?.matches('.wtf-toolbar-break')) {
       const lineBreak = buttonHost.querySelector(':scope > .wtf-toolbar-break') || document.createElement('span');
@@ -2194,9 +2701,7 @@
         }
       });
       const pingButton = document.getElementById('wtf-clear-pings-button');
-      const status = topPanel.querySelector('.terminal-status');
       if (pingButton?.parentElement === buttonHost) pingButton.after(button);
-      else if (status) status.before(button);
       else buttonHost.appendChild(button);
     }
     const buttonText = pingCopy('Delete all route nodes', '경로 전부 삭제');
@@ -2285,7 +2790,67 @@
     return element;
   };
 
+  // Site popups are placed at the marker's unrotated screen point; on Terminal
+  // move them to where the tilted canvas actually draws that marker.
+  const setNativePopupTilt = (popup) => {
+    const radians = mapTiltRadians();
+    let dx = 0;
+    let dy = 0;
+    const container = document.querySelector('.map-cont');
+    const layer = popup.offsetParent || popup.parentElement;
+    if (radians && container && layer && !popup.dataset.wtfBuiltInStep) {
+      const x = Number.parseFloat(popup.style.left);
+      const y = Number.parseFloat(popup.style.top);
+      if (Number.isFinite(x) && Number.isFinite(y)) {
+        const containerRect = container.getBoundingClientRect();
+        const layerRect = layer.getBoundingClientRect();
+        const cx = containerRect.left + containerRect.width / 2 - layerRect.left;
+        const cy = containerRect.top + containerRect.height / 2 - layerRect.top;
+        const cos = Math.cos(radians);
+        const sin = Math.sin(radians);
+        dx = cx + ((x - cx) * cos) - ((y - cy) * sin) - x;
+        dy = cy + ((x - cx) * sin) + ((y - cy) * cos) - y;
+      }
+    }
+    for (const [key, value] of [['--wtf-popup-tilt-x', dx], ['--wtf-popup-tilt-y', dy]]) {
+      const text = `${Math.round(value * 100) / 100}px`;
+      if (popup.style.getPropertyValue(key) !== text) popup.style.setProperty(key, text);
+    }
+  };
+
+  // The site anchors its compass to a map point in unrotated screen space; on
+  // Terminal move it with the tilt and turn the rose by the same angle.
+  const updateCompassTilt = () => {
+    const radians = mapTiltRadians();
+    const root = document.documentElement;
+    const angle = `${Math.round(radians * 180 / Math.PI * 1000) / 1000}deg`;
+    if (root.style.getPropertyValue('--wtf-map-tilt') !== angle) root.style.setProperty('--wtf-map-tilt', angle);
+    const anchor = document.querySelector('.map-compass-anchor');
+    const container = document.querySelector('.map-cont');
+    if (!anchor || !container) return;
+    let dx = 0;
+    let dy = 0;
+    const x = Number.parseFloat(anchor.style.left);
+    const y = Number.parseFloat(anchor.style.top);
+    const layer = anchor.offsetParent || anchor.parentElement;
+    if (radians && layer && Number.isFinite(x) && Number.isFinite(y)) {
+      const containerRect = container.getBoundingClientRect();
+      const layerRect = layer.getBoundingClientRect();
+      const cx = containerRect.left + containerRect.width / 2 - layerRect.left;
+      const cy = containerRect.top + containerRect.height / 2 - layerRect.top;
+      const cos = Math.cos(radians);
+      const sin = Math.sin(radians);
+      dx = cx + ((x - cx) * cos) - ((y - cy) * sin) - x;
+      dy = cy + ((x - cx) * sin) + ((y - cy) * cos) - y;
+    }
+    for (const [key, value] of [['--wtf-compass-tilt-x', dx], ['--wtf-compass-tilt-y', dy]]) {
+      const text = `${Math.round(value * 100) / 100}px`;
+      if (anchor.style.getPropertyValue(key) !== text) anchor.style.setProperty(key, text);
+    }
+  };
+
   const nativePopupLayouts = new Map();
+  const nativePopupFitMs = 700;
   let nativePopupLayoutFrame = 0;
   const fitNativeQuestPopups = () => {
     nativePopupLayoutFrame = 0;
@@ -2301,6 +2866,7 @@
         continue;
       }
       if (!popup.getClientRects().length) continue;
+      setNativePopupTilt(popup);
       const rect = popup.getBoundingClientRect();
       // Popup layer is outside the rotating/scaling map scene. Account for
       // CSS zoom, without touching the native marker anchor or transform.
@@ -2312,6 +2878,20 @@
       };
       set('--wtf-popup-max-width', Math.max(1, window.innerWidth - margin * 2) / sx);
       set('--wtf-popup-max-height', Math.max(1, window.innerHeight - top - margin) / sy);
+      // Fit the popup on screen only while it opens (the site's own open move
+      // takes 0.4 s); after that it stays put on its marker and moves with the
+      // map instead of chasing the screen edges.
+      // A popup element the site reuses for another marker opens again, so it
+      // gets its own fit instead of keeping the last marker's shift.
+      const opened = [...popup.querySelectorAll('.title')].map((node) => node.textContent).join('\n');
+      if (entry.opened !== opened) {
+        entry.opened = opened;
+        entry.openedAt = performance.now();
+      }
+      if (performance.now() - entry.openedAt > nativePopupFitMs) {
+        entry.style = popup.getAttribute('style');
+        continue;
+      }
       const sized = popup.getBoundingClientRect();
       const baseX = sized.left - entry.x * sx;
       const baseY = sized.top - entry.y * sy;
@@ -2477,6 +3057,236 @@
     requestAnimationFrame(renderQuestMarkers);
   };
 
+  // Built-in walkthrough steps (The Ticket on Terminal) have no site marker to
+  // open, so their popup is rebuilt from the site's own MapPopup markup: the same
+  // element tree, classes and scoped-style attributes, placed in the site's
+  // popup layer. The site's CSS then styles it exactly like a native quest popup.
+  const builtInStepPopupState = { popup: null, marker: null, markerData: null, index: 0 };
+
+  // Vue scoped styles key elements by data-v-<hash>; the hashes change with every
+  // site build, so read them from the site's own stylesheet rules.
+  const nativePopupScopeIds = () => {
+    if (wtfOverlayState.nativePopupScopes?.popup) return wtfOverlayState.nativePopupScopes;
+    const found = { popup: '', layer: '' };
+    for (const sheet of document.styleSheets) {
+      let rules;
+      try { rules = sheet.cssRules; } catch { continue; }
+      for (const rule of rules || []) {
+        const text = rule.selectorText || '';
+        if (!found.popup) found.popup = text.match(/\.map-popup\[data-v-([0-9a-f]{6,})\]/)?.[1] || '';
+        if (!found.layer) found.layer = text.match(/\.popup-layer\[data-v-([0-9a-f]{6,})\]/)?.[1] || '';
+        if (found.popup && found.layer) break;
+      }
+      if (found.popup && found.layer) break;
+    }
+    if (found.popup) wtfOverlayState.nativePopupScopes = found;
+    return found;
+  };
+
+  const builtInStepText = (value) => (siteLocale() === 'kr' ? value?.kr : '') || value?.en || '';
+
+  const closeBuiltInStepPopup = () => {
+    builtInStepPopupState.popup?.remove();
+    builtInStepPopupState.popup = null;
+    builtInStepPopupState.marker = null;
+    builtInStepPopupState.markerData = null;
+  };
+
+  const updateBuiltInStepPopupPosition = () => {
+    const { popup, marker } = builtInStepPopupState;
+    if (!popup) return;
+    if (!popup.isConnected || !marker?.isConnected) {
+      closeBuiltInStepPopup();
+      return;
+    }
+    const layerRect = popup.parentElement.getBoundingClientRect();
+    const markerRect = marker.getBoundingClientRect();
+    const x = markerRect.left + markerRect.width / 2 - layerRect.left;
+    const y = markerRect.top + markerRect.height / 2 - layerRect.top;
+    popup.style.left = `${x}px`;
+    popup.style.top = `${y}px`;
+  };
+
+  const renderBuiltInStepPopup = () => {
+    const { popup, markerData } = builtInStepPopupState;
+    if (!popup || !markerData) return;
+    const scope = nativePopupScopeIds();
+    const el = (tag, className, text) => {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (scope.popup) node.setAttribute(`data-v-${scope.popup}`, '');
+      if (text !== undefined) node.textContent = text;
+      return node;
+    };
+    const step = markerData.builtInStep;
+    const images = step.images || [];
+    const count = images.length;
+    builtInStepPopupState.index = Math.min(Math.max(0, builtInStepPopupState.index), Math.max(0, count - 1));
+    const index = builtInStepPopupState.index;
+
+    const inner = el('div', 'inner');
+    const header = el('div', 'd-flex h-space-between v-start');
+    const textColumn = el('div', 'w-100');
+    const titleBlock = el('div');
+    const questRow = el('div', 'd-flex h-space-between');
+    const questLink = el('a', 'title plus d-flex');
+    questLink.classList.toggle('story', Boolean(markerData.storyline));
+    questLink.classList.toggle('side', !markerData.requiredForKappa);
+    if (markerData.questId) questLink.href = `${sitePathPrefix()}/progression/quests?quest=${encodeURIComponent(markerData.questId)}`;
+    questLink.appendChild(el('div', '', formatQuestName(markerData.quest)));
+    questRow.append(questLink, el('div', 'd-flex'));
+    const stepTitle = el('div', 'title');
+    stepTitle.appendChild(el('div', '', builtInStepText(step)));
+    const wikiRow = el('div', 'mt-n5');
+    const wiki = el('a', 'ext-link sub', 'Wiki');
+    wiki.href = markerData.wiki || 'https://escapefromtarkov.fandom.com/wiki/The_Ticket';
+    wiki.target = '_blank';
+    wikiRow.appendChild(wiki);
+    titleBlock.append(questRow, stepTitle, wikiRow);
+    textColumn.appendChild(titleBlock);
+    const controls = el('div', 'ml-15 self-start');
+    const sizeToggle = el('div', 'large pointer text-right', '⤢');
+    sizeToggle.addEventListener('click', () => popup.classList.toggle('xlsize'));
+    controls.appendChild(sizeToggle);
+    header.append(textColumn, controls);
+    inner.append(header, el('div', 'd-flex'), el('div', '', builtInStepText(step.details)));
+    const nodes = [inner];
+
+    if (count) {
+      const image = images[index];
+      const caption = el('div');
+      caption.append(el('div', 'px-10 bold', builtInStepText(image)), el('div', 'px-10'));
+      const frame = el('div', 'fs-0 mt-10');
+      const view = el('div', 'p-relative');
+      const nav = el('div', 'img-nav');
+      const go = (delta) => {
+        builtInStepPopupState.index = (builtInStepPopupState.index + delta + count) % count;
+        renderBuiltInStepPopup();
+      };
+      for (const [arrow, delta] of [['←', -1], ['→', 1]]) {
+        const button = el('div');
+        button.appendChild(el('span', '', arrow));
+        button.addEventListener('click', () => go(delta));
+        nav.appendChild(button);
+      }
+      const photo = el('img');
+      photo.src = `https://appcontent/${image.src}`;
+      photo.alt = builtInStepText(image);
+      photo.addEventListener('click', () => popup.classList.toggle('xlsize'));
+      photo.addEventListener('load', scheduleNativeQuestPopupLayout);
+      view.append(nav, photo);
+      if (count > 1) {
+        const hint = el('div', 'mouse-hint');
+        hint.innerHTML = '<svg class="icon icon_mid_mouse" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 100"><rect fill="currentColor" x="6.377" y="18.032" width="37.246" height="63.935" rx="18.623" ry="18.623" style="stroke: rgb(0, 0, 0); stroke-miterlimit: 10; stroke-width: 3px;"></rect><rect fill="currentColor" x="20.946" y="24.937" width="8.107" height="19.87" rx="2.859" ry="2.859" style="stroke: rgb(0, 0, 0); stroke-miterlimit: 10; stroke-width: 3px;"></rect><path fill="currentColor" d="m25,96.196l-12.897-9.522c-.889-.656-1.077-1.908-.421-2.797.656-.889,1.908-1.078,2.797-.422l10.521,7.769,10.522-7.769c.89-.656,2.141-.467,2.797.422.655.889.467,2.141-.422,2.797l-12.897,9.522Z"></path><path fill="currentColor" d="m36.708,16.936c-.412,0-.828-.127-1.186-.391l-10.522-7.768-10.521,7.768c-.889.657-2.141.468-2.797-.421s-.468-2.141.421-2.797L25,3.805l12.897,9.522c.889.656,1.077,1.908.422,2.797-.393.531-.998.812-1.611.812Z"></path></svg>';
+        if (scope.popup) for (const node of hint.querySelectorAll('*')) node.setAttribute(`data-v-${scope.popup}`, '');
+        view.appendChild(hint);
+        // Like the site: the wheel over the photo steps through the photos.
+        view.addEventListener('wheel', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          go(event.deltaY > 0 ? 1 : -1);
+        }, { passive: false });
+      }
+      frame.appendChild(view);
+      nodes.push(caption, frame);
+      if (count > 1) {
+        const previews = el('div', 'img-preview-cont scroll');
+        images.forEach((entry, previewIndex) => {
+          const preview = el('img', 'img-preview');
+          preview.classList.toggle('selected', previewIndex === index);
+          preview.src = `https://appcontent/${entry.src}`;
+          preview.alt = builtInStepText(entry);
+          preview.addEventListener('click', () => {
+            builtInStepPopupState.index = previewIndex;
+            renderBuiltInStepPopup();
+          });
+          previews.appendChild(preview);
+        });
+        previews.addEventListener('wheel', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          previews.scrollLeft += event.deltaY;
+        }, { passive: false });
+        nodes.push(previews);
+      }
+    }
+    popup.replaceChildren(...nodes);
+    ensureNativeQuestPopupCloseButton();
+    scheduleNativeQuestPopupLayout();
+  };
+
+  const openBuiltInStepPopup = (markerData, marker) => {
+    if (!markerData?.builtInStep || !marker) return;
+    const mapContainer = document.querySelector('.map-cont');
+    if (!mapContainer) return;
+    // Only one popup at a time, like the site: close a native one first.
+    if (document.querySelector('.map-popup:not([data-wtf-built-in-step])')) {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    }
+    if (builtInStepPopupState.markerData === markerData && builtInStepPopupState.popup?.isConnected) return;
+    closeBuiltInStepPopup();
+    const scope = nativePopupScopeIds();
+    let layer = mapContainer.querySelector(':scope > .popup-layer');
+    if (!layer) {
+      layer = document.createElement('div');
+      layer.className = 'popup-layer';
+      if (scope.layer) layer.setAttribute(`data-v-${scope.layer}`, '');
+      layer.dataset.wtfBuiltInStepLayer = 'true';
+      mapContainer.appendChild(layer);
+    }
+    const popup = document.createElement('div');
+    popup.className = 'map-popup';
+    if (scope.popup) popup.setAttribute(`data-v-${scope.popup}`, '');
+    if (scope.layer) popup.setAttribute(`data-v-${scope.layer}`, '');
+    popup.dataset.wtfBuiltInStep = String(markerData.step);
+    const offset = Math.round(marker.getBoundingClientRect().height / 2) + 3;
+    popup.style.transformOrigin = `calc(50% + 10px) calc(100% + ${12 + offset}px)`;
+    popup.style.transform = `translateX(calc(-50% - 10px)) translateY(calc(-100% - ${12 + offset}px))`;
+    // The site's popup keeps map gestures from reaching the map underneath.
+    for (const type of ['click', 'dblclick', 'mousedown', 'pointerdown', 'keydown', 'touchstart', 'touchmove', 'touchend']) {
+      popup.addEventListener(type, (event) => event.stopPropagation());
+    }
+    layer.appendChild(popup);
+    builtInStepPopupState.popup = popup;
+    builtInStepPopupState.marker = marker;
+    builtInStepPopupState.markerData = markerData;
+    builtInStepPopupState.index = 0;
+    renderBuiltInStepPopup();
+    updateBuiltInStepPopupPosition();
+  };
+
+  // Closing follows the site's popup: Escape (also sent by the close button),
+  // a click on the map, or another popup opening. Capture phase: the popup stops
+  // keydown from bubbling, so Escape pressed inside it would never reach here.
+  window.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closeBuiltInStepPopup();
+  }, true);
+  // Like the site's popup it stays open while the map is dragged or zoomed and
+  // follows its ring; only a click (press and release without moving) on the map
+  // itself closes it, not one on the panels and toolbar laid over the map.
+  let builtInPopupPress = null;
+  const isMapClickTarget = (target) => target instanceof Element
+    && Boolean(target.closest('.map-cont'))
+    && !target.closest('.map-popup[data-wtf-built-in-step], .wtf-quest-marker, '
+      + '.panel_top, .panel_left, .panel_right, #wtf-quest-requirements-panel');
+  document.addEventListener('pointerdown', (event) => {
+    builtInPopupPress = builtInStepPopupState.popup && event.button === 0 && isMapClickTarget(event.target)
+      ? { x: event.clientX, y: event.clientY, moved: false }
+      : null;
+  }, true);
+  document.addEventListener('pointermove', (event) => {
+    if (builtInPopupPress && Math.hypot(event.clientX - builtInPopupPress.x, event.clientY - builtInPopupPress.y) > 4) {
+      builtInPopupPress.moved = true;
+    }
+  }, true);
+  document.addEventListener('pointerup', (event) => {
+    const press = builtInPopupPress;
+    builtInPopupPress = null;
+    if (!press || press.moved || event.button !== 0 || !builtInStepPopupState.popup) return;
+    if (Math.hypot(event.clientX - press.x, event.clientY - press.y) > 4) return;
+    if (isMapClickTarget(event.target)) closeBuiltInStepPopup();
+  }, true);
+
   const updateQuestMarkerFloorOpacity = () => {
     const selectedFloor = selectedPingFloor();
     for (const marker of document.querySelectorAll('.wtf-quest-marker, .wtf-quest-zone')) {
@@ -2546,13 +3356,15 @@
       marker.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();
-        openNativeQuestMarkerDetails(markerData);
+        if (markerData.builtInStep) openBuiltInStepPopup(markerData, marker);
+        else openNativeQuestMarkerDetails(markerData);
       });
       marker.addEventListener('keydown', (event) => {
         if (event.key !== 'Enter' && event.key !== ' ') return;
         event.preventDefault();
         event.stopPropagation();
-        openNativeQuestMarkerDetails(markerData);
+        if (markerData.builtInStep) openBuiltInStepPopup(markerData, marker);
+        else openNativeQuestMarkerDetails(markerData);
       });
 
       const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -2560,20 +3372,45 @@
       svg.setAttribute('viewBox', '0 0 507.885 507.885');
       svg.setAttribute('aria-hidden', 'true');
       const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      path.setAttribute('d', tarkovMarketQuestIconPath);
+      // Built-in walkthrough steps keep the site's quest ring and put the step
+      // number where the site draws its exclamation mark.
+      path.setAttribute('d', markerData.step ? tarkovMarketQuestRingPath : tarkovMarketQuestIconPath);
       path.setAttribute('fill', liveQuestMarkerColor(markerData));
       path.setAttribute('stroke', '#000');
       path.setAttribute('stroke-width', '20');
       svg.appendChild(path);
+      if (markerData.step) {
+        marker.dataset.step = String(markerData.step);
+        const number = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        number.classList.add('wtf-quest-step-number');
+        number.setAttribute('x', '253.943');
+        number.setAttribute('y', '253.943');
+        number.setAttribute('text-anchor', 'middle');
+        number.setAttribute('dominant-baseline', 'central');
+        number.setAttribute('font-size', markerData.step >= 10 ? '230' : '290');
+        number.setAttribute('fill', liveQuestMarkerColor(markerData));
+        number.setAttribute('stroke', '#000');
+        number.setAttribute('stroke-width', '20');
+        number.setAttribute('paint-order', 'stroke');
+        number.textContent = String(markerData.step);
+        svg.appendChild(number);
+        // Pins, live data and identity updates rebuild the layer: an open step
+        // popup moves to the rebuilt ring of its step instead of closing.
+        if (builtInStepPopupState.popup && builtInStepPopupState.markerData?.builtInStep === markerData.builtInStep) {
+          builtInStepPopupState.marker = marker;
+          builtInStepPopupState.markerData = markerData;
+        }
+      }
       marker.appendChild(svg);
       overlay.appendChild(marker);
     }
+    wtfOverlayState.builtInRingsShown = Boolean(overlay.querySelector('.wtf-quest-marker[data-step]'));
     updateQuestMarkerFloorOpacity();
     scheduleOverlayPositionUpdate();
   };
 
   // 2026-10 UI: the map is drawn on canvases. .map-wrap/.map-scene only exist
-  // in the site's builder mode (and in our local Terminal page), so normal maps
+  // in the site's builder mode, so normal maps
   // expose the view only through the matrix the site passes to setTransform on
   // the doc canvas before every redraw (map pixels -> canvas pixels).
   const nativeDocMapCanvas = (mapContainer) => [...mapContainer.querySelectorAll('canvas.doc-map-canvas')]
@@ -2603,9 +3440,15 @@
     const originalSetTransform = context.setTransform;
     context.setTransform = function (...args) {
       const result = originalSetTransform.apply(this, args);
-      record(args.length >= 6
-        ? { a: args[0], b: args[1], c: args[2], d: args[3], e: args[4], f: args[5] }
-        : args[0]);
+      // Record what the canvas really uses; on Terminal that includes the extra tilt.
+      // An identity request is the site clearing the canvas, not a view.
+      const requested = this.__wtfRequestedTransform;
+      if (requested && sameMatrix(requested, { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 })) return result;
+      record(typeof this.getTransform === 'function'
+        ? this.getTransform()
+        : (args.length >= 6
+          ? { a: args[0], b: args[1], c: args[2], d: args[3], e: args[4], f: args[5] }
+          : args[0]));
       return result;
     };
     canvas.__wtfNativeView = view;
@@ -2738,6 +3581,72 @@
     return true;
   };
 
+  // Built-in step rings (The Ticket) mark spots where the site often has its own
+  // icon (a lock, a key, a lever). A ring on top of the icon hides it and takes
+  // its clicks, so each ring stands just beside any site icon (and beside the
+  // rings already placed), at the smallest screen offset that clears them. The
+  // offset is in screen pixels, so it holds at every zoom and rotation.
+  const builtInRingGap = 2;
+  const layoutBuiltInStepRings = (screenPoint) => {
+    const layer = wtfOverlayState.questLayer;
+    if (!layer) return;
+    const rings = [...layer.querySelectorAll('.wtf-quest-marker[data-step]')]
+      .sort((a, b) => Number(a.dataset.step) - Number(b.dataset.step));
+    if (!rings.length) return;
+    // Measure every ring before updateOverlayPositions writes positions: one
+    // layout per frame instead of one forced layout per ring.
+    for (const ring of rings) {
+      const size = Math.round(ring.getBoundingClientRect().width * 100) / 100;
+      if (size > 0 && ring.dataset.ringSize !== String(size)) ring.dataset.ringSize = String(size);
+    }
+    const icons = nativeIconFrame.icons;
+    const placed = [];
+    for (const ring of rings) {
+      const base = screenPoint(ring.dataset.left, ring.dataset.top);
+      const radius = Math.max(8, (Number(ring.dataset.ringSize) || 30) / 2);
+      const reach = radius * 6 + 64;
+      const obstacles = icons.concat(placed)
+        .filter((item) => Math.abs(item.x - base.x) < reach && Math.abs(item.y - base.y) < reach);
+      const clearAt = (x, y) => obstacles.every((item) => Math.hypot(item.x - x, item.y - y) >= item.r + radius + builtInRingGap);
+      let spot = { x: base.x, y: base.y };
+      if (!clearAt(base.x, base.y)) {
+        // Prefer moving straight away from the nearest thing underneath; a ring
+        // sitting exactly on an icon moves up and to the right.
+        const nearest = obstacles
+          .map((item) => ({ item, distance: Math.hypot(item.x - base.x, item.y - base.y) }))
+          .sort((a, b) => a.distance - b.distance)[0];
+        const preferred = nearest && nearest.distance > 0.5
+          ? Math.atan2(base.y - nearest.item.y, base.x - nearest.item.x)
+          : -Math.PI / 4;
+        // Stay close to the spot: at most about two ring sizes away. Where the
+        // site's icons are packed tighter than that (far zoomed out), take the
+        // nearby spot that overlaps least.
+        const overlapAt = (x, y) => obstacles.reduce((sum, item) => sum
+          + Math.max(0, item.r + radius + builtInRingGap - Math.hypot(item.x - x, item.y - y)), 0);
+        const limit = Math.max(20, radius * 3);
+        let least = { x: base.x, y: base.y, overlap: overlapAt(base.x, base.y) };
+        search:
+        for (let distance = 2; distance <= limit; distance += 2) {
+          for (let step = 0; step < 24; step += 1) {
+            const turn = Math.ceil(step / 2) * (step % 2 ? 1 : -1) * (Math.PI / 12);
+            const x = base.x + Math.cos(preferred + turn) * distance;
+            const y = base.y + Math.sin(preferred + turn) * distance;
+            const overlap = overlapAt(x, y);
+            if (overlap <= 0) {
+              least = { x, y, overlap };
+              break search;
+            }
+            if (overlap < least.overlap - 0.5) least = { x, y, overlap };
+          }
+        }
+        spot = { x: least.x, y: least.y };
+      }
+      ring.dataset.spreadX = String(Math.round((spot.x - base.x) * 100) / 100);
+      ring.dataset.spreadY = String(Math.round((spot.y - base.y) * 100) / 100);
+      placed.push({ x: spot.x, y: spot.y, r: radius });
+    }
+  };
+
   const updateOverlayPositions = () => {
     wtfOverlayState.updateFrame = 0;
     const mapContainer = wtfOverlayState.mapContainer;
@@ -2751,6 +3660,7 @@
       ? 1
       : Math.max(0.5, Math.sqrt(currentZoom / baseZoom));
     const screenPoint = geometry.toContainer;
+    layoutBuiltInStepRings(screenPoint);
 
     const zoneCanvas = wtfOverlayState.questLayer?.querySelector('.wtf-quest-zone-canvas');
     if (zoneCanvas) {
@@ -2777,10 +3687,12 @@
       marker.style.left = (screen.x + spreadX) + 'px';
       marker.style.top = (screen.y + spreadY) + 'px';
       if (marker.classList.contains('wtf-quest-marker')) {
-        marker.style.setProperty(
-          '--wtf-quest-marker-scale',
-          String(state.iconScale * nativeQuestMarkerScale)
-        );
+        const scale = String(state.iconScale * nativeQuestMarkerScale);
+        if (marker.style.getPropertyValue('--wtf-quest-marker-scale') !== scale) {
+          marker.style.setProperty('--wtf-quest-marker-scale', scale);
+          // A step ring changed size: lay the rings out again with the new size.
+          if (marker.dataset.step) scheduleOverlayPositionUpdate();
+        }
       } else if (marker.classList.contains('wtf-squad-marker')) {
         // Headings are map-space angles; follow the native view rotation.
         const direction = `${(Number(marker.dataset.direction) || 0) + geometry.rotation}deg`;
@@ -2790,11 +3702,18 @@
       }
     }
     updateRouteLines();
+    updateBuiltInStepPopupPosition();
+    updateCompassTilt();
   };
 
   const scheduleOverlayPositionUpdate = () => {
     if (wtfOverlayState.updateFrame) return;
     wtfOverlayState.updateFrame = requestAnimationFrame(updateOverlayPositions);
+  };
+  // Re-place the step rings after the site redraws its icons (called for every
+  // icon the site draws, so it only reads a flag kept by renderQuestMarkers).
+  nativeIconFrame.onDrawn = () => {
+    if (wtfOverlayState.builtInRingsShown) scheduleOverlayPositionUpdate();
   };
 
   const mapPercentFromClientPoint = (host, clientX, clientY) => {
@@ -2937,7 +3856,8 @@
     const handler = (event) => {
       if (!event.altKey || event.button !== 0
           || event.target.closest(`${overlayPlacementBlockedSelector}, .wtf-quest-marker`)) return;
-      const nearbyPing = nearestOverlayMarker('.wtf-ping-marker[data-owned="true"]', event.clientX, event.clientY);
+      const screen = screenPointOf(event);
+      const nearbyPing = nearestOverlayMarker('.wtf-ping-marker[data-owned="true"]', screen.clientX, screen.clientY);
       if (nearbyPing?.dataset.id) {
         event.preventDefault();
         event.stopImmediatePropagation();
@@ -2947,7 +3867,7 @@
         }));
         return;
       }
-      const point = mapPercentFromClientPoint(wtfOverlayState, event.clientX, event.clientY);
+      const point = mapPercentFromClientPoint(wtfOverlayState, screenPointOf(event).clientX, screenPointOf(event).clientY);
       if (!point) return;
       event.preventDefault();
       event.stopImmediatePropagation();
@@ -3084,14 +4004,17 @@
       if (event.button !== 1 || isInteractiveUi(event.target)) return;
       event.preventDefault();
       event.stopImmediatePropagation();
-      const nearbyNode = nearestOverlayMarker('.wtf-route-node[data-owned="true"]', event.clientX, event.clientY);
+      // Only a click on the node itself (7 px dot + 4 px) removes it, so nodes can
+      // be placed on icons that sit close to an earlier node.
+      const screen = screenPointOf(event);
+      const nearbyNode = nearestOverlayMarker('.wtf-route-node[data-owned="true"]', screen.clientX, screen.clientY, 4);
       if (nearbyNode?.dataset.id) {
         window.chrome?.webview?.postMessage(JSON.stringify({
           action: 'map-route-node-delete', id: nearbyNode.dataset.id
         }));
         return;
       }
-      const maxNodes = Number(wtfOverlayState.route.maxNodes) || 20;
+      const maxNodes = Number(wtfOverlayState.route.maxNodes) || 40;
       if ((Number(wtfOverlayState.route.localNodeCount) || 0) >= maxNodes) {
         window.alert(pingCopy(
           `A route can contain up to ${maxNodes} nodes.`,
@@ -3099,7 +4022,7 @@
         ));
         return;
       }
-      const point = mapPercentFromClientPoint(wtfOverlayState, event.clientX, event.clientY);
+      const point = mapPercentFromClientPoint(wtfOverlayState, screenPointOf(event).clientX, screenPointOf(event).clientY);
       if (!point) return;
       window.chrome?.webview?.postMessage(JSON.stringify({
         action: 'map-route-node-add',
@@ -3190,7 +4113,7 @@
     wtfOverlayState.mapCanvas = canvas;
     const observedTransforms = [];
     if (mapWrap) {
-      // Our Terminal page pans a stage wrapper (left/top) around the map wrap.
+      // A stage wrapper may pan (left/top) around the map wrap; watch every ancestor.
       for (let element = mapWrap; element && element !== mapContainer; element = element.parentElement) {
         observedTransforms.push(element);
       }
@@ -3446,8 +4369,8 @@
     configure(snapshot = {}) {
       wtfOverlayState.route = {
         map: String(snapshot.map || ''),
-        nodes: Array.isArray(snapshot.nodes) ? snapshot.nodes.slice(0, 100) : [],
-        maxNodes: Math.min(20, Math.max(1, Number(snapshot.maxNodes) || 20)),
+        nodes: Array.isArray(snapshot.nodes) ? snapshot.nodes.slice(0, 200) : [],
+        maxNodes: Math.min(40, Math.max(1, Number(snapshot.maxNodes) || 40)),
         localNodeCount: Math.max(0, Number(snapshot.localNodeCount) || 0)
       };
       wtfOverlayState.routeVisible = snapshot.visible !== false;

@@ -25,8 +25,7 @@ const inputScript = inputTemplate.replace('__MENU_OPENED__', 'false');
     <div class="hint-root"><button id="fullscreen" aria-label="Full screen"></button></div></div>
     <div class="position-controls"></div></div>
     <div class="panel_left"></div><div class="panel_right"><div class="wtf-squad-panel">WTFMI squad</div></div>
-    <div id="map"><div class="map-scene"><div class="marker" id="player"></div></div>
-    <div class="marker" data-terminal-managed="true" id="terminal"></div></div>
+    <div id="map"><div class="map-scene"><div class="marker" id="player"></div></div></div>
     <div class="footer-wrap maps-site-chrome"></div></body>`, {runScripts:'dangerously', pretendToBeVisual:true,url:'https://tarkov-market.com/maps/woods'});
   const w = dom.window, d = w.document;
   const tick = () => new Promise(resolve => setTimeout(resolve, 25));
@@ -66,7 +65,6 @@ const inputScript = inputTemplate.replace('__MENU_OPENED__', 'false');
   const triangle = d.querySelector('#player .triangle-indicator');
   assert.ok(triangle.style.transform.includes('rotate(270deg)'), triangle.style.transform);
   assert.equal(triangle.style.getPropertyPriority('transform'),'important','heading must override the base CSS transform');
-  assert.equal(d.querySelector('#terminal .triangle-indicator'),null);
   assert.equal(d.querySelector('.map-scene > .triangle-indicator'),null,'map layers are not player markers');
   w.eval(heading);
   await tick();
@@ -96,10 +94,8 @@ const inputScript = inputTemplate.replace('__MENU_OPENED__', 'false');
   if (w.__eftWhereAmIUnwantedFrame) w.cancelAnimationFrame(w.__eftWhereAmIUnwantedFrame);
   dom.window.close();
 
-  const terminal = new JSDOM('<button id="terminalPanelToggle"></button><button id="terminalFullScreen"></button><input id="terminalLocationInput">');
-  for(const [name,id] of [['HIDE_SHOW_PANEL_BUTTON_SELECTOR','terminalPanelToggle'],['FULL_SCREEN_BUTTON_SELECTOR','terminalFullScreen'],['WHERE_AM_I_INPUT_SELECTOR','terminalLocationInput']]) {
-    assert.equal(terminal.window.document.querySelector(selector(name)).id,id);
+  for (const name of ['HIDE_SHOW_PANEL_BUTTON_SELECTOR','FULL_SCREEN_BUTTON_SELECTOR','WHERE_AM_I_INPUT_SELECTOR']) {
+    assert.doesNotMatch(selector(name), /#terminal/, `${name} must not keep the retired local Terminal page fallback`);
   }
-  terminal.window.close();
-  console.log('PASS: new/legacy/Terminal controls, heading input replacement, observer reinjection and idle stability.');
+  console.log('PASS: new/legacy controls, heading input replacement, observer reinjection and idle stability.');
 })().catch(error => { console.error(error); process.exit(1); });

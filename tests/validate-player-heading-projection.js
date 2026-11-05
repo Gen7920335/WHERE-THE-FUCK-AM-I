@@ -13,8 +13,7 @@ const tick=()=>new Promise(r=>setTimeout(r,15));
  for(const map of maps){
   const dom=new JSDOM(`<div class="panel_top"><input id="map-position-file"></div><div class="map-cont">
    <div class="map-wrap" style="transform:matrix(1.7,0,0,1.7,200,-90)"><div class="map-scene"></div></div>
-   <div class="squad-layer"><div class="marker"></div></div>
-   <div class="marker" data-terminal-managed="true"></div></div>`,{runScripts:'dangerously',pretendToBeVisual:true,url:`https://tarkov-market.com/maps/${map.slug}`});
+   <div class="squad-layer"><div class="marker"></div></div></div>`,{runScripts:'dangerously',pretendToBeVisual:true,url:`https://tarkov-market.com/maps/${map.slug}`});
   const w=dom.window,d=w.document,input=d.querySelector('input'),marker=d.querySelector('.marker'),scene=d.querySelector('.map-scene');
   try {
    w.eval(script);
@@ -50,12 +49,11 @@ const tick=()=>new Promise(r=>setTimeout(r,15));
    assert.ok(error(first,after+37)<1e-7);
    input.value='invalid';input.dispatchEvent(new w.Event('change'));assert.equal(triangle.hidden,true);
    input.value='stamp_0, 0, 0_0, 0, 0, 0_0';input.dispatchEvent(new w.Event('change'));assert.equal(triangle.hidden,true);
-   assert.equal(d.querySelector('[data-terminal-managed] .triangle-indicator'),null);
    await tick();let callbacks=0;
    const idle=new w.MutationObserver(()=>callbacks++);idle.observe(marker,{attributes:true,subtree:true});
    await tick();await tick();idle.disconnect();assert.equal(callbacks,0);
   } finally {w.__eftWhereAmIMarkerObserver.disconnect();w.clearTimeout(w.__eftWhereAmIHeadingInitTimer);w.close();}
  }
- assert.equal(maps.length,12);
- console.log(`PASS: ${cases} headings across 12 maps, 8 directions, 4 view rotations, native parent heading; style refresh, invalid input, idle stability and Terminal isolation.`);
+ assert.equal(maps.length,13);
+ console.log(`PASS: ${cases} headings across 13 maps, 8 directions, 4 view rotations, native parent heading; style refresh, invalid input, and idle stability.`);
 })().catch(e=>{console.error(e);process.exitCode=1;});

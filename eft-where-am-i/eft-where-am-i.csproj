@@ -9,7 +9,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
 
     <!-- 버전을 여기서만 관리 -->
-    <Version>1.1.18</Version>
+    <Version>1.1.19</Version>
     <AssemblyName>WHERE THE FUCK AM I</AssemblyName>
     <AssemblyTitle>WHERE THE FUCK AM I</AssemblyTitle>
     <Product>WHERE THE FUCK AM I</Product>
@@ -85,27 +85,8 @@
     <None Update="html\styles.css">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="html\terminal-map.html">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="html\terminal-map.css">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="html\terminal-map.js">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="html\terminal-map-data.js">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="html\maps\terminal-source.svg">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <Content Include="html\maps\terminal-guides\**\*.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
-    </Content>
-    <Content Include="html\maps\terminal-guides\**\*.jpg">
+    <!-- The Ticket step photos (EFT Wiki, CC BY-SA 3.0; see CREDITS.txt), served as https://appcontent/maps/terminal-photos/ -->
+    <Content Include="html\maps\terminal-photos\**\*.webp;html\maps\terminal-photos\CREDITS.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
       <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
