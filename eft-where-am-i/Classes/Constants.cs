@@ -6,18 +6,18 @@ namespace eft_where_am_i.Classes
             ".panel_top button[aria-label=\"Hide panels\"], " +
             ".panel_top button[aria-label=\"Show panels\"], " +
             ".panel_top .toolbar-group.view-tools > .hint-root:first-child > button, " +
-            ".panel_top > div > div.mr-15 > button, #terminalPanelToggle";
+            ".panel_top > div > div.mr-15 > button";
 
         public const string FULL_SCREEN_BUTTON_SELECTOR =
             ".panel_top button[aria-label=\"Full screen\"], " +
             ".panel_top button[aria-label=\"Exit full screen\"], " +
             ".panel_top .toolbar-group.view-tools > .hint-root:nth-child(2) > button, " +
-            ".panel_top.desktop-panel > div > div:nth-child(3) > button, #terminalFullScreen";
+            ".panel_top.desktop-panel > div > div:nth-child(3) > button";
 
         public const string WHERE_AM_I_INPUT_SELECTOR =
             "#map-position-file, " +
             ".panel_top .position-controls > input[type=\"text\"], " +
-            ".panel_top .d-flex.ml-15 > input[type=\"text\"], #terminalLocationInput";
+            ".panel_top .d-flex.ml-15 > input[type=\"text\"]";
 
         /*
          * The following code (ADD_DIRECTION_INDICATORS_SCRIPT) is from 'Tarkov-Client' by 'byeong1'
@@ -95,7 +95,7 @@ namespace eft_where_am_i.Classes
     const mapRotations = {
         factory: 0, customs: 90, interchange: 90, woods: 90,
         shoreline: 90, reserve: 105, lighthouse: 90, streets: 90,
-        lab: 180, 'ground-zero': 90, labyrinth: 180, icebreaker: 90
+        lab: 180, 'ground-zero': 90, labyrinth: 180, terminal: 90, icebreaker: 90
     };
 
     function transformVector(element, vector, inverse = false) {
@@ -150,7 +150,9 @@ namespace eft_where_am_i.Classes
             // No transformed scene element: fall back to the toolbar's view rotation.
             const rotationButton = document.querySelector('.panel_top .toolbar-rotation');
             const rotationText = rotationButton?.getAttribute('aria-label') || rotationButton?.textContent || '';
-            const view = Number(rotationText.match(/(-?\d+(?:\.\d+)?)\s*°/)?.[1] || 0) * Math.PI / 180;
+            // Terminal adds the wall-map tilt (enhancements.js) on top of the site's step.
+            const tilt = Number(window.__wtfMapTiltDegrees?.() || 0);
+            const view = (Number(rotationText.match(/(-?\d+(?:\.\d+)?)\s*°/)?.[1] || 0) + tilt) * Math.PI / 180;
             forward = {
                 x: forward.x * Math.cos(view) - forward.y * Math.sin(view),
                 y: forward.x * Math.sin(view) + forward.y * Math.cos(view)
@@ -166,7 +168,6 @@ namespace eft_where_am_i.Classes
     }
 
     function updateTriangle(marker) {
-        if (marker.dataset?.terminalManaged === 'true') return;
         let triangle = marker.querySelector('.triangle-indicator');
         if (!triangle) {
             triangle = document.createElement('div');
@@ -840,7 +841,7 @@ namespace eft_where_am_i.Classes
         unwantedObserver.observe(document.body, { childList: true, subtree: true });
     }
 
-    // 플레이어 화면 좌표: 보이는 .marker(구 UI, Terminal) 또는 2026-10 UI의 canvas 점.
+    // 플레이어 화면 좌표: 보이는 .marker(구 UI) 또는 2026-10 UI의 canvas 점.
     // 숨겨진 마커(크기 0)는 (0,0)으로 계산되어 지도를 엉뚱하게 끌기 때문에 제외합니다.
     window.__wtfPlayerScreenPoint = function() {
         var markers = Array.prototype.filter.call(document.querySelectorAll('.marker'), function(marker) {

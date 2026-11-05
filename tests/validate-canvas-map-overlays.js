@@ -217,6 +217,82 @@ const assertMarkerAt = (element, matrix, percent, label) => {
   const line = document.querySelector('.wtf-route-line');
   near(Number(line.getAttribute('x2')), Number.parseFloat(routeNodes[1].style.left), 'route line end');
 
+  // Route nodes land exactly on icons: a wheel click on a native canvas marker or
+  // on our quest marker adds a node at the clicked point, and the site never sees
+  // a click from it.
+  const iconTargets = [
+    { name: 'native canvas icon', target: docCanvas, point: { left: 70, top: 20 } },
+    { name: 'quest marker', target: questMarkers[1], point: projectPercent(120, -80) }
+  ];
+  for (const { name, target, point } of iconTargets) {
+    const screen = expectedScreen(matrix, point.left, point.top);
+    const clicksBefore = siteClicks;
+    before = messages.length;
+    target.dispatchEvent(new window.MouseEvent('pointerdown', {
+      bubbles: true, cancelable: true, button: 1, clientX: screen.x, clientY: screen.y
+    }));
+    target.dispatchEvent(new window.MouseEvent('auxclick', {
+      bubbles: true, cancelable: true, button: 1, clientX: screen.x, clientY: screen.y
+    }));
+    const added = messages.slice(before).find((message) => message.action === 'map-route-node-add');
+    assert.ok(added, `wheel click on a ${name} must add a route node`);
+    near(added.left, point.left, `route node on ${name} left`);
+    near(added.top, point.top, `route node on ${name} top`);
+    assert.equal(siteClicks, clicksBefore, `wheel click on a ${name} must not reach the site`);
+  }
+
+  // Icons sit close together: a wheel click 12 px from an existing node must add a
+  // new node, while a click on the node itself still removes it.
+  window.__wtfRouteOverlay.configure({
+    map: 'interchange', visible: true, maxNodes: 40, localNodeCount: 1,
+    nodes: [{ id: 'near', map: 'interchange', left: 20, top: 80, floor: 1, createdAt: 1 }]
+  });
+  await nextFrame();
+  await nextFrame();
+  const nearNode = document.querySelector('.wtf-route-node[data-id="near"]');
+  // jsdom has no layout: give the 7 px node its rendered box at its screen position.
+  const nearCenter = expectedScreen(matrix, 20, 80);
+  nearNode.getBoundingClientRect = () => ({
+    left: nearCenter.x - 3.5, top: nearCenter.y - 3.5, right: nearCenter.x + 3.5, bottom: nearCenter.y + 3.5, width: 7, height: 7
+  });
+  before = messages.length;
+  docCanvas.dispatchEvent(new window.MouseEvent('pointerdown', {
+    bubbles: true, cancelable: true, button: 1, clientX: nearCenter.x + 12, clientY: nearCenter.y
+  }));
+  assert.ok(messages.slice(before).some((message) => message.action === 'map-route-node-add'),
+    'a wheel click 12 px from a node must add a new node');
+  assert.ok(!messages.slice(before).some((message) => message.action === 'map-route-node-delete'),
+    'a wheel click 12 px from a node must not delete it');
+  before = messages.length;
+  docCanvas.dispatchEvent(new window.MouseEvent('pointerdown', {
+    bubbles: true, cancelable: true, button: 1, clientX: nearCenter.x + 2, clientY: nearCenter.y
+  }));
+  assert.ok(messages.slice(before).some((message) => message.action === 'map-route-node-delete' && message.id === 'near'),
+    'a wheel click on the node must still delete it');
+
+  // Forty nodes per local participant: the fortieth is allowed, the forty-first is not.
+  const alerts = [];
+  window.alert = (text) => alerts.push(text);
+  const freePoint = expectedScreen(matrix, 20, 80);
+  for (const [count, allowed] of [[39, true], [40, false]]) {
+    window.__wtfRouteOverlay.configure({
+      map: 'interchange', visible: true, maxNodes: 40, localNodeCount: count,
+      nodes: [{ id: 'n1', map: 'interchange', left: 55, top: 35, floor: 1, createdAt: 1 }]
+    });
+    before = messages.length;
+    docCanvas.dispatchEvent(new window.MouseEvent('pointerdown', {
+      bubbles: true, cancelable: true, button: 1, clientX: freePoint.x, clientY: freePoint.y
+    }));
+    const added = messages.slice(before).some((message) => message.action === 'map-route-node-add');
+    assert.equal(added, allowed, `node ${count + 1} must ${allowed ? '' : 'not '}be added`);
+  }
+  assert.equal(alerts.length, 1, 'the forty-first node must show the limit message');
+  assert.match(alerts[0], /40/, 'the limit message must name forty nodes');
+  window.__wtfRouteOverlay.configure({ map: 'interchange', visible: true, maxNodes: 999, localNodeCount: 0, nodes: [] });
+  await nextFrame();
+  const routeCount = document.querySelector('[data-wtf-route-count]');
+  if (routeCount) assert.equal(routeCount.textContent, '0/40', 'the route counter must cap at forty');
+
   // Squad: teammate position and heading follow the native view (rotated 90 degrees).
   window.__wtfSquadOverlay.configure({
     map: 'interchange',

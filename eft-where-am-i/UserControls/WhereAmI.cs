@@ -75,13 +75,9 @@ namespace eft_where_am_i
         private bool squadPingsPublished;
         private bool squadRoutesPublished;
 
-        private static bool IsLocalTerminalMap(string? mapName) =>
-            string.Equals(mapName, "terminal", StringComparison.OrdinalIgnoreCase);
-
         // 한국어 모드는 Tarkov-Market 공식 번역(/kr/) 페이지를 그대로 쓴다.
-        private static string GetMapUrl(string? mapName, string? language) => IsLocalTerminalMap(mapName)
-            ? "https://appcontent/terminal-map.html"
-            : language?.StartsWith("ko", StringComparison.OrdinalIgnoreCase) == true
+        private static string GetMapUrl(string? mapName, string? language) =>
+            language?.StartsWith("ko", StringComparison.OrdinalIgnoreCase) == true
                 ? $"https://tarkov-market.com/kr/maps/{mapName}"
                 : $"https://tarkov-market.com/maps/{mapName}";
 
@@ -126,10 +122,7 @@ namespace eft_where_am_i
                 floorManager = new FloorManager();
 
                 // 4. 앱 시작 시 패널을 강제로 열어둠
-                if (!IsLocalTerminalMap(appSettings.latest_map))
-                {
-                    await RestorePanelVisibilityAsync(appSettings.latest_map, forceOpen: true);
-                }
+                await RestorePanelVisibilityAsync(appSettings.latest_map, forceOpen: true);
 
                 // 5. LogWatcher 초기화
                 InitializeLogWatcher();
@@ -286,6 +279,8 @@ namespace eft_where_am_i
                 // 사용자 데이터 폴더를 지정하여 새로운 WebView2 환경 생성
                 env = await CoreWebView2Environment.CreateAsync(null, userDataFolder);
                 await webView2.EnsureCoreWebView2Async(env);
+                // Local images shown inside Tarkov-Market pages (The Ticket step photos):
+                // https://appcontent/maps/terminal-photos/... maps to the app's html folder.
                 string htmlFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "html");
                 webView2.CoreWebView2.SetVirtualHostNameToFolderMapping(
                     "appcontent",
@@ -675,15 +670,6 @@ namespace eft_where_am_i
             await jsExecutor.ExecuteScriptAsync(Constants.DEAD_ZONE_AUTO_PAN_SCRIPT);
             await ApplyEnhancementSettingsAsync();
 
-            if (IsLocalTerminalMap(appSettings.latest_map))
-            {
-                await InjectSquadOverlayAsync();
-                await InjectPingOverlayAsync();
-                await InjectRouteOverlayAsync();
-                await jsExecutor.ExecuteScriptAsync(Constants.ADD_DIRECTION_INDICATORS_SCRIPT);
-                return;
-            }
-
             // 패널 상태 복원: 저장된 값이 있으면 그 상태로, 없으면 첫 실행이므로 열려 있는 상태로 맞춤
             await RestorePanelVisibilityAsync(appSettings.latest_map);
 
@@ -831,7 +817,7 @@ namespace eft_where_am_i
             {
                 map = appSettings.latest_map,
                 visible,
-                maxNodes = 20,
+                maxNodes = 40,
                 localNodeCount = appSettings.map_route_nodes.Count(node =>
                     string.Equals(node.map, appSettings.latest_map, StringComparison.OrdinalIgnoreCase)
                     && string.IsNullOrWhiteSpace(node.creatorId)),
@@ -1258,18 +1244,6 @@ namespace eft_where_am_i
 
         private async void WmiInitialize()
         {
-            if (IsLocalTerminalMap(appSettings.latest_map))
-            {
-                await Task.Delay(750);
-                await ApplyEnhancementSettingsAsync();
-                await InjectSquadOverlayAsync();
-                await InjectPingOverlayAsync();
-                await InjectRouteOverlayAsync();
-                await jsExecutor.ExecuteScriptAsync(Constants.ADD_DIRECTION_INDICATORS_SCRIPT);
-                await jsExecutor.ExecuteScriptAsync(Constants.DEAD_ZONE_AUTO_PAN_SCRIPT);
-                return;
-            }
-
             await Task.Delay(4000);
             await jsExecutor.ClickButtonAsync(Constants.FULL_SCREEN_BUTTON_SELECTOR);
             await jsExecutor.EnsureWhereAmIInputAsync();
@@ -1607,7 +1581,7 @@ namespace eft_where_am_i
                         int currentRouteNodeCount = appSettings.map_route_nodes.Count(node =>
                             string.Equals(node.map, appSettings.latest_map, StringComparison.OrdinalIgnoreCase)
                             && string.IsNullOrWhiteSpace(node.creatorId));
-                        if (currentRouteNodeCount >= 20)
+                        if (currentRouteNodeCount >= 40)
                         {
                             break;
                         }

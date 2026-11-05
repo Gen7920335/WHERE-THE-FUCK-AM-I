@@ -8,7 +8,7 @@ const rows = Array.from({ length: questCount }, (_, index) =>
 ).join('');
 const dom = new JSDOM(
   `<body>
-    <div class="panel_top"><button type="button">Native</button><span class="terminal-status"></span></div>
+    <div class="panel_top"><button type="button">Native</button></div>
     <div class="panel_left"><div class="two-columns"><div>
       <div><div class="bold">임무 위치</div></div>
       <div class="items"><div id="native-quest-visibility" class="d-flex"><span><svg><path d="m253.943,502.885 test"></path></svg>목표</span></div></div>
