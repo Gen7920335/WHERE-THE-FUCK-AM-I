@@ -2813,6 +2813,7 @@
   };
 
   const nativePopupLayouts = new Map();
+  const nativePopupFitMs = 700;
   let nativePopupLayoutFrame = 0;
   const fitNativeQuestPopups = () => {
     nativePopupLayoutFrame = 0;
@@ -2840,6 +2841,14 @@
       };
       set('--wtf-popup-max-width', Math.max(1, window.innerWidth - margin * 2) / sx);
       set('--wtf-popup-max-height', Math.max(1, window.innerHeight - top - margin) / sy);
+      // Fit the popup on screen only while it opens (the site's own open move
+      // takes 0.4 s); after that it stays put on its marker and moves with the
+      // map instead of chasing the screen edges.
+      entry.openedAt ??= performance.now();
+      if (performance.now() - entry.openedAt > nativePopupFitMs) {
+        entry.style = popup.getAttribute('style');
+        continue;
+      }
       const sized = popup.getBoundingClientRect();
       const baseX = sized.left - entry.x * sx;
       const baseY = sized.top - entry.y * sy;

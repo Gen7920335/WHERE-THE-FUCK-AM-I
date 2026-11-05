@@ -147,6 +147,20 @@ namespace eft_where_am_i
         {
             // 새로운 설정 반영
             appSettings = updatedSettings;
+            // The map page language follows the site URL (/kr/ for Korean), so a
+            // language change reloads the current map in that language. Done before
+            // the awaits below, which can wait while the settings page is showing.
+            bool siteIsKorean = siteUrl?.Contains("/kr/", StringComparison.OrdinalIgnoreCase) == true;
+            bool wantKorean = appSettings.language?.StartsWith("ko", StringComparison.OrdinalIgnoreCase) == true;
+            AppLogger.Info("Language", $"settings changed: site {siteUrl}, language {appSettings.language}, core {(webView2.CoreWebView2 != null)}");
+            if (siteIsKorean != wantKorean
+                && webView2.CoreWebView2 != null
+                && !string.IsNullOrEmpty(appSettings.latest_map))
+            {
+                siteUrl = GetMapUrl(appSettings.latest_map, appSettings.language);
+                webView2.Source = new Uri(siteUrl);
+                WmiInitialize();
+            }
 
             // 화면 갱신 (언어/경로 등 UI 업데이트)
             LoadSettings();
