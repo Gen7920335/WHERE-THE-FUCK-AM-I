@@ -367,8 +367,16 @@
     const sin = Math.sin(radians);
     return { x: cx + (dx * cos) + (dy * sin), y: cy - (dx * sin) + (dy * cos) };
   };
+  // While the app pans the map for a popup (see panMapToBuiltInPopup), real
+  // mouse input on the map is held back so it cannot join that drag.
+  const mapPanAnimation = { active: false };
   const rewriteTiltedMapEvent = (event) => {
     if (!event.isTrusted) return;
+    if (mapPanAnimation.active && /^(?:pointer|mouse)(?:down|move|up)$|^wheel$/.test(event.type)) {
+      event.stopImmediatePropagation();
+      if (event.cancelable && event.type === 'wheel') event.preventDefault();
+      return;
+    }
     const radians = mapTiltRadians();
     if (!radians) {
       tiltGesture = false;
@@ -2842,8 +2850,22 @@
         });
         entry.mutation.observe(popup, { attributes: true, attributeFilter: ['style'] });
         nativePopupLayouts.set(popup, entry);
+        if (!popup.dataset.wtfBuiltInStep) {
+          // After the site's own 0.4 s centring move, make room if still needed.
+          entry.roomUntil = performance.now() + 2000;
+          setTimeout(() => makeRoomForSitePopup(popup, entry), 650);
+        }
       }
       const nativeSizeToggle = popup.querySelector('.large.pointer.text-right');
+      if (nativeSizeToggle && !popup.dataset.wtfBuiltInStep && !nativeSizeToggle.dataset.wtfRoomHook) {
+        nativeSizeToggle.dataset.wtfRoomHook = 'true';
+        nativeSizeToggle.addEventListener('click', () => {
+          const entry = nativePopupLayouts.get(popup);
+          if (!entry) return;
+          entry.roomUntil = performance.now() + 1500;
+          setTimeout(() => makeRoomForSitePopup(popup, entry), 300);
+        });
+      }
       nativeSizeToggle?.setAttribute('aria-hidden', 'true');
       const controls = nativeSizeToggle?.parentElement || popup.querySelector('.ml-15.self-start');
       if (!controls || controls.querySelector('.wtf-native-popup-close')) continue;
@@ -2999,6 +3021,135 @@
 
   const builtInStepText = (value) => (siteLocale() === 'kr' ? value?.kr : '') || value?.en || '';
 
+  // The site's popup moves the map when it opens (centerOnPopup): the marker
+  // glides in about 0.4 s to the middle of the map, 12 px + the marker offset
+  // below centre, and further down by however much the popup is taller than
+  // 470 px, so the popup never covers its marker. The site's mover is not
+  // reachable from outside, so the same move is made with the site's own drag
+  // handling (mouse drag on the map), in its unrotated space on Terminal.
+  const sitePopupMoveMs = 400;
+  const easeOut = (t) => {
+    // cubic-bezier(0, 0, 0.58, 1), the site's pan easing.
+    let low = 0;
+    let high = 1;
+    let u = t;
+    for (let i = 0; i < 24; i += 1) {
+      u = (low + high) / 2;
+      const x = (3 * (1 - u) * u * u * 0.58) + (u * u * u);
+      if (x < t) low = u; else high = u;
+    }
+    return (3 * (1 - u) * (1 - u) * u * 0) + (3 * (1 - u) * u * u) + (u * u * u);
+  };
+  let mapPanFrame = 0;
+  let mapPanEnd = null;
+  let mapPanAgain = null;
+  const isMapPanRunning = () => Boolean(mapPanFrame);
+  // Move the map by (dx, dy) screen pixels the way the site's own popup move
+  // looks (0.4 s ease-out), through the site's drag handling. The site keeps
+  // the map gliding after a drag that ends while moving, so a move is never cut
+  // short: a request made meanwhile runs right after it (`again`).
+  const animateMapPan = (dx, dy, again) => {
+    if (mapPanFrame) {
+      mapPanAgain = again || null;
+      return false;
+    }
+    const mapContainer = document.querySelector('.map-cont');
+    const target = mapContainer && [...mapContainer.querySelectorAll('canvas.markers-canvas, canvas.doc-map-canvas')]
+      .find((canvas) => canvas.style.display !== 'none');
+    if (!target || !(Math.hypot(dx, dy) >= 1)) return false;
+    const box = mapContainer.getBoundingClientRect();
+    // The site pans in its own (unrotated) space; Terminal's view is tilted on top.
+    const radians = mapTiltRadians();
+    const cos = Math.cos(radians);
+    const sin = Math.sin(radians);
+    const siteDx = (dx * cos) + (dy * sin);
+    const siteDy = (-dx * sin) + (dy * cos);
+    const startX = box.left + (box.width / 2);
+    const startY = box.top + (box.height / 2);
+    const fire = (node, type, x, y, buttons) => node.dispatchEvent(new MouseEvent(type, {
+      bubbles: true, cancelable: true, view: window, clientX: x, clientY: y, button: 0, buttons
+    }));
+    let last = { x: startX, y: startY };
+    mapPanEnd = () => {
+      mapPanEnd = null;
+      fire(document, 'mouseup', last.x, last.y, 0);
+      mapPanAnimation.active = false;
+    };
+    mapPanAnimation.active = true;
+    fire(target, 'mousedown', startX, startY, 1);
+    const began = performance.now();
+    const step = (now) => {
+      const t = Math.min(1, (now - began) / sitePopupMoveMs);
+      const eased = easeOut(t);
+      last = { x: startX + (siteDx * eased), y: startY + (siteDy * eased) };
+      fire(document, 'mousemove', last.x, last.y, 1);
+      if (t < 1) {
+        mapPanFrame = requestAnimationFrame(step);
+        return;
+      }
+      mapPanFrame = 0;
+      mapPanEnd?.();
+      const next = mapPanAgain;
+      mapPanAgain = null;
+      if (next) requestAnimationFrame(() => requestAnimationFrame(next));
+    };
+    mapPanFrame = requestAnimationFrame(step);
+    return true;
+  };
+
+  // Lowest/highest screen rows a popup may use: under the toolbar, inside the map.
+  const popupRoomLimits = (mapContainer) => {
+    const box = mapContainer.getBoundingClientRect();
+    const toolbar = document.querySelector('.panel_top')?.getBoundingClientRect();
+    const top = Math.max(box.top, toolbar && toolbar.width > 0 ? toolbar.bottom : box.top) + 8;
+    return { box, top, bottom: box.top + mapContainer.offsetHeight - 8 };
+  };
+
+  const panMapToBuiltInPopup = () => {
+    const { popup, marker, offset } = builtInStepPopupState;
+    const mapContainer = document.querySelector('.map-cont');
+    if (!popup || !marker || !mapContainer) return;
+    if (isMapPanRunning()) {
+      animateMapPan(0, 0, panMapToBuiltInPopup);
+      return;
+    }
+    const { box, top: topLimit, bottom } = popupRoomLimits(mapContainer);
+    const ring = marker.getBoundingClientRect();
+    const popupHeight = popup.offsetHeight || popup.getBoundingClientRect().height || 0;
+    const goalX = box.left + (mapContainer.offsetWidth / 2);
+    // The site's rule, plus: never leave the popup under the toolbar, where the
+    // app's popup fitting would push it down over its own marker.
+    const siteGoalY = box.top + (mapContainer.offsetHeight / 2) + 12 + offset + Math.max(0, popupHeight - 470);
+    const roomGoalY = topLimit + popupHeight + 12 + offset;
+    const lowestY = bottom - (ring.height / 2);
+    const goalY = Math.min(Math.max(siteGoalY, roomGoalY), Math.max(siteGoalY, lowestY));
+    animateMapPan(goalX - (ring.left + ring.width / 2), goalY - (ring.top + ring.height / 2), panMapToBuiltInPopup);
+  };
+
+  // The site's own popups: the site centres them itself, but a popup taller
+  // than the room above its marker is pushed down by the app's popup fitting
+  // (to stay under the toolbar) and then covers the marker. While such a popup
+  // is settling after it opens (or after its size toggle), move the map down by
+  // the push so the popup sits above its marker again.
+  const makeRoomForSitePopup = (popup, entry) => {
+    if (!popup.isConnected || popup.dataset.wtfBuiltInStep) return;
+    if (performance.now() > (entry.roomUntil || 0)) return;
+    const mapContainer = document.querySelector('.map-cont');
+    if (!mapContainer) return;
+    if (isMapPanRunning()) {
+      animateMapPan(0, 0, () => makeRoomForSitePopup(popup, entry));
+      return;
+    }
+    const push = Number(entry.y) || 0;
+    if (push <= 1) return;
+    const rect = popup.getBoundingClientRect();
+    const gap = Number(String(popup.style.transform || '').match(/translateY\(calc\(-100% - ([\d.]+)px\)\)/)?.[1]) || 30;
+    const anchorY = rect.bottom - push + gap;
+    const { bottom } = popupRoomLimits(mapContainer);
+    const dy = Math.min(push, bottom - 16 - anchorY);
+    if (dy > 1) animateMapPan(0, dy, () => makeRoomForSitePopup(popup, entry));
+  };
+
   const closeBuiltInStepPopup = () => {
     builtInStepPopupState.popup?.remove();
     builtInStepPopupState.popup = null;
@@ -3060,7 +3211,7 @@
     textColumn.appendChild(titleBlock);
     const controls = el('div', 'ml-15 self-start');
     const sizeToggle = el('div', 'large pointer text-right', '⤢');
-    sizeToggle.addEventListener('click', () => popup.classList.toggle('xlsize'));
+    sizeToggle.addEventListener('click', () => { popup.classList.toggle('xlsize'); panMapToBuiltInPopup(); });
     controls.appendChild(sizeToggle);
     header.append(textColumn, controls);
     inner.append(header, el('div', 'd-flex'), el('div', '', builtInStepText(step.details)));
@@ -3086,7 +3237,7 @@
       const photo = el('img');
       photo.src = `https://appcontent/${image.src}`;
       photo.alt = builtInStepText(image);
-      photo.addEventListener('click', () => popup.classList.toggle('xlsize'));
+      photo.addEventListener('click', () => { popup.classList.toggle('xlsize'); panMapToBuiltInPopup(); });
       photo.addEventListener('load', scheduleNativeQuestPopupLayout);
       view.append(nav, photo);
       if (count > 1) {
@@ -3168,6 +3319,21 @@
     builtInStepPopupState.index = 0;
     renderBuiltInStepPopup();
     updateBuiltInStepPopupPosition();
+    panMapToBuiltInPopup();
+    // The photo loads after the popup opens and makes it taller: while the
+    // popup is settling (first 1.5 s), move again for its final size.
+    const openedAt = performance.now();
+    let lastHeight = popup.offsetHeight;
+    const settle = typeof ResizeObserver === 'function' ? new ResizeObserver(() => {
+      if (builtInStepPopupState.popup !== popup || performance.now() - openedAt > 1500) {
+        settle.disconnect();
+        return;
+      }
+      if (Math.abs(popup.offsetHeight - lastHeight) < 2) return;
+      lastHeight = popup.offsetHeight;
+      panMapToBuiltInPopup();
+    }) : null;
+    settle?.observe(popup);
   };
 
   // Closing follows the site's popup: Escape (also sent by the close button),
